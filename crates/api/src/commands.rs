@@ -22,6 +22,7 @@ pub struct EventData {
     pub role: Option<String>,
     pub content: Option<String>,
     pub timestamp: String,
+    pub raw_payload: serde_json::Value,
 }
 
 /// List all sessions
@@ -81,6 +82,7 @@ pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, St
             role: row.role,
             content: row.content,
             timestamp: row.timestamp,
+            raw_payload: serde_json::from_str(&row.raw_payload).unwrap_or(serde_json::Value::Null),
         })
         .collect();
 

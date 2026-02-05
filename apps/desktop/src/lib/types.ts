@@ -8,6 +8,36 @@ export type SessionData = {
   updated_at: string;
 };
 
+type TextContentBlock = { type: "text"; text: string };
+
+type ThinkingContentBlock = { type: "thinking"; thinking: string; signature?: string };
+
+type ToolUseContentBlock = { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+
+type Block = { type: string };
+
+export type ContentBlock = TextContentBlock | ThinkingContentBlock | ToolUseContentBlock | Block;
+
+export type ClaudeMessage = {
+  role: string;
+  content?: string | ContentBlock[];
+  model?: string;
+  usage?: Record<string, unknown>;
+  stop_reason?: string;
+};
+
+export type EventPayload = {
+  type?: string;
+  uuid?: string;
+  parentUuid?: string | null;
+  timestamp?: string;
+  message?: ClaudeMessage;
+  content?: string;
+  gitBranch?: string;
+  cwd?: string;
+  [key: string]: unknown;
+};
+
 export type EventData = {
   id: string;
   session_id: string;
@@ -15,6 +45,7 @@ export type EventData = {
   role: string | null;
   content: string | null;
   timestamp: string;
+  raw_payload: EventPayload;
 };
 
 export type SearchResult = { event: EventData; rank: number; snippet: string | null };

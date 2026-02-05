@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { EventData, SessionData } from "$lib/types";
+  import type { ContentBlock, EventData, EventPayload, SessionData } from "$lib/types";
 
   type Props = { session: SessionData; events: EventData[] };
 
@@ -46,20 +46,54 @@
     }
   }
 
-  function getContentPreview(content: string | null): string {
-    if (!content) return "";
+  function extractToolCalls(rawPayload: EventPayload): Array<{ name: string; id: string }> {
+    const message = rawPayload.message;
+    if (!message) return [];
 
-    try {
-      const parsed = JSON.parse(content);
-      if (typeof parsed === "object") {
-        if (parsed.name) return `[Tool: ${parsed.name}]`;
-        if (parsed.content) return String(parsed.content).slice(0, 100);
-        return JSON.stringify(parsed).slice(0, 100);
-      }
-    } catch {
-      /* No-op */
+    const content = message.content;
+    if (!Array.isArray(content)) return [];
+
+    return content
+      .filter(
+        (block): block is ContentBlock & { type: "tool_use"; name: string; id: string } =>
+          block.type === "tool_use" && typeof (block as { name?: string }).name === "string",
+      )
+      .map((block) => ({ name: block.name, id: block.id }));
+  }
+
+  function extractThinking(rawPayload: EventPayload): string | null {
+    const message = rawPayload.message;
+    if (!message) return null;
+
+    const content = message.content;
+    if (!Array.isArray(content)) return null;
+
+    const thinkingBlock = content.find(
+      (block): block is ContentBlock & { type: "thinking"; thinking: string } =>
+        block.type === "thinking" && typeof (block as { thinking?: string }).thinking === "string",
+    );
+    return thinkingBlock?.thinking ?? null;
+  }
+
+  function extractGitBranch(rawPayload: EventPayload): string | null {
+    return rawPayload.gitBranch ?? null;
+  }
+
+  function extractCwd(rawPayload: EventPayload): string | null {
+    return rawPayload.cwd ?? null;
+  }
+
+  function getContentPreview(event: EventData): string {
+    if (event.content) {
+      return event.content.slice(0, 150).replace(/\n/g, " ");
     }
-    return content.slice(0, 100).replace(/\n/g, " ");
+
+    const toolCalls = extractToolCalls(event.raw_payload);
+    if (toolCalls.length > 0) {
+      return `Tool calls: ${toolCalls.map((t) => t.name).join(", ")}`;
+    }
+
+    return "";
   }
 
   function groupEventsByDate(events: EventData[]): Map<string, EventData[]> {
@@ -79,6 +113,17 @@
   }
 
   let groupedEvents = $derived(groupEventsByDate(events));
+  let expandedEvents = $state<Set<string>>(new Set());
+
+  function toggleEvent(eventId: string) {
+    const newSet = new Set(expandedEvents);
+    if (newSet.has(eventId)) {
+      newSet.delete(eventId);
+    } else {
+      newSet.add(eventId);
+    }
+    expandedEvents = newSet;
+  }
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden">
@@ -108,7 +153,7 @@
         </span>
       </div>
     </div>
-    <div class="text-right text-xs text-fg-dim flex-shrink-0">
+    <div class="text-right text-xs text-fg-dim shrink-0">
       <div class="mb-1">
         <span class="text-fg-muted">Created:</span>
         {formatDate(session.created_at)}
@@ -132,9 +177,17 @@
             {date}
           </div>
           <div class="flex flex-col gap-2">
-            {#each dateEvents as event, index (event.id)}
-              <div class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted">
-                <div class="flex-shrink-0 w-6 flex items-start justify-center pt-0.5">
+            {#each dateEvents as event (event.id)}
+              {@const toolCalls = extractToolCalls(event.raw_payload)}
+              {@const thinking = extractThinking(event.raw_payload)}
+              {@const gitBranch = extractGitBranch(event.raw_payload)}
+              {@const cwd = extractCwd(event.raw_payload)}
+              {@const isExpanded = expandedEvents.has(event.id)}
+
+              <div
+                class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted cursor-pointer"
+                onclick={() => toggleEvent(event.id)}>
+                <div class="shrink-0 w-6 flex items-start justify-center pt-0.5">
                   <span class="{getEventIcon(event.kind)} text-fg-dim text-base"></span>
                 </div>
                 <div class="flex-1 min-w-0">
@@ -143,6 +196,12 @@
                       {event.role || "unknown"}
                     </span>
                     <span class="text-fg-muted lowercase">{event.kind}</span>
+                    {#if gitBranch}
+                      <span class="text-fg-dim">
+                        <span class="i-ri-git-branch-line"></span>
+                        {gitBranch}
+                      </span>
+                    {/if}
                     <span class="text-fg-dim ml-auto">
                       {new Date(event.timestamp).toLocaleTimeString("en-US", {
                         hour: "2-digit",
@@ -151,9 +210,48 @@
                       })}
                     </span>
                   </div>
+
+                  {#if cwd && isExpanded}
+                    <div class="text-xs text-fg-muted mb-2 font-mono">
+                      {cwd}
+                    </div>
+                  {/if}
+
                   {#if event.content}
                     <div class="text-sm text-fg leading-relaxed overflow-hidden text-ellipsis line-clamp-3">
-                      {getContentPreview(event.content)}
+                      {getContentPreview(event)}
+                    </div>
+                  {/if}
+
+                  {#if toolCalls.length > 0}
+                    <div class="mt-2 flex flex-wrap gap-1">
+                      {#each toolCalls as tool}
+                        <span
+                          class="inline-flex items-center gap-1 px-2 py-0.5 bg-bg-muted rounded text-xs text-fg-dim">
+                          <span class="i-ri-tools-line"></span>
+                          {tool.name}
+                        </span>
+                      {/each}
+                    </div>
+                  {/if}
+
+                  {#if thinking && isExpanded}
+                    <div class="mt-3 p-3 bg-bg-muted rounded border-l-2 border-blue-500">
+                      <div class="text-xs font-semibold text-fg-muted mb-2 flex items-center gap-1">
+                        <span class="i-ri-brain-line"></span>
+                        Thinking
+                      </div>
+                      <div class="text-sm text-fg-dim whitespace-pre-wrap font-mono">
+                        {thinking.slice(0, 500)}{thinking.length > 500 ? "..." : ""}
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#if isExpanded && event.raw_payload && Object.keys(event.raw_payload).length > 0}
+                    <div class="mt-3 p-2 bg-bg-muted rounded">
+                      <div class="text-xs font-semibold text-fg-muted mb-1">Raw Data</div>
+                      <pre class="text-xs text-fg-dim overflow-x-auto"><code
+                          >{JSON.stringify(event.raw_payload, null, 2).slice(0, 1000)}</code></pre>
                     </div>
                   {/if}
                 </div>

@@ -259,10 +259,39 @@ impl Database {
     pub async fn insert_session_with_events(
         &self, session: &Session, events: &[Event],
     ) -> Result<(), tokio_rusqlite::Error> {
+        let source = session.source.to_string();
+        let external_id = session.external_id.clone();
+
+        let existing_id: Option<String> = self
+            .conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare("SELECT id FROM sessions WHERE source = ?1 AND external_id = ?2")?;
+                let id: Option<String> = stmt.query_row([&source, &external_id], |row| row.get(0)).ok();
+                Ok(id)
+            })
+            .await?;
+
+        let (session_id_to_use, is_update) = match existing_id {
+            Some(id) => (id, true),
+            None => (session.id.to_string(), false),
+        };
+
+        if is_update {
+            let delete_id = session_id_to_use.clone();
+            self.conn
+                .call(move |conn| {
+                    conn.execute("DELETE FROM events WHERE session_id = ?1", [&delete_id])?;
+                    Ok(())
+                })
+                .await?;
+        }
+
         self.insert_session(session).await?;
 
         for event in events {
-            self.insert_event(event).await?;
+            let mut event_with_correct_id = event.clone();
+            event_with_correct_id.session_id = uuid::Uuid::parse_str(&session_id_to_use).unwrap_or(event.session_id);
+            self.insert_event(&event_with_correct_id).await?;
         }
 
         info!("Inserted session {} with {} events", session.external_id, events.len());

@@ -49,7 +49,7 @@
           <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-2">
             {getProjectName(session)}
           </span>
-          <span class="flex-shrink-0">{formatDate(session.updated_at)}</span>
+          <span class="shrink-0">{formatDate(session.updated_at)}</span>
         </div>
       </button>
     {/each}
