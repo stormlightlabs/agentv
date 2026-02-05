@@ -108,12 +108,12 @@ cargo build -p agent-viz-cli
 
 **Tasks:**
 
-- [ ] FTS5 query layer with highlighting
-- [ ] Faceted filtering (source, project, date range, kind)
-- [ ] CLI: `search "query" --since 7d --source claude`
-- [ ] Desktop: search page with facets + result list
-- [ ] Analytics: activity chart (events/day)
-- [ ] Analytics: errors chart (errors/day + top signatures)
+- [x] FTS5 query layer with highlighting
+- [x] Faceted filtering (source, project, date range, kind)
+- [x] CLI: `search "query" --since 7d --source claude`
+- [x] Desktop: search page with facets + result list
+- [x] Analytics: activity chart (events/day)
+- [x] Analytics: errors chart (errors/day + top signatures)
 
 **CLI Testing:**
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SearchPanel from "$lib/components/SearchPanel.svelte";
   import SessionList from "$lib/components/SessionList.svelte";
   import SessionViewer from "$lib/components/SessionViewer.svelte";
   import type { EventData, SessionData } from "$lib/types";
@@ -10,6 +11,7 @@
   let events = $state<EventData[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let activeTab = $state<"sessions" | "search">("sessions");
 
   async function loadSessions() {
     try {
@@ -30,6 +32,14 @@
     } catch (e) {
       console.error("Failed to load events:", e);
       events = [];
+    }
+  }
+
+  async function selectSessionById(sessionId: string) {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (session) {
+      await selectSession(session);
+      activeTab = "sessions";
     }
   }
 
@@ -62,11 +72,24 @@
       </button>
     </div>
 
+    <div class="tab-bar">
+      <button class="tab-button" class:active={activeTab === "sessions"} onclick={() => (activeTab = "sessions")}>
+        Sessions
+      </button>
+      <button class="tab-button" class:active={activeTab === "search"} onclick={() => (activeTab = "search")}>
+        Search
+      </button>
+    </div>
+
     {#if error}
       <div class="error-message">{error}</div>
     {/if}
 
-    <SessionList {sessions} {selectedSession} onSelect={selectSession} />
+    {#if activeTab === "sessions"}
+      <SessionList {sessions} {selectedSession} onSelect={selectSession} />
+    {:else}
+      <SearchPanel onSelectSession={selectSessionById} />
+    {/if}
   </aside>
 
   <main class="main-content">
@@ -155,5 +178,35 @@
     align-items: center;
     justify-content: center;
     color: var(--color-fg-dim);
+  }
+
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--color-bg-muted);
+    background-color: var(--color-bg);
+  }
+
+  .tab-button {
+    flex: 1;
+    padding: 0.75rem;
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--color-fg-dim);
+    font-family: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .tab-button:hover {
+    color: var(--color-fg);
+    background-color: var(--color-bg-soft);
+  }
+
+  .tab-button.active {
+    color: var(--color-blue);
+    border-bottom-color: var(--color-blue);
+    background-color: var(--color-bg-soft);
   }
 </style>

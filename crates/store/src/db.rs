@@ -1,4 +1,5 @@
-use agent_viz_core::{Event, HealthStatus, Session, Source, SourceHealth};
+use agent_viz_core::{Event, EventKind, HealthStatus, Session, Source, SourceHealth};
+use chrono::{DateTime, NaiveDate, Utc};
 use std::path::PathBuf;
 use tokio_rusqlite::Connection;
 use tracing::{error, info};
@@ -6,6 +7,49 @@ use tracing::{error, info};
 use crate::migrations::MIGRATIONS;
 use crate::models::{EventRow, SessionRow};
 use crate::queries;
+
+/// Search result with highlighted snippet
+#[derive(Debug, Clone)]
+pub struct SearchResult {
+    pub event: EventRow,
+    pub rank: f64,
+    pub snippet: Option<String>,
+}
+
+/// Facets for filtering search results
+#[derive(Debug, Clone, Default)]
+pub struct SearchFacets {
+    pub source: Option<String>,
+    pub project: Option<String>,
+    pub kind: Option<String>,
+    pub since: Option<DateTime<Utc>>,
+}
+
+/// Activity stats for a day
+#[derive(Debug, Clone)]
+pub struct ActivityStats {
+    pub day: NaiveDate,
+    pub event_count: i64,
+    pub session_count: i64,
+}
+
+/// Error stats for a day
+#[derive(Debug, Clone)]
+pub struct ErrorStats {
+    pub day: NaiveDate,
+    pub error_count: i64,
+    pub signature: Option<String>,
+}
+
+/// Stats grouped by a dimension
+#[derive(Debug, Clone)]
+pub struct GroupedStats {
+    pub dimension: String,
+    pub count: i64,
+    pub sessions: Option<i64>,
+    pub earliest: Option<String>,
+    pub latest: Option<String>,
+}
 
 /// Database connection wrapper with async support
 #[derive(Debug)]
@@ -224,6 +268,277 @@ impl Database {
         info!("Inserted session {} with {} events", session.external_id, events.len());
 
         Ok(())
+    }
+
+    /// Search events with FTS5 and faceted filtering
+    pub async fn search_events(
+        &self, query: &str, facets: &SearchFacets, limit: i64, offset: i64,
+    ) -> Result<Vec<SearchResult>, tokio_rusqlite::Error> {
+        let query = query.to_string();
+        let source = facets.source.clone();
+        let project = facets.project.clone();
+        let kind = facets.kind.clone();
+        let since = facets.since.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::SEARCH_EVENTS_FILTERED)?;
+                let rows = stmt
+                    .query_map(
+                        [
+                            query,
+                            source.unwrap_or_default(),
+                            project.unwrap_or_default(),
+                            kind.unwrap_or_default(),
+                            since.unwrap_or_default(),
+                            limit.to_string(),
+                            offset.to_string(),
+                        ],
+                        |row| {
+                            Ok(SearchResult {
+                                event: EventRow {
+                                    id: row.get(0)?,
+                                    session_id: row.get(1)?,
+                                    kind: row.get(2)?,
+                                    role: row.get(3)?,
+                                    content: row.get(4)?,
+                                    timestamp: row.get(5)?,
+                                    raw_payload: row.get(6)?,
+                                },
+                                rank: row.get(7)?,
+                                snippet: None,
+                            })
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Search sessions with FTS5 and faceted filtering
+    pub async fn search_sessions(
+        &self, query: &str, facets: &SearchFacets, limit: i64, offset: i64,
+    ) -> Result<Vec<(SessionRow, f64)>, tokio_rusqlite::Error> {
+        let query = query.to_string();
+        let source = facets.source.clone();
+        let project = facets.project.clone();
+        let since = facets.since.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::SEARCH_SESSIONS_FILTERED)?;
+                let rows = stmt
+                    .query_map(
+                        [
+                            query,
+                            source.unwrap_or_default(),
+                            project.unwrap_or_default(),
+                            since.unwrap_or_default(),
+                            limit.to_string(),
+                            offset.to_string(),
+                        ],
+                        |row| {
+                            let session = SessionRow {
+                                id: row.get(0)?,
+                                source: row.get(1)?,
+                                external_id: row.get(2)?,
+                                project: row.get(3)?,
+                                title: row.get(4)?,
+                                created_at: row.get(5)?,
+                                updated_at: row.get(6)?,
+                                raw_payload: row.get(7)?,
+                            };
+                            let rank: f64 = row.get(8)?;
+                            Ok((session, rank))
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get activity stats by day
+    pub async fn get_activity_by_day(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>, kind: Option<EventKind>,
+    ) -> Result<Vec<ActivityStats>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+        let kind_str = kind.map(|k| k.to_string());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::ACTIVITY_BY_DAY)?;
+                let rows = stmt
+                    .query_map(
+                        [
+                            since_str.unwrap_or_default(),
+                            until_str.unwrap_or_default(),
+                            kind_str.unwrap_or_default(),
+                        ],
+                        |row| {
+                            let day_str: String = row.get(0)?;
+                            let day = NaiveDate::parse_from_str(&day_str, "%Y-%m-%d")
+                                .unwrap_or_else(|_| Utc::now().date_naive());
+                            Ok(ActivityStats { day, event_count: row.get(1)?, session_count: row.get(2)? })
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get error stats by day
+    pub async fn get_errors_by_day(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<Vec<ErrorStats>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::ERRORS_BY_DAY)?;
+                let rows = stmt
+                    .query_map([since_str.unwrap_or_default(), until_str.unwrap_or_default()], |row| {
+                        let day_str: String = row.get(0)?;
+                        let day =
+                            NaiveDate::parse_from_str(&day_str, "%Y-%m-%d").unwrap_or_else(|_| Utc::now().date_naive());
+                        Ok(ErrorStats { day, error_count: row.get(1)?, signature: row.get(2)? })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get top error signatures
+    pub async fn get_top_errors(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>, limit: i64,
+    ) -> Result<Vec<(String, i64)>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::TOP_ERROR_SIGNATURES)?;
+                let rows = stmt
+                    .query_map(
+                        [
+                            since_str.unwrap_or_default(),
+                            until_str.unwrap_or_default(),
+                            limit.to_string(),
+                        ],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get stats grouped by source
+    pub async fn get_stats_by_source(&self) -> Result<Vec<GroupedStats>, tokio_rusqlite::Error> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::STATS_BY_SOURCE)?;
+                let rows = stmt
+                    .query_map([], |row| {
+                        Ok(GroupedStats {
+                            dimension: row.get(0)?,
+                            count: row.get(1)?,
+                            sessions: None,
+                            earliest: row.get(2)?,
+                            latest: row.get(3)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get stats grouped by project
+    pub async fn get_stats_by_project(
+        &self, source: Option<String>,
+    ) -> Result<Vec<GroupedStats>, tokio_rusqlite::Error> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::STATS_BY_PROJECT)?;
+                let rows = stmt
+                    .query_map([source.unwrap_or_default()], |row| {
+                        Ok(GroupedStats {
+                            dimension: row.get(0)?,
+                            count: row.get(1)?,
+                            sessions: None,
+                            earliest: row.get(2)?,
+                            latest: row.get(3)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get stats grouped by tool kind
+    pub async fn get_stats_by_tool(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<Vec<GroupedStats>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::STATS_BY_TOOL)?;
+                let rows = stmt
+                    .query_map([since_str.unwrap_or_default(), until_str.unwrap_or_default()], |row| {
+                        Ok(GroupedStats {
+                            dimension: row.get(0)?,
+                            count: row.get(1)?,
+                            sessions: row.get(2)?,
+                            earliest: None,
+                            latest: None,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get available sources for faceting
+    pub async fn get_sources(&self) -> Result<Vec<String>, tokio_rusqlite::Error> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::GET_SOURCES)?;
+                let rows = stmt.query_map([], |row| row.get(0))?.collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get available projects for faceting
+    pub async fn get_projects(&self) -> Result<Vec<String>, tokio_rusqlite::Error> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::GET_PROJECTS)?;
+                let rows = stmt.query_map([], |row| row.get(0))?.collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get available event kinds for faceting
+    pub async fn get_event_kinds(&self) -> Result<Vec<String>, tokio_rusqlite::Error> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::GET_EVENT_KINDS)?;
+                let rows = stmt.query_map([], |row| row.get(0))?.collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
     }
 }
 

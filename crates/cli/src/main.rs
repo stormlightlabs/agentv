@@ -1,11 +1,10 @@
 use clap::{Parser, Subcommand};
-use owo_colors::OwoColorize;
 use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
 
 mod commands;
 
-use commands::{doctor, ingest, list, show};
+use commands::{doctor, ingest, list, search, show, stats};
 
 #[derive(Parser)]
 #[command(name = "agent-viz")]
@@ -45,8 +44,20 @@ enum Commands {
         /// Search query
         query: String,
         /// Filter by source
-        #[arg(short, long)]
+        #[arg(short = 'S', long)]
         source: Option<String>,
+        /// Filter by date range (e.g., "7d", "30d")
+        #[arg(short = 's', long)]
+        since: Option<String>,
+        /// Filter by event kind (message, tool_call, tool_result, error)
+        #[arg(short = 'k', long)]
+        kind: Option<String>,
+    },
+    /// Show statistics and analytics
+    Stats {
+        /// Group by dimension (day, source, project, tool, error)
+        #[arg(short, long)]
+        by: Option<String>,
         /// Filter by date range (e.g., "7d", "30d")
         #[arg(short, long)]
         since: Option<String>,
@@ -97,16 +108,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Showing session: {}", session_id);
             show::session(session_id).await?;
         }
-        Commands::Search { query, source, since } => {
+        Commands::Search { query, source, since, kind } => {
             info!("Searching for: {}", query);
-            println!("{} {}", "Search:".bold().underline(), query.cyan());
-            if let Some(s) = source {
-                println!("{} {}", "Source:".dimmed(), s.cyan());
-            }
-            if let Some(s) = since {
-                println!("{} {}", "Since:".dimmed(), s.cyan());
-            }
-            println!("{}", "(Not yet implemented)".yellow());
+            search::run(query, source, since, kind).await?;
+        }
+        Commands::Stats { by, since } => {
+            info!("Running stats command");
+            stats::run(by, since).await?;
         }
     }
 

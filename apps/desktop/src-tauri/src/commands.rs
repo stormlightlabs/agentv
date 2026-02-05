@@ -32,6 +32,50 @@ pub struct IngestResult {
     pub total: usize,
 }
 
+/// Search result for the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub event: EventData,
+    pub rank: f64,
+    pub snippet: Option<String>,
+}
+
+/// Search facets for filtering
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchFacets {
+    pub source: Option<String>,
+    pub project: Option<String>,
+    pub kind: Option<String>,
+    pub since: Option<String>,
+}
+
+/// Activity stats for the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityStats {
+    pub day: String,
+    pub event_count: i64,
+    pub session_count: i64,
+}
+
+/// Error stats for the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorStats {
+    pub day: String,
+    pub error_count: i64,
+    pub signature: Option<String>,
+}
+
+/// Grouped stats for the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct GroupedStats {
+    pub dimension: String,
+    pub count: i64,
+    pub sessions: Option<i64>,
+    pub earliest: Option<String>,
+    pub latest: Option<String>,
+}
+
 /// List all sessions
 #[tauri::command]
 pub async fn list_sessions() -> Result<Vec<SessionData>, String> {
@@ -136,5 +180,192 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
             Ok(IngestResult { imported, failed, total: imported + failed })
         }
         _ => Err(format!("Source '{}' not yet implemented", source)),
+    }
+}
+
+/// Search events with FTS5 and faceted filtering
+#[tauri::command]
+pub async fn search_events(query: String, facets: SearchFacets, limit: i64) -> Result<Vec<SearchResult>, String> {
+    use agent_viz_store::SearchFacets as DbSearchFacets;
+    use chrono::Utc;
+
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let since_dt = facets
+        .since
+        .and_then(|s| parse_duration(&s))
+        .map(|dur| Utc::now() - dur);
+
+    let db_facets =
+        DbSearchFacets { source: facets.source, project: facets.project, kind: facets.kind, since: since_dt };
+
+    let results = db
+        .search_events(&query, &db_facets, limit, 0)
+        .await
+        .map_err(|e| format!("Failed to search events: {}", e))?;
+
+    Ok(results
+        .into_iter()
+        .map(|r| SearchResult {
+            event: EventData {
+                id: r.event.id,
+                session_id: r.event.session_id,
+                kind: r.event.kind,
+                role: r.event.role,
+                content: r.event.content,
+                timestamp: r.event.timestamp,
+            },
+            rank: r.rank,
+            snippet: r.snippet,
+        })
+        .collect())
+}
+
+/// Get activity stats by day
+#[tauri::command]
+pub async fn get_activity_stats(since: Option<String>, until: Option<String>) -> Result<Vec<ActivityStats>, String> {
+    use chrono::Utc;
+
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+    let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+
+    let stats = db
+        .get_activity_by_day(since_dt, until_dt, None)
+        .await
+        .map_err(|e| format!("Failed to get activity stats: {}", e))?;
+
+    Ok(stats
+        .into_iter()
+        .map(|s| ActivityStats { day: s.day.to_string(), event_count: s.event_count, session_count: s.session_count })
+        .collect())
+}
+
+/// Get error stats
+#[tauri::command]
+pub async fn get_error_stats(since: Option<String>, until: Option<String>) -> Result<Vec<ErrorStats>, String> {
+    use chrono::Utc;
+
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+    let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+
+    let stats = db
+        .get_errors_by_day(since_dt, until_dt)
+        .await
+        .map_err(|e| format!("Failed to get error stats: {}", e))?;
+
+    Ok(stats
+        .into_iter()
+        .map(|s| ErrorStats { day: s.day.to_string(), error_count: s.error_count, signature: s.signature })
+        .collect())
+}
+
+/// Get available sources for faceting
+#[tauri::command]
+pub async fn get_sources() -> Result<Vec<String>, String> {
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let sources = db
+        .get_sources()
+        .await
+        .map_err(|e| format!("Failed to get sources: {}", e))?;
+
+    Ok(sources)
+}
+
+/// Get available projects for faceting
+#[tauri::command]
+pub async fn get_projects() -> Result<Vec<String>, String> {
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let projects = db
+        .get_projects()
+        .await
+        .map_err(|e| format!("Failed to get projects: {}", e))?;
+
+    Ok(projects)
+}
+
+/// Get available event kinds for faceting
+#[tauri::command]
+pub async fn get_event_kinds() -> Result<Vec<String>, String> {
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let kinds = db
+        .get_event_kinds()
+        .await
+        .map_err(|e| format!("Failed to get event kinds: {}", e))?;
+
+    Ok(kinds)
+}
+
+fn parse_duration(s: &str) -> Option<chrono::Duration> {
+    use chrono::Duration;
+
+    if s.ends_with('d') {
+        if let Some(days) = s.strip_suffix('d') {
+            let days = days.parse().ok()?;
+            Some(Duration::days(days))
+        } else {
+            None
+        }
+    } else if s.ends_with('h') {
+        if let Some(hours) = s.strip_suffix('h') {
+            let hours = hours.parse().ok()?;
+            Some(Duration::hours(hours))
+        } else {
+            None
+        }
+    } else if s.ends_with('w') {
+        if let Some(weeks) = s.strip_suffix('w') {
+            let weeks = weeks.parse().ok()?;
+            Some(Duration::weeks(weeks))
+        } else {
+            None
+        }
+    } else if s.ends_with('m') && !s.ends_with("min") {
+        let months: i64 = s[..s.len() - 1].parse().ok()?;
+        Some(Duration::days(months * 30))
+    } else {
+        None
     }
 }

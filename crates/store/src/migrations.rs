@@ -49,7 +49,8 @@ pub const MIGRATIONS: &[Migration] = &[
             -- FTS5 virtual table for full-text search on events
             CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
                 content,
-                content_rowid=id,
+                content='events',
+                content_rowid='rowid',
                 tokenize='porter'
             );
 
@@ -70,7 +71,8 @@ pub const MIGRATIONS: &[Migration] = &[
             -- FTS5 virtual table for session titles
             CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
                 title,
-                content_rowid=id,
+                content='sessions',
+                content_rowid='rowid',
                 tokenize='porter'
             );
 
