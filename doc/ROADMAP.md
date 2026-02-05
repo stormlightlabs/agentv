@@ -77,19 +77,17 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz list sessions
 ```
 
----
-
 ### M1 — Claude Code Adapter (Read-Only)
 
 **Goal:** Ingest Claude Code JSONL sessions and render read-only timeline.
 
 **Tasks:**
 
-- [ ] Adapter: discover `~/.claude/projects/.../*.jsonl`
-- [ ] Adapter: parse JSONL into canonical events (messages, tool calls, errors)
-- [ ] Store: lossless ingestion with raw JSON preservation
-- [ ] CLI: `ingest --source claude` (batch import)
-- [ ] CLI: `show session <id>` (timeline view)
+- [x] Adapter: discover `~/.claude/projects/.../*.jsonl`
+- [x] Adapter: parse JSONL into canonical events (messages, tool calls, errors)
+- [x] Store: lossless ingestion with raw JSON preservation
+- [x] CLI: `ingest --source claude` (batch import)
+- [x] CLI: `show session <id>` (timeline view)
 - [ ] Desktop: session list + session viewer (progressive disclosure)
 
 **CLI Testing:**
@@ -103,8 +101,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz show session <session-id>
 ./target/debug/agent-viz search "error"
 ```
-
----
 
 ### M2 — Search + Charts
 
@@ -131,8 +127,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz stats --by tool
 ```
 
----
-
 ### M3 — Codex Adapter
 
 **Goal:** Ingest Codex CLI rollout logs.
@@ -151,8 +145,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz list sessions --source codex
 ./target/debug/agent-viz search "rollout" --source codex
 ```
-
----
 
 ### M4 — OpenCode Adapter
 
@@ -174,8 +166,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz search "error" --source opencode
 ```
 
----
-
 ### M5 — Crush Adapter
 
 **Goal:** Read-only SQLite adapter for Crush database.
@@ -193,8 +183,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz ingest --source crush
 ./target/debug/agent-viz list sessions --source crush
 ```
-
----
 
 ### M6 — Incremental Ingest + Watchers
 
@@ -217,8 +205,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz ingest --incremental
 ```
 
----
-
 ### M7 — Analytics Polish
 
 **Goal:** Complete Tier 1 + Tier 2 charts.
@@ -239,8 +225,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz export --session <id> --format md
 ./target/debug/agent-viz export --search "error" --format jsonl
 ```
-
----
 
 ### M8 — CCV Parity: Interactive Client
 
@@ -266,8 +250,6 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz runtime attach <session-id>
 ```
 
----
-
 ### M9 — CCV Parity: Project Management
 
 **Goal:** Create projects and auto-discovery.
@@ -278,8 +260,6 @@ cargo build -p agent-viz-cli
 - [ ] Auto-discover projects from `~/.claude/projects/`
 - [ ] Setting: hide sessions without user messages
 - [ ] Setting: unify sessions with same title
-
----
 
 ### M10 — CCV Parity: File Upload & Preview
 
@@ -292,8 +272,6 @@ cargo build -p agent-viz-cli
 - [ ] Store attachments in app data dir
 - [ ] Reference in event stream
 
----
-
 ### M11 — CCV Parity: Browser Preview
 
 **Goal:** Right-side browser panel.
@@ -305,8 +283,6 @@ cargo build -p agent-viz-cli
 - [ ] URL input + reload
 - [ ] Track URL changes same-origin
 
----
-
 ### M12 — CCV Parity: Git Workflow
 
 **Goal:** In-app git diff viewer + commit/push.
@@ -317,8 +293,6 @@ cargo build -p agent-viz-cli
 - [ ] Commit UI
 - [ ] Push UI (push-only, commit+push)
 - [ ] Session context integration
-
----
 
 ### M13 — CCV Parity: Scheduler + MCP
 
@@ -332,8 +306,6 @@ cargo build -p agent-viz-cli
 - [ ] MCP server viewer in sidebar
 - [ ] System info monitor
 
----
-
 ### M14 — CCV Parity: i18n + Polish
 
 **Goal:** Multi-language support and final UX.
@@ -344,8 +316,6 @@ cargo build -p agent-viz-cli
 - [ ] Theme: system/dark/light
 - [ ] Audio notifications
 - [ ] Mobile-optimized layouts
-
----
 
 ## Quick Start for Development
 

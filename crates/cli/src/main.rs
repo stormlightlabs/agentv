@@ -5,7 +5,7 @@ use tracing_subscriber::FmtSubscriber;
 
 mod commands;
 
-use commands::{doctor, ingest, list};
+use commands::{doctor, ingest, list, show};
 
 #[derive(Parser)]
 #[command(name = "agent-viz")]
@@ -95,8 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Commands::Show { session_id } => {
             info!("Showing session: {}", session_id);
-            println!("{} {}", "Session:".bold().underline(), session_id.cyan());
-            println!("{}", "(Not yet implemented)".yellow());
+            show::session(session_id).await?;
         }
         Commands::Search { query, source, since } => {
             info!("Searching for: {}", query);

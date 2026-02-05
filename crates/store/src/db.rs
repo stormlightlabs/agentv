@@ -1,4 +1,4 @@
-use agent_viz_core::{HealthStatus, Source, SourceHealth};
+use agent_viz_core::{Event, HealthStatus, Session, Source, SourceHealth};
 use std::path::PathBuf;
 use tokio_rusqlite::Connection;
 use tracing::{error, info};
@@ -157,6 +157,87 @@ impl Database {
                 Ok(rows)
             })
             .await
+    }
+
+    /// Insert or update a session
+    pub async fn insert_session(&self, session: &Session) -> Result<(), tokio_rusqlite::Error> {
+        let id = session.id.to_string();
+        let source = session.source.to_string();
+        let external_id = session.external_id.clone();
+        let project = session.project.clone();
+        let title = session.title.clone();
+        let created_at = session.created_at.to_rfc3339();
+        let updated_at = session.updated_at.to_rfc3339();
+        let raw_payload = serde_json::to_string(&session.raw_payload).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                conn.execute(
+                    queries::INSERT_SESSION,
+                    [
+                        id,
+                        source,
+                        external_id,
+                        project.unwrap_or_default(),
+                        title.unwrap_or_default(),
+                        created_at,
+                        updated_at,
+                        raw_payload,
+                    ],
+                )?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Insert an event
+    pub async fn insert_event(&self, event: &Event) -> Result<(), tokio_rusqlite::Error> {
+        let id = event.id.to_string();
+        let session_id = event.session_id.to_string();
+        let kind = event.kind.to_string();
+        let role = event.role.map(|r| r.to_string()).unwrap_or_default();
+        let content = event.content.clone().unwrap_or_default();
+        let timestamp = event.timestamp.to_rfc3339();
+        let raw_payload = serde_json::to_string(&event.raw_payload).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                conn.execute(
+                    queries::INSERT_EVENT,
+                    [
+                        id,
+                        session_id,
+                        kind,
+                        role,
+                        content,
+                        timestamp,
+                        raw_payload,
+                    ],
+                )?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Insert a session with all its events in a transaction
+    pub async fn insert_session_with_events(
+        &self,
+        session: &Session,
+        events: &[Event],
+    ) -> Result<(), tokio_rusqlite::Error> {
+        self.insert_session(session).await?;
+
+        for event in events {
+            self.insert_event(event).await?;
+        }
+
+        info!(
+            "Inserted session {} with {} events",
+            session.external_id,
+            events.len()
+        );
+
+        Ok(())
     }
 }
 
