@@ -18,7 +18,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+agent-viz-adapters = { path = "../../../crates/adapters" }
+agent-viz-core = { path = "../../../crates/core" }
+agent-viz-store = { path = "../../../crates/store" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tokio = { version = "1.42", features = ["rt-multi-thread"] }

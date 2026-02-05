@@ -28,6 +28,7 @@ dependencies = [
 name = "agent-viz-api"
 version = "0.1.0"
 dependencies = [
+ "agent-viz-adapters",
  "agent-viz-core",
  "agent-viz-store",
  "serde",
@@ -68,11 +69,15 @@ dependencies = [
 name = "agent-viz-gui"
 version = "0.1.0"
 dependencies = [
+ "agent-viz-adapters",
+ "agent-viz-core",
+ "agent-viz-store",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "tokio",
 ]
 
 [[package]]

@@ -72,30 +72,20 @@ async fn ingest_claude(db: &Database) -> Result<(), Box<dyn std::error::Error>> 
     let mut failed = 0;
 
     for session_file in sessions {
-        print!(
-            "  {} {} ... ",
-            "→".dimmed(),
-            session_file.session_id.cyan()
-        );
+        print!("  {} {} ... ", "→".dimmed(), session_file.session_id.cyan());
 
         match adapter.parse_session(&session_file).await {
-            Ok((session, events)) => {
-                match db.insert_session_with_events(&session, &events).await {
-                    Ok(_) => {
-                        println!(
-                            "{} ({} events)",
-                            "✓".green(),
-                            events.len().to_string().dimmed()
-                        );
-                        imported += 1;
-                    }
-                    Err(e) => {
-                        println!("{} {}", "✗".red(), e.to_string().dimmed());
-                        error!("Failed to insert session {}: {}", session.external_id, e);
-                        failed += 1;
-                    }
+            Ok((session, events)) => match db.insert_session_with_events(&session, &events).await {
+                Ok(_) => {
+                    println!("{} ({} events)", "✓".green(), events.len().to_string().dimmed());
+                    imported += 1;
                 }
-            }
+                Err(e) => {
+                    println!("{} {}", "✗".red(), e.to_string().dimmed());
+                    error!("Failed to insert session {}: {}", session.external_id, e);
+                    failed += 1;
+                }
+            },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
                 error!("Failed to parse session {:?}: {}", session_file.path, e);

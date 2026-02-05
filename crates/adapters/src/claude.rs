@@ -115,7 +115,7 @@ impl ClaudeAdapter {
     /// Parse a session file and return a Session with its Events
     pub async fn parse_session(
         &self, session_file: &ClaudeSessionFile,
-    ) -> Result<(Session, Vec<Event>), Box<dyn std::error::Error>> {
+    ) -> Result<(Session, Vec<Event>), Box<dyn std::error::Error + Send + Sync>> {
         tracing::debug!("Parsing session file: {:?}", session_file.path);
 
         let content = tokio::fs::read_to_string(&session_file.path).await?;

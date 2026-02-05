@@ -1,0 +1,120 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@plugin "@egoist/tailwindcss-icons";
+
+@theme {
+  /* Gruvbox Dark Colors */
+  --color-bg: #282828;
+  --color-bg-soft: #32302f;
+  --color-bg-muted: #3c3836;
+  --color-bg-hard: #1d2021;
+
+  --color-fg: #ebdbb2;
+  --color-fg-dim: #a89984;
+  --color-fg-muted: #928374;
+
+  /* Gruvbox Accents */
+  --color-red: #cc241d;
+  --color-red-bright: #fb4934;
+  --color-green: #98971a;
+  --color-green-bright: #b8bb26;
+  --color-yellow: #d79921;
+  --color-yellow-bright: #fabd2f;
+  --color-blue: #458588;
+  --color-blue-bright: #83a598;
+  --color-purple: #b16286;
+  --color-purple-bright: #d3869b;
+  --color-aqua: #689d6a;
+  --color-aqua-bright: #8ec07c;
+  --color-orange: #d65d0e;
+  --color-orange-bright: #fe8019;
+
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --spacing-sidebar: 280px;
+}
+
+html {
+  font-family: var(--font-mono);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-hard);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fg-dim);
+}
+
+::selection {
+  background-color: var(--color-blue);
+  color: var(--color-bg);
+}
+
+.text-muted {
+  color: var(--color-fg-muted);
+}
+
+.text-dim {
+  color: var(--color-fg-dim);
+}
+
+.bg-soft {
+  background-color: var(--color-bg-soft);
+}
+
+.bg-muted {
+  background-color: var(--color-bg-muted);
+}
+
+.bg-hard {
+  background-color: var(--color-bg-hard);
+}
+
+.border-subtle {
+  border-color: var(--color-bg-muted);
+}
+
+.accent-red {
+  color: var(--color-red-bright);
+}
+.accent-green {
+  color: var(--color-green-bright);
+}
+.accent-yellow {
+  color: var(--color-yellow-bright);
+}
+.accent-blue {
+  color: var(--color-blue-bright);
+}
+.accent-purple {
+  color: var(--color-purple-bright);
+}
+.accent-aqua {
+  color: var(--color-aqua-bright);
+}
+.accent-orange {
+  color: var(--color-orange-bright);
+}

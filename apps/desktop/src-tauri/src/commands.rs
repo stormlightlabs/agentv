@@ -24,6 +24,14 @@ pub struct EventData {
     pub timestamp: String,
 }
 
+/// Result of an ingestion operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IngestResult {
+    pub imported: usize,
+    pub failed: usize,
+    pub total: usize,
+}
+
 /// List all sessions
 #[tauri::command]
 pub async fn list_sessions() -> Result<Vec<SessionData>, String> {
@@ -112,7 +120,8 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
             let mut failed = 0;
 
             for session_file in sessions {
-                match adapter.parse_session(&session_file).await {
+                let parse_result = adapter.parse_session(&session_file).await;
+                match parse_result {
                     Ok((session, events)) => {
                         if db.insert_session_with_events(&session, &events).await.is_ok() {
                             imported += 1;
@@ -128,12 +137,4 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
         }
         _ => Err(format!("Source '{}' not yet implemented", source)),
     }
-}
-
-/// Result of an ingestion operation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IngestResult {
-    pub imported: usize,
-    pub failed: usize,
-    pub total: usize,
 }

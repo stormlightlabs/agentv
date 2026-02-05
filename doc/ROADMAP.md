@@ -88,7 +88,7 @@ cargo build -p agent-viz-cli
 - [x] Store: lossless ingestion with raw JSON preservation
 - [x] CLI: `ingest --source claude` (batch import)
 - [x] CLI: `show session <id>` (timeline view)
-- [ ] Desktop: session list + session viewer (progressive disclosure)
+- [x] Desktop: session list + session viewer (progressive disclosure)
 
 **CLI Testing:**
 

@@ -204,15 +204,7 @@ impl Database {
             .call(move |conn| {
                 conn.execute(
                     queries::INSERT_EVENT,
-                    [
-                        id,
-                        session_id,
-                        kind,
-                        role,
-                        content,
-                        timestamp,
-                        raw_payload,
-                    ],
+                    [id, session_id, kind, role, content, timestamp, raw_payload],
                 )?;
                 Ok(())
             })
@@ -221,9 +213,7 @@ impl Database {
 
     /// Insert a session with all its events in a transaction
     pub async fn insert_session_with_events(
-        &self,
-        session: &Session,
-        events: &[Event],
+        &self, session: &Session, events: &[Event],
     ) -> Result<(), tokio_rusqlite::Error> {
         self.insert_session(session).await?;
 
@@ -231,11 +221,7 @@ impl Database {
             self.insert_event(event).await?;
         }
 
-        info!(
-            "Inserted session {} with {} events",
-            session.external_id,
-            events.len()
-        );
+        info!("Inserted session {} with {} events", session.external_id, events.len());
 
         Ok(())
     }
