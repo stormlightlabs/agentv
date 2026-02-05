@@ -63,26 +63,41 @@
   });
 </script>
 
-<div class="app-container">
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <h1 class="app-title">Agent Viz</h1>
-      <button class="btn-primary" onclick={ingestClaude} disabled={loading}>
+<div class="flex h-screen overflow-hidden">
+  <aside class="w-80 min-w-80 bg-bg-soft border-r border-bg-muted flex flex-col overflow-hidden">
+    <div class="p-4 border-b border-bg-muted flex flex-col gap-3">
+      <h1 class="m-0 text-xl font-semibold text-fg">Agent Viz</h1>
+      <button
+        class="px-4 py-2 bg-blue text-bg border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
+        onclick={ingestClaude}
+        disabled={loading}>
         {loading ? "Loading..." : "Ingest Claude"}
       </button>
     </div>
 
-    <div class="tab-bar">
-      <button class="tab-button" class:active={activeTab === "sessions"} onclick={() => (activeTab = "sessions")}>
+    <div class="flex border-b border-bg-muted bg-bg">
+      <button
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
+        class:active={activeTab === "sessions"}
+        class:text-blue={activeTab === "sessions"}
+        class:border-b-blue={activeTab === "sessions"}
+        class:bg-bg-soft={activeTab === "sessions"}
+        onclick={() => (activeTab = "sessions")}>
         Sessions
       </button>
-      <button class="tab-button" class:active={activeTab === "search"} onclick={() => (activeTab = "search")}>
+      <button
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
+        class:active={activeTab === "search"}
+        class:text-blue={activeTab === "search"}
+        class:border-b-blue={activeTab === "search"}
+        class:bg-bg-soft={activeTab === "search"}
+        onclick={() => (activeTab = "search")}>
         Search
       </button>
     </div>
 
     {#if error}
-      <div class="error-message">{error}</div>
+      <div class="mx-4 my-2 p-2 bg-red text-bg rounded text-xs">{error}</div>
     {/if}
 
     {#if activeTab === "sessions"}
@@ -92,121 +107,13 @@
     {/if}
   </aside>
 
-  <main class="main-content">
+  <main class="flex-1 overflow-hidden flex flex-col">
     {#if selectedSession}
       <SessionViewer session={selectedSession} {events} />
     {:else}
-      <div class="empty-state">
+      <div class="flex-1 flex items-center justify-center text-fg-dim">
         <p>Select a session to view details</p>
       </div>
     {/if}
   </main>
 </div>
-
-<style>
-  .app-container {
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  .sidebar {
-    width: 320px;
-    min-width: 320px;
-    background-color: var(--color-bg-soft);
-    border-right: 1px solid var(--color-bg-muted);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .sidebar-header {
-    padding: 1rem;
-    border-bottom: 1px solid var(--color-bg-muted);
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .app-title {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--color-fg);
-  }
-
-  .btn-primary {
-    padding: 0.5rem 1rem;
-    background-color: var(--color-blue);
-    color: var(--color-bg);
-    border: none;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background-color: var(--color-blue-bright);
-  }
-
-  .btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .error-message {
-    margin: 0.5rem 1rem;
-    padding: 0.5rem;
-    background-color: var(--color-red);
-    color: var(--color-bg);
-    border-radius: 4px;
-    font-size: 0.75rem;
-  }
-
-  .main-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .empty-state {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-fg-dim);
-  }
-
-  .tab-bar {
-    display: flex;
-    border-bottom: 1px solid var(--color-bg-muted);
-    background-color: var(--color-bg);
-  }
-
-  .tab-button {
-    flex: 1;
-    padding: 0.75rem;
-    background-color: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--color-fg-dim);
-    font-family: inherit;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .tab-button:hover {
-    color: var(--color-fg);
-    background-color: var(--color-bg-soft);
-  }
-
-  .tab-button.active {
-    color: var(--color-blue);
-    border-bottom-color: var(--color-blue);
-    background-color: var(--color-bg-soft);
-  }
-</style>

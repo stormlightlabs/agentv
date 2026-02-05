@@ -94,13 +94,13 @@
 
   function getKindClass(kind: string): string {
     const classes: Record<string, string> = {
-      message: "kind-message",
-      tool_call: "kind-tool",
-      tool_result: "kind-result",
-      error: "kind-error",
-      system: "kind-system",
+      message: "bg-blue text-bg",
+      tool_call: "bg-purple text-bg",
+      tool_result: "bg-green text-bg",
+      error: "bg-red text-bg",
+      system: "bg-bg-muted text-fg-dim",
     };
-    return classes[kind] || "kind-default";
+    return classes[kind] || "bg-bg-muted text-fg";
   }
 
   function truncateContent(content: string | null, maxLen: number = 120): string {
@@ -116,36 +116,43 @@
   });
 </script>
 
-<div class="search-container">
-  <div class="search-header">
-    <div class="search-input-wrapper">
+<div class="flex flex-col h-full overflow-hidden">
+  <div class="p-4 border-b border-bg-muted bg-bg-soft">
+    <div class="flex gap-2 mb-3">
       <input
         type="text"
-        class="search-input"
+        class="flex-1 px-3 py-2 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm focus:outline-none focus:border-blue"
         placeholder="Search across sessions..."
         bind:value={query}
         onkeydown={handleKeydown} />
-      <button class="search-button" onclick={performSearch} disabled={loading}>
+      <button
+        class="px-4 py-2 bg-blue text-bg border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
+        onclick={performSearch}
+        disabled={loading}>
         {loading ? "Searching..." : "Search"}
       </button>
     </div>
 
-    <div class="search-actions">
-      <button class="action-button" onclick={() => (showFilters = !showFilters)}>
+    <div class="flex gap-2">
+      <button
+        class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
+        onclick={() => (showFilters = !showFilters)}>
         {showFilters ? "Hide Filters" : "Show Filters"}
       </button>
-      <button class="action-button" onclick={() => (showAnalytics = !showAnalytics)}>
+      <button
+        class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
+        onclick={() => (showAnalytics = !showAnalytics)}>
         {showAnalytics ? "Hide Analytics" : "Show Analytics"}
       </button>
     </div>
   </div>
 
   {#if showFilters}
-    <div class="filters-panel">
-      <div class="filter-group">
-        <label class="filter-label">Source</label>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 p-4 bg-bg border-b border-bg-muted">
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-fg-dim uppercase tracking-wide">Source</label>
         <select
-          class="filter-select"
+          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.source || ""}
           onchange={(e) => {
             facets.source = e.currentTarget.value || undefined;
@@ -158,10 +165,10 @@
         </select>
       </div>
 
-      <div class="filter-group">
-        <label class="filter-label">Project</label>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-fg-dim uppercase tracking-wide">Project</label>
         <select
-          class="filter-select"
+          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.project || ""}
           onchange={(e) => {
             facets.project = e.currentTarget.value || undefined;
@@ -174,10 +181,10 @@
         </select>
       </div>
 
-      <div class="filter-group">
-        <label class="filter-label">Event Kind</label>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-fg-dim uppercase tracking-wide">Event Kind</label>
         <select
-          class="filter-select"
+          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.kind || ""}
           onchange={(e) => {
             facets.kind = e.currentTarget.value || undefined;
@@ -190,10 +197,10 @@
         </select>
       </div>
 
-      <div class="filter-group">
-        <label class="filter-label">Since</label>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
         <select
-          class="filter-select"
+          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.since || ""}
           onchange={(e) => {
             facets.since = e.currentTarget.value || undefined;
@@ -207,21 +214,31 @@
         </select>
       </div>
 
-      <button class="clear-filters" onclick={clearFilters}>Clear Filters</button>
+      <button
+        class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer self-end transition-colors hover:border-red hover:text-red"
+        onclick={clearFilters}>
+        Clear Filters
+      </button>
     </div>
   {/if}
 
   {#if showAnalytics && activityStats.length > 0}
-    <div class="analytics-panel">
-      <h3 class="analytics-title">Activity (Last 30 Days)</h3>
-      <div class="activity-chart">
+    <div class="p-4 bg-bg-soft border-b border-bg-muted">
+      <h3 class="m-0 mb-3 text-sm font-semibold text-fg">Activity (Last 30 Days)</h3>
+      <div class="flex items-end gap-1 h-25 pb-6 relative">
         {#each activityStats.slice(0, 14) as stat}
           {@const maxEvents = Math.max(...activityStats.map((s) => s.event_count))}
           {@const barHeight = maxEvents > 0 ? (stat.event_count / maxEvents) * 100 : 0}
-          <div class="activity-bar-wrapper">
-            <div class="activity-bar" style="height: {barHeight}%"></div>
-            <div class="activity-label">{stat.day.slice(5)}</div>
-            <div class="activity-tooltip">
+          <div class="flex-1 flex flex-col items-center relative h-full group">
+            <div
+              class="w-full bg-blue rounded-t-sm min-h-0.5 transition-colors group-hover:bg-blue-bright"
+              style="height: {barHeight}%">
+            </div>
+            <div class="absolute -bottom-5 text-2xs text-fg-dim -rotate-45 origin-center whitespace-nowrap">
+              {stat.day.slice(5)}
+            </div>
+            <div
+              class="absolute bottom-full left-1/2 -translate-x-1/2 px-2 py-1 bg-bg border border-bg-muted rounded text-xs text-fg whitespace-nowrap opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 z-10">
               {stat.day}: {stat.event_count} events, {stat.session_count} sessions
             </div>
           </div>
@@ -231,413 +248,53 @@
   {/if}
 
   {#if error}
-    <div class="error-message">{error}</div>
+    <div class="mx-4 my-2 p-2 bg-red text-bg rounded text-xs">{error}</div>
   {/if}
 
-  <div class="results-container">
+  <div class="flex-1 overflow-hidden flex flex-col">
     {#if results.length > 0}
-      <div class="results-header">
-        <span class="results-count">{results.length} results</span>
+      <div class="px-4 py-2 border-b border-bg-muted bg-bg-soft">
+        <span class="text-xs text-fg-dim">{results.length} results</span>
       </div>
 
-      <div class="results-list">
+      <div class="flex-1 overflow-y-auto p-2">
         {#each results as result (result.event.id)}
-          <div class="result-item">
-            <div class="result-header">
-              <span class="result-timestamp">{formatTimestamp(result.event.timestamp)}</span>
-              <span class="result-kind {getKindClass(result.event.kind)}">
+          <div class="p-3 mb-2 bg-bg-soft border border-bg-muted rounded transition-colors hover:border-blue">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-xs text-fg-dim">{formatTimestamp(result.event.timestamp)}</span>
+              <span class="text-2xs font-semibold px-1.5 py-0.5 rounded uppercase {getKindClass(result.event.kind)}">
                 {getKindLabel(result.event.kind)}
               </span>
               {#if result.event.role}
-                <span class="result-role">{result.event.role}</span>
+                <span class="text-2xs text-fg-dim lowercase">{result.event.role}</span>
               {/if}
             </div>
-            <div class="result-content">
+            <div class="text-sm text-fg leading-snug wrap-break-word mb-2">
               {truncateContent(result.event.content)}
             </div>
-            <div class="result-footer">
-              <button class="session-link" onclick={() => onSelectSession?.(result.event.session_id)}>
+            <div class="flex justify-between items-center">
+              <button
+                class="bg-transparent border-none p-0 font-inherit text-xs text-blue cursor-pointer underline hover:text-blue-bright"
+                onclick={() => onSelectSession?.(result.event.session_id)}>
                 Session: {result.event.session_id.slice(0, 8)}
               </button>
-              <span class="result-rank">rank: {result.rank.toFixed(4)}</span>
+              <span class="text-2xs text-fg-dim">rank: {result.rank.toFixed(4)}</span>
             </div>
           </div>
         {/each}
       </div>
     {:else if query && !loading}
-      <div class="empty-state">
+      <div class="flex-1 flex flex-col items-center justify-center text-fg-dim text-center p-8">
         <p>No results found for "{query}"</p>
         {#if Object.keys(facets).length > 0}
-          <p class="empty-hint">Try adjusting your filters</p>
+          <p class="text-sm mt-2">Try adjusting your filters</p>
         {/if}
       </div>
     {:else if !query}
-      <div class="empty-state">
+      <div class="flex-1 flex flex-col items-center justify-center text-fg-dim text-center p-8">
         <p>Enter a search query to find events across sessions</p>
-        <p class="empty-hint">Search supports full-text matching on event content</p>
+        <p class="text-sm mt-2">Search supports full-text matching on event content</p>
       </div>
     {/if}
   </div>
 </div>
-
-<style>
-  .search-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: hidden;
-  }
-
-  .search-header {
-    padding: 1rem;
-    border-bottom: 1px solid var(--color-bg-muted);
-    background-color: var(--color-bg-soft);
-  }
-
-  .search-input-wrapper {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .search-input {
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    background-color: var(--color-bg);
-    border: 1px solid var(--color-bg-muted);
-    border-radius: 4px;
-    color: var(--color-fg);
-    font-family: inherit;
-    font-size: 0.875rem;
-  }
-
-  .search-input:focus {
-    outline: none;
-    border-color: var(--color-blue);
-  }
-
-  .search-button {
-    padding: 0.5rem 1rem;
-    background-color: var(--color-blue);
-    color: var(--color-bg);
-    border: none;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .search-button:hover:not(:disabled) {
-    background-color: var(--color-blue-bright);
-  }
-
-  .search-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .search-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .action-button {
-    padding: 0.375rem 0.75rem;
-    background-color: transparent;
-    border: 1px solid var(--color-bg-muted);
-    border-radius: 4px;
-    color: var(--color-fg-dim);
-    font-family: inherit;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .action-button:hover {
-    border-color: var(--color-blue);
-    color: var(--color-fg);
-  }
-
-  .filters-panel {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-    padding: 1rem;
-    background-color: var(--color-bg);
-    border-bottom: 1px solid var(--color-bg-muted);
-  }
-
-  .filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .filter-label {
-    font-size: 0.75rem;
-    color: var(--color-fg-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-  }
-
-  .filter-select {
-    padding: 0.375rem 0.5rem;
-    background-color: var(--color-bg-soft);
-    border: 1px solid var(--color-bg-muted);
-    border-radius: 4px;
-    color: var(--color-fg);
-    font-family: inherit;
-    font-size: 0.875rem;
-    cursor: pointer;
-  }
-
-  .filter-select:focus {
-    outline: none;
-    border-color: var(--color-blue);
-  }
-
-  .clear-filters {
-    padding: 0.375rem 0.75rem;
-    background-color: transparent;
-    border: 1px solid var(--color-bg-muted);
-    border-radius: 4px;
-    color: var(--color-fg-dim);
-    font-family: inherit;
-    font-size: 0.75rem;
-    cursor: pointer;
-    align-self: flex-end;
-  }
-
-  .clear-filters:hover {
-    border-color: var(--color-red);
-    color: var(--color-red);
-  }
-
-  .analytics-panel {
-    padding: 1rem;
-    background-color: var(--color-bg-soft);
-    border-bottom: 1px solid var(--color-bg-muted);
-  }
-
-  .analytics-title {
-    margin: 0 0 0.75rem 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-fg);
-  }
-
-  .activity-chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 4px;
-    height: 100px;
-    padding-bottom: 1.5rem;
-    position: relative;
-  }
-
-  .activity-bar-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-    height: 100%;
-  }
-
-  .activity-bar {
-    width: 100%;
-    background-color: var(--color-blue);
-    border-radius: 2px 2px 0 0;
-    min-height: 2px;
-    transition: background-color 0.2s;
-  }
-
-  .activity-bar-wrapper:hover .activity-bar {
-    background-color: var(--color-blue-bright);
-  }
-
-  .activity-label {
-    position: absolute;
-    bottom: -1.25rem;
-    font-size: 0.625rem;
-    color: var(--color-fg-dim);
-    transform: rotate(-45deg);
-    transform-origin: center;
-    white-space: nowrap;
-  }
-
-  .activity-tooltip {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 0.25rem 0.5rem;
-    background-color: var(--color-bg);
-    border: 1px solid var(--color-bg-muted);
-    border-radius: 4px;
-    font-size: 0.75rem;
-    color: var(--color-fg);
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s;
-    z-index: 10;
-  }
-
-  .activity-bar-wrapper:hover .activity-tooltip {
-    opacity: 1;
-  }
-
-  .error-message {
-    margin: 0.5rem 1rem;
-    padding: 0.5rem;
-    background-color: var(--color-red);
-    color: var(--color-bg);
-    border-radius: 4px;
-    font-size: 0.75rem;
-  }
-
-  .results-container {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .results-header {
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--color-bg-muted);
-    background-color: var(--color-bg-soft);
-  }
-
-  .results-count {
-    font-size: 0.75rem;
-    color: var(--color-fg-dim);
-  }
-
-  .results-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.5rem;
-  }
-
-  .result-item {
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    background-color: var(--color-bg-soft);
-    border: 1px solid var(--color-bg-muted);
-    border-radius: 4px;
-    transition: border-color 0.2s;
-  }
-
-  .result-item:hover {
-    border-color: var(--color-blue);
-  }
-
-  .result-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .result-timestamp {
-    font-size: 0.75rem;
-    color: var(--color-fg-dim);
-  }
-
-  .result-kind {
-    font-size: 0.625rem;
-    font-weight: 600;
-    padding: 0.125rem 0.375rem;
-    border-radius: 3px;
-    text-transform: uppercase;
-  }
-
-  .kind-message {
-    background-color: var(--color-blue);
-    color: var(--color-bg);
-  }
-
-  .kind-tool {
-    background-color: var(--color-purple);
-    color: var(--color-bg);
-  }
-
-  .kind-result {
-    background-color: var(--color-green);
-    color: var(--color-bg);
-  }
-
-  .kind-error {
-    background-color: var(--color-red);
-    color: var(--color-bg);
-  }
-
-  .kind-system {
-    background-color: var(--color-bg-muted);
-    color: var(--color-fg-dim);
-  }
-
-  .kind-default {
-    background-color: var(--color-bg-muted);
-    color: var(--color-fg);
-  }
-
-  .result-role {
-    font-size: 0.625rem;
-    color: var(--color-fg-dim);
-    text-transform: lowercase;
-  }
-
-  .result-content {
-    font-size: 0.875rem;
-    color: var(--color-fg);
-    line-height: 1.4;
-    word-break: break-word;
-    margin-bottom: 0.5rem;
-  }
-
-  .result-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .session-link {
-    background: none;
-    border: none;
-    padding: 0;
-    font-family: inherit;
-    font-size: 0.75rem;
-    color: var(--color-blue);
-    cursor: pointer;
-    text-decoration: underline;
-  }
-
-  .session-link:hover {
-    color: var(--color-blue-bright);
-  }
-
-  .result-rank {
-    font-size: 0.625rem;
-    color: var(--color-fg-dim);
-  }
-
-  .empty-state {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-fg-dim);
-    text-align: center;
-    padding: 2rem;
-  }
-
-  .empty-hint {
-    font-size: 0.875rem;
-    margin-top: 0.5rem;
-  }
-</style>

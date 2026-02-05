@@ -81,65 +81,69 @@
   let groupedEvents = $derived(groupEventsByDate(events));
 </script>
 
-<div class="session-viewer">
-  <header class="session-header">
-    <div class="header-main">
-      <h2 class="session-title">{session.title || "Untitled Session"}</h2>
-      <div class="session-meta">
-        <span class="meta-item">
-          <span class="meta-label">ID:</span>
+<div class="flex-1 flex flex-col overflow-hidden">
+  <header class="px-6 py-4 bg-bg-soft border-b border-bg-muted flex justify-between items-start gap-4">
+    <div class="flex-1 min-w-0">
+      <h2 class="m-0 mb-2 text-xl font-semibold text-fg overflow-hidden text-ellipsis whitespace-nowrap">
+        {session.title || "Untitled Session"}
+      </h2>
+      <div class="flex flex-wrap gap-3 text-xs text-fg-dim">
+        <span class="flex gap-1">
+          <span class="text-fg-muted">ID:</span>
           {session.external_id.slice(0, 8)}
         </span>
-        <span class="meta-item">
-          <span class="meta-label">Source:</span>
+        <span class="flex gap-1">
+          <span class="text-fg-muted">Source:</span>
           {session.source}
         </span>
         {#if session.project}
-          <span class="meta-item">
-            <span class="meta-label">Project:</span>
+          <span class="flex gap-1">
+            <span class="text-fg-muted">Project:</span>
             {session.project}
           </span>
         {/if}
-        <span class="meta-item">
-          <span class="meta-label">Events:</span>
+        <span class="flex gap-1">
+          <span class="text-fg-muted">Events:</span>
           {events.length}
         </span>
       </div>
     </div>
-    <div class="header-dates">
-      <div class="date-item">
-        <span class="date-label">Created:</span>
+    <div class="text-right text-xs text-fg-dim flex-shrink-0">
+      <div class="mb-1">
+        <span class="text-fg-muted">Created:</span>
         {formatDate(session.created_at)}
       </div>
-      <div class="date-item">
-        <span class="date-label">Updated:</span>
+      <div>
+        <span class="text-fg-muted">Updated:</span>
         {formatDate(session.updated_at)}
       </div>
     </div>
   </header>
 
-  <div class="events-container">
+  <div class="flex-1 overflow-y-auto px-6 py-4">
     {#if events.length === 0}
-      <div class="empty-events">
+      <div class="flex items-center justify-center h-full text-fg-dim">
         <p>No events in this session</p>
       </div>
     {:else}
       {#each groupedEvents.entries() as [date, dateEvents]}
-        <div class="date-group">
-          <div class="date-header">{date}</div>
-          <div class="events-list">
+        <div class="mb-6">
+          <div class="text-xs font-semibold uppercase text-fg-muted mb-3 pb-1 border-b border-bg-muted">
+            {date}
+          </div>
+          <div class="flex flex-col gap-2">
             {#each dateEvents as event, index (event.id)}
-              <div class="event-item">
-                <div class="event-marker">
-                  <span class="{getEventIcon(event.kind)} text-fg-dim"></span>
+              <div class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted">
+                <div class="flex-shrink-0 w-6 flex items-start justify-center pt-0.5">
+                  <span class="{getEventIcon(event.kind)} text-fg-dim text-base"></span>
                 </div>
-                <div class="event-content">
-                  <div class="event-header">
-                    <span class="event-role" style="color: {getRoleColor(event.role)}">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1 text-xs">
+                    <span class="font-semibold uppercase" style="color: {getRoleColor(event.role)}">
                       {event.role || "unknown"}
                     </span>
-                    <span class="event-kind">{event.kind}</span>
-                    <span class="event-time">
+                    <span class="text-fg-muted lowercase">{event.kind}</span>
+                    <span class="text-fg-dim ml-auto">
                       {new Date(event.timestamp).toLocaleTimeString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -148,7 +152,7 @@
                     </span>
                   </div>
                   {#if event.content}
-                    <div class="event-text">
+                    <div class="text-sm text-fg leading-relaxed overflow-hidden text-ellipsis line-clamp-3">
                       {getContentPreview(event.content)}
                     </div>
                   {/if}
@@ -161,170 +165,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  .session-viewer {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .session-header {
-    padding: 1rem 1.5rem;
-    background-color: var(--color-bg-soft);
-    border-bottom: 1px solid var(--color-bg-muted);
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .header-main {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .session-title {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--color-fg);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .session-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    font-size: 0.75rem;
-    color: var(--color-fg-dim);
-  }
-
-  .meta-item {
-    display: flex;
-    gap: 0.25rem;
-  }
-
-  .meta-label {
-    color: var(--color-fg-muted);
-  }
-
-  .header-dates {
-    text-align: right;
-    font-size: 0.75rem;
-    color: var(--color-fg-dim);
-    flex-shrink: 0;
-  }
-
-  .date-item {
-    margin-bottom: 0.25rem;
-  }
-
-  .date-label {
-    color: var(--color-fg-muted);
-  }
-
-  .events-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem 1.5rem;
-  }
-
-  .empty-events {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: var(--color-fg-dim);
-  }
-
-  .date-group {
-    margin-bottom: 1.5rem;
-  }
-
-  .date-header {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--color-fg-muted);
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.25rem;
-    border-bottom: 1px solid var(--color-bg-muted);
-  }
-
-  .events-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .event-item {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    background-color: var(--color-bg-soft);
-    border-radius: 4px;
-    border: 1px solid transparent;
-    transition: border-color 0.15s ease;
-  }
-
-  .event-item:hover {
-    border-color: var(--color-bg-muted);
-  }
-
-  .event-marker {
-    flex-shrink: 0;
-    width: 24px;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 0.125rem;
-  }
-
-  .event-marker :global([class*="i-ri-"]) {
-    font-size: 1rem;
-    color: var(--color-fg-dim);
-  }
-
-  .event-content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .event-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.75rem;
-  }
-
-  .event-role {
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .event-kind {
-    color: var(--color-fg-muted);
-    text-transform: lowercase;
-  }
-
-  .event-time {
-    color: var(--color-fg-dim);
-    margin-left: auto;
-  }
-
-  .event-text {
-    font-size: 0.8125rem;
-    color: var(--color-fg);
-    line-height: 1.5;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-  }
-</style>

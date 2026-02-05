@@ -25,124 +25,33 @@
   }
 </script>
 
-<div class="session-list">
-  <div class="list-header">
-    <span class="count">{sessions.length} sessions</span>
+<div class="flex-1 flex flex-col overflow-hidden">
+  <div class="px-4 py-2 border-b border-bg-muted flex justify-between items-center">
+    <span class="text-xs text-fg-muted">{sessions.length} sessions</span>
   </div>
 
-  <div class="list-content">
+  <div class="flex-1 overflow-y-auto p-2">
     {#each sessions as session (session.id)}
       <button
-        class="session-item"
-        class:selected={selectedSession?.id === session.id}
+        class="w-full p-3 mb-1 bg-transparent border border-transparent rounded text-left cursor-pointer transition-all font-inherit hover:bg-bg-muted"
+        class:bg-bg-muted={selectedSession?.id === session.id}
+        class:border-blue={selectedSession?.id === session.id}
         onclick={() => onSelect(session)}>
-        <div class="session-header">
-          <span class="session-title">{getSessionTitle(session)}</span>
-          <span class="session-source">{session.source}</span>
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-medium text-fg text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-2">
+            {getSessionTitle(session)}
+          </span>
+          <span class="text-2xs uppercase px-1.5 py-0.5 bg-blue text-bg rounded flex-shrink-0">
+            {session.source}
+          </span>
         </div>
-        <div class="session-meta">
-          <span class="project-name">{getProjectName(session)}</span>
-          <span class="session-date">{formatDate(session.updated_at)}</span>
+        <div class="flex justify-between items-center text-xs text-fg-dim">
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-2">
+            {getProjectName(session)}
+          </span>
+          <span class="flex-shrink-0">{formatDate(session.updated_at)}</span>
         </div>
       </button>
     {/each}
   </div>
 </div>
-
-<style>
-  .session-list {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .list-header {
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--color-bg-muted);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .count {
-    font-size: 0.75rem;
-    color: var(--color-fg-muted);
-  }
-
-  .list-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.5rem;
-  }
-
-  .session-item {
-    width: 100%;
-    padding: 0.75rem;
-    margin-bottom: 0.25rem;
-    background-color: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: inherit;
-  }
-
-  .session-item:hover {
-    background-color: var(--color-bg-muted);
-  }
-
-  .session-item.selected {
-    background-color: var(--color-bg-muted);
-    border-color: var(--color-blue);
-  }
-
-  .session-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.25rem;
-  }
-
-  .session-title {
-    font-weight: 500;
-    color: var(--color-fg);
-    font-size: 0.875rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    margin-right: 0.5rem;
-  }
-
-  .session-source {
-    font-size: 0.625rem;
-    text-transform: uppercase;
-    padding: 0.125rem 0.375rem;
-    background-color: var(--color-blue);
-    color: var(--color-bg);
-    border-radius: 3px;
-    flex-shrink: 0;
-  }
-
-  .session-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.75rem;
-    color: var(--color-fg-dim);
-  }
-
-  .project-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    margin-right: 0.5rem;
-  }
-
-  .session-date {
-    flex-shrink: 0;
-  }
-</style>
