@@ -3,4 +3,17 @@ name = "agent-viz-cli"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "agent-viz"
+path = "src/main.rs"
+
 [dependencies]
+agent-viz-core = { path = "../core" }
+agent-viz-store = { path = "../store" }
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1.42", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+owo-colors = { version = "4.1", features = ["supports-colors"] }

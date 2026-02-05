@@ -1,0 +1,17 @@
+[package]
+name = "agent-viz-ingest"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+agent-viz-core = { path = "../core" }
+agent-viz-store = { path = "../store" }
+agent-viz-adapters = { path = "../adapters" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+tokio = { version = "1.42", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3.15"

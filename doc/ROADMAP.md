@@ -5,16 +5,19 @@ A Rust workspace shipping a desktop app (SvelteKit + Tauri) and CLI (clap) for i
 ## Data Sources
 
 ### Claude Code
+
 - **Location:** `~/.claude/projects/<project>/<session-id>.jsonl`
 - **Format:** JSONL with conversation entries, tool calls, approvals
 - **Reference:** [claude-code-viewer](https://github.com/d-kimuson/claude-code-viewer)
 
 ### Codex CLI
+
 - **Location:** `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl` (defaults to `~/.codex`)
 - **Format:** JSONL "rollout" logs, date-sharded
 - **Note:** No CLI option to specify custom log path; must discover by glob
 
 ### OpenCode
+
 - **Logs:** `~/.local/share/opencode/log/YYYY-MM-DDTHHMMSS.log` (timestamp-named, keeps last 10)
 - **Project Data:** `~/.local/share/opencode/project/<project-slug>/storage/` (Git repos) or `./global/storage/` (non-Git)
 - **Auth:** `~/.local/share/opencode/auth.json`
@@ -22,6 +25,7 @@ A Rust workspace shipping a desktop app (SvelteKit + Tauri) and CLI (clap) for i
 - **Reference:** [Troubleshooting docs](https://opencode.ai/docs/troubleshooting/)
 
 ### Crush
+
 - **Location:** `.crush/crush.db` (project-local) or `~/.crush/crush.db` (global)
 - **Format:** SQLite with published schema.json
 - **Note:** Schema may change; use feature probes (table/column existence)
@@ -29,8 +33,8 @@ A Rust workspace shipping a desktop app (SvelteKit + Tauri) and CLI (clap) for i
 
 ## Project Structure
 
-```
-agent-viz/
+```sh
+.
   Cargo.toml                 # workspace
   crates/
     core/                    # canonical model + normalization types
@@ -56,14 +60,16 @@ agent-viz/
 **Goal:** Workspace scaffolding with SQLite + FTS5. CLI commands work against empty DB.
 
 **Tasks:**
-- [ ] Workspace layout (crates + apps)
-- [ ] SQLite migrations + FTS5 virtual tables
-- [ ] Canonical structs + serde JSON for lossless payloads
-- [ ] CLI: `doctor` (validate paths, DB migrations, adapter health)
-- [ ] CLI: `ingest --help` (stub)
-- [ ] CLI: `list sessions` (empty DB returns nothing)
+
+- [x] Workspace layout (crates + apps)
+- [x] SQLite migrations + FTS5 virtual tables
+- [x] Canonical structs + serde JSON for lossless payloads
+- [x] CLI: `doctor` (validate paths, DB migrations, adapter health)
+- [x] CLI: `ingest --help` (stub)
+- [x] CLI: `list sessions` (empty DB returns nothing)
 
 **CLI Testing:**
+
 ```bash
 # Build and test CLI
 cargo build -p agent-viz-cli
@@ -78,6 +84,7 @@ cargo build -p agent-viz-cli
 **Goal:** Ingest Claude Code JSONL sessions and render read-only timeline.
 
 **Tasks:**
+
 - [ ] Adapter: discover `~/.claude/projects/.../*.jsonl`
 - [ ] Adapter: parse JSONL into canonical events (messages, tool calls, errors)
 - [ ] Store: lossless ingestion with raw JSON preservation
@@ -86,6 +93,7 @@ cargo build -p agent-viz-cli
 - [ ] Desktop: session list + session viewer (progressive disclosure)
 
 **CLI Testing:**
+
 ```bash
 # Ingest Claude Code sessions
 ./target/debug/agent-viz ingest --source claude
@@ -103,6 +111,7 @@ cargo build -p agent-viz-cli
 **Goal:** FTS search with facets + two core charts.
 
 **Tasks:**
+
 - [ ] FTS5 query layer with highlighting
 - [ ] Faceted filtering (source, project, date range, kind)
 - [ ] CLI: `search "query" --since 7d --source claude`
@@ -111,6 +120,7 @@ cargo build -p agent-viz-cli
 - [ ] Analytics: errors chart (errors/day + top signatures)
 
 **CLI Testing:**
+
 ```bash
 # Search with filters
 ./target/debug/agent-viz search "panic" --since 7d --source claude
@@ -128,12 +138,14 @@ cargo build -p agent-viz-cli
 **Goal:** Ingest Codex CLI rollout logs.
 
 **Tasks:**
+
 - [ ] Adapter: discover `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`
 - [ ] Adapter: parse rollout records into canonical events
 - [ ] CLI: `ingest --source codex`
 - [ ] Desktop: source filter + per-source health status
 
 **CLI Testing:**
+
 ```bash
 ./target/debug/agent-viz ingest --source codex
 ./target/debug/agent-viz list sessions --source codex
@@ -147,6 +159,7 @@ cargo build -p agent-viz-cli
 **Goal:** Ingest OpenCode logs and session data.
 
 **Tasks:**
+
 - [ ] Adapter: discover `~/.local/share/opencode/log/` (timestamp-named log files)
 - [ ] Adapter: parse log files and session JSONs from `project/` storage
 - [ ] Adapter: read auth.json for provider/model context
@@ -154,6 +167,7 @@ cargo build -p agent-viz-cli
 - [ ] Cross-tool search: query across all sources
 
 **CLI Testing:**
+
 ```bash
 ./target/debug/agent-viz ingest --source opencode
 ./target/debug/agent-viz list sessions
@@ -167,12 +181,14 @@ cargo build -p agent-viz-cli
 **Goal:** Read-only SQLite adapter for Crush database.
 
 **Tasks:**
+
 - [ ] Adapter: discover `.crush/crush.db` (project-local) and `~/.crush/crush.db` (global)
 - [ ] Adapter: schema probing + graceful degradation (feature probes for table/column existence)
 - [ ] CLI: `ingest --source crush`
 - [ ] Desktop: sessions + messages with raw JSON fallback
 
 **CLI Testing:**
+
 ```bash
 ./target/debug/agent-viz ingest --source crush
 ./target/debug/agent-viz list sessions --source crush
@@ -185,12 +201,14 @@ cargo build -p agent-viz-cli
 **Goal:** Auto-detect new sessions and changes.
 
 **Tasks:**
+
 - [ ] Filesystem watchers for Claude/Codex/OpenCode logs
 - [ ] DB polling for Crush (mtime + latest message probe)
 - [ ] CLI: `ingest --watch` (daemon mode)
 - [ ] Desktop: auto-refresh indicator
 
 **CLI Testing:**
+
 ```bash
 # Watch mode (runs continuously)
 ./target/debug/agent-viz ingest --watch
@@ -206,6 +224,7 @@ cargo build -p agent-viz-cli
 **Goal:** Complete Tier 1 + Tier 2 charts.
 
 **Tasks:**
+
 - [ ] Session metrics table (computed at ingest)
 - [ ] Tool-call frequency chart
 - [ ] Files touched leaderboard
@@ -214,6 +233,7 @@ cargo build -p agent-viz-cli
 - [ ] Export: `md`, `json`, `jsonl` formats
 
 **CLI Testing:**
+
 ```bash
 ./target/debug/agent-viz stats --by project
 ./target/debug/agent-viz export --session <id> --format md
@@ -227,6 +247,7 @@ cargo build -p agent-viz-cli
 **Goal:** Start/resume/continue Claude Code sessions from UI.
 
 **Tasks:**
+
 - [ ] Configure Claude Code executable path
 - [ ] Spawn Claude Code process with PTY
 - [ ] Stream stdin/stdout into UI
@@ -236,6 +257,7 @@ cargo build -p agent-viz-cli
 - [ ] Tool approval flow
 
 **CLI Testing:**
+
 ```bash
 # Configure and test runtime
 ./target/debug/agent-viz config set claude.executable /usr/local/bin/claude
@@ -251,6 +273,7 @@ cargo build -p agent-viz-cli
 **Goal:** Create projects and auto-discovery.
 
 **Tasks:**
+
 - [ ] Create project UI (select directory, run `/init`)
 - [ ] Auto-discover projects from `~/.claude/projects/`
 - [ ] Setting: hide sessions without user messages
@@ -263,6 +286,7 @@ cargo build -p agent-viz-cli
 **Goal:** Upload and preview attachments.
 
 **Tasks:**
+
 - [ ] Upload images (PNG, JPEG, GIF, WebP), PDFs, text files
 - [ ] Inline preview components
 - [ ] Store attachments in app data dir
@@ -275,6 +299,7 @@ cargo build -p agent-viz-cli
 **Goal:** Right-side browser panel.
 
 **Tasks:**
+
 - [ ] Detect URLs in messages
 - [ ] Resizable right-side panel
 - [ ] URL input + reload
@@ -287,6 +312,7 @@ cargo build -p agent-viz-cli
 **Goal:** In-app git diff viewer + commit/push.
 
 **Tasks:**
+
 - [ ] Diff viewer (staged/unstaged, file tree + hunks)
 - [ ] Commit UI
 - [ ] Push UI (push-only, commit+push)
@@ -299,6 +325,7 @@ cargo build -p agent-viz-cli
 **Goal:** Message scheduling and system monitoring.
 
 **Tasks:**
+
 - [ ] Scheduler: one-off datetime + cron recurring
 - [ ] Concurrency policies (skip/run)
 - [ ] Rate limit auto-continue
@@ -312,6 +339,7 @@ cargo build -p agent-viz-cli
 **Goal:** Multi-language support and final UX.
 
 **Tasks:**
+
 - [ ] i18n framework (en/ja/zh-Hans)
 - [ ] Theme: system/dark/light
 - [ ] Audio notifications
