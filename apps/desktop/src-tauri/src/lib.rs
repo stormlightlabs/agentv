@@ -1,8 +1,8 @@
 mod commands;
 
 use commands::{
-    get_activity_stats, get_error_stats, get_event_kinds, get_projects, get_session_events, get_source_health,
-    get_sources, ingest_all_sources, ingest_source, list_sessions, search_events,
+    check_for_new_sessions, get_activity_stats, get_error_stats, get_event_kinds, get_projects, get_session_events,
+    get_source_health, get_sources, ingest_all_sources, ingest_source, list_sessions, search_events,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -20,7 +20,8 @@ pub fn run() {
             get_sources,
             get_projects,
             get_event_kinds,
-            get_source_health
+            get_source_health,
+            check_for_new_sessions
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

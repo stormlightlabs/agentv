@@ -9,8 +9,8 @@
   import { useToast } from "$lib/stores/toast";
   import type { EventData, IngestResult, SessionData } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount } from "svelte";
-  import { fade } from "svelte/transition";
+  import { onDestroy, onMount } from "svelte";
+  import { fade, slide } from "svelte/transition";
 
   const toast = useToast();
 
@@ -22,6 +22,9 @@
   let activeTab = $state<"sessions" | "search" | "status">("sessions");
   let ingestLoading = $state(false);
   let lastIngestTime = $state<Date | null>(null);
+  let newSessionsAvailable = $state(false);
+  let autoRefreshEnabled = $state(true);
+  let refreshInterval: number | null = null;
 
   const sources = [
     { id: "claude", name: "Claude", color: "blue" },
@@ -35,11 +38,52 @@
       loading = true;
       error = null;
       sessions = await invoke<SessionData[]>("list_sessions");
+      newSessionsAvailable = false;
     } catch (e) {
       error = String(e);
       toast.error(`Failed to load sessions: ${e}`);
     } finally {
       loading = false;
+    }
+  }
+
+  async function checkForNewSessions() {
+    if (!autoRefreshEnabled) return;
+
+    try {
+      const hasNewSessions = await invoke<boolean>("check_for_new_sessions");
+      if (hasNewSessions && !newSessionsAvailable) {
+        newSessionsAvailable = true;
+        toast.info("New sessions available - click refresh to load");
+      }
+    } catch (e) {
+      console.error("Failed to check for new sessions:", e);
+    }
+  }
+
+  function startAutoRefresh() {
+    if (refreshInterval) return;
+
+    refreshInterval = window.setInterval(() => {
+      checkForNewSessions();
+    }, 30000); // Check every 30 seconds
+  }
+
+  function stopAutoRefresh() {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+  }
+
+  function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    if (autoRefreshEnabled) {
+      startAutoRefresh();
+      toast.info("Auto-refresh enabled");
+    } else {
+      stopAutoRefresh();
+      toast.info("Auto-refresh disabled");
     }
   }
 
@@ -117,6 +161,11 @@
 
   onMount(() => {
     loadSessions();
+    startAutoRefresh();
+  });
+
+  onDestroy(() => {
+    stopAutoRefresh();
   });
 </script>
 
@@ -131,6 +180,22 @@
   <aside class="w-80 min-w-80 bg-bg-soft border-r border-bg-muted flex flex-col overflow-hidden">
     <div class="p-4 border-b border-bg-muted flex flex-col gap-3">
       <h1 class="m-0 text-xl font-semibold text-fg">Agent Viz</h1>
+
+      {#if newSessionsAvailable}
+        <div
+          class="px-3 py-2 bg-yellow/20 border border-yellow rounded text-xs text-yellow flex items-center justify-between"
+          transition:slide>
+          <div class="flex items-center gap-2">
+            <span class="i-ri-notification-3-line animate-pulse"></span>
+            <span>New sessions available</span>
+          </div>
+          <button
+            class="bg-transparent border-none p-0 text-yellow font-semibold cursor-pointer hover:underline"
+            onclick={ingestAllSources}>
+            Refresh
+          </button>
+        </div>
+      {/if}
 
       <button
         class="px-4 py-2 bg-blue text-bg border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
@@ -155,6 +220,20 @@
             {source.name}
           </button>
         {/each}
+      </div>
+
+      <div class="flex items-center gap-2 text-2xs text-fg-dim">
+        <button
+          class="flex items-center gap-1.5 cursor-pointer bg-transparent border-none p-0 text-inherit hover:text-fg"
+          onclick={toggleAutoRefresh}>
+          {#if autoRefreshEnabled}
+            <span class="i-ri-checkbox-circle-line text-green"></span>
+            <span>Auto-refresh on</span>
+          {:else}
+            <span class="i-ri-checkbox-blank-circle-line"></span>
+            <span>Auto-refresh off</span>
+          {/if}
+        </button>
       </div>
     </div>
 

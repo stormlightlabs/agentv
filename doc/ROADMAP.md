@@ -146,7 +146,7 @@ For all adapters, verify with:
 - [x] Adapter: discover `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`
 - [x] Adapter: parse rollout records into canonical events
 - [x] CLI: `ingest --source codex`
-- [ ] Desktop: source filter + per-source health status
+- [x] Desktop: source filter + per-source health status
 
 **CLI Testing:**
 
@@ -166,7 +166,7 @@ For all adapters, verify with:
 - [x] Adapter: parse log files and session JSONs from `project/` storage
 - [x] Adapter: read auth.json for provider/model context
 - [x] CLI: `ingest --source opencode`
-- [ ] Cross-tool search: query across all sources
+- [x] Cross-tool search: query across all sources
 
 **CLI Testing:**
 
@@ -185,7 +185,7 @@ For all adapters, verify with:
 - [x] Adapter: discover `.crush/crush.db` (project-local) and `~/.crush/crush.db` (global)
 - [x] Adapter: schema probing + graceful degradation (feature probes for table/column existence)
 - [x] CLI: `ingest --source crush`
-- [ ] Desktop: sessions + messages with raw JSON fallback
+- [x] Desktop: sessions + messages with raw JSON fallback
 
 **CLI Testing:**
 
@@ -200,10 +200,10 @@ For all adapters, verify with:
 
 **Tasks:**
 
-- [ ] Filesystem watchers for Claude/Codex/OpenCode logs
-- [ ] DB polling for Crush (mtime + latest message probe)
-- [ ] CLI: `ingest --watch` (daemon mode)
-- [ ] Desktop: auto-refresh indicator
+- [x] Filesystem watchers for Claude/Codex/OpenCode logs
+- [x] DB polling for Crush (mtime + latest message probe)
+- [x] CLI: `ingest --watch` (daemon mode)
+- [x] Desktop: auto-refresh indicator
 
 **CLI Testing:**
 

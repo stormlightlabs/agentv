@@ -544,3 +544,54 @@ pub async fn ingest_all_sources() -> Result<Vec<IngestResult>, String> {
 
     Ok(results)
 }
+
+/// Check for new sessions available in source directories
+#[tauri::command]
+pub async fn check_for_new_sessions() -> Result<bool, String> {
+    use agent_viz_adapters::{ClaudeAdapter, CodexAdapter, CrushAdapter, OpenCodeAdapter};
+
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let existing_sessions = db
+        .list_sessions(10000, 0)
+        .await
+        .map_err(|e| format!("Failed to list sessions: {}", e))?;
+    let existing_ids: std::collections::HashSet<String> =
+        existing_sessions.into_iter().map(|s| s.external_id).collect();
+
+    let claude_adapter = ClaudeAdapter::new();
+    for session_file in claude_adapter.discover_sessions().await {
+        if !existing_ids.contains(&session_file.session_id) {
+            return Ok(true);
+        }
+    }
+
+    let codex_adapter = CodexAdapter::new();
+    for session_file in codex_adapter.discover_sessions().await {
+        if !existing_ids.contains(&session_file.session_id) {
+            return Ok(true);
+        }
+    }
+
+    let opencode_adapter = OpenCodeAdapter::new();
+    for session in opencode_adapter.discover_sessions().await {
+        if !existing_ids.contains(&session.id) {
+            return Ok(true);
+        }
+    }
+
+    let crush_adapter = CrushAdapter::new();
+    for session_file in crush_adapter.discover_sessions().await {
+        if !existing_ids.contains(&session_file.session_id) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}

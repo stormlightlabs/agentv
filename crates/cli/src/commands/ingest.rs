@@ -1,16 +1,13 @@
 use agent_viz_adapters::{claude::ClaudeAdapter, codex::CodexAdapter, crush::CrushAdapter, opencode::OpenCodeAdapter};
 use agent_viz_core::Source;
+use agent_viz_ingest::Watcher;
 use agent_viz_store::Database;
 use owo_colors::OwoColorize;
 use std::str::FromStr;
-use tracing::{error, info};
 
 pub async fn run(source: Option<String>, watch: bool) -> Result<(), Box<dyn std::error::Error>> {
     if watch {
-        println!("{}", "Watch mode".bold().underline());
-        println!("{}", "Continuously monitoring for new sessions...".dimmed());
-        println!("{}", "(Not yet implemented - would run indefinitely)".yellow());
-        return Ok(());
+        return run_watch_mode(source).await;
     }
 
     let db = Database::open_default().await?;
@@ -19,7 +16,7 @@ pub async fn run(source: Option<String>, watch: bool) -> Result<(), Box<dyn std:
     match source {
         Some(src) => {
             let source = Source::from_str(&src)?;
-            info!("Ingesting from source: {}", source);
+            tracing::info!("Ingesting from source: {}", source);
             println!("{} {}", "Ingesting from:".bold(), src.cyan());
 
             match source {
@@ -42,6 +39,48 @@ pub async fn run(source: Option<String>, watch: bool) -> Result<(), Box<dyn std:
             println!();
             println!("{}", "Options:".bold());
             println!("  {}   Continuously watch for new sessions", "--watch".cyan());
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_watch_mode(source: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("{}", "Watch Mode".bold().underline());
+    println!();
+    println!("{}", "Continuously monitoring for new sessions...".dimmed());
+    println!("  {} Press Ctrl+C to stop", "→".dimmed());
+    println!();
+
+    let watcher = Watcher::new();
+
+    let handle: tokio::task::JoinHandle<Result<(), Box<dyn std::error::Error + Send + Sync>>> = match source {
+        Some(src) => {
+            let source = Source::from_str(&src)?;
+            println!("  {} Watching only: {}", "→".dimmed(), src.cyan());
+            println!();
+
+            tokio::spawn(async move { watcher.watch_source(source).await })
+        }
+        None => {
+            println!("  {} Watching all sources", "→".dimmed());
+            println!();
+
+            tokio::spawn(async move { watcher.watch_all().await })
+        }
+    };
+
+    match handle.await {
+        Ok(Ok(())) => {
+            println!("  {} Watch mode stopped", "✓".green());
+        }
+        Ok(Err(e)) => {
+            tracing::error!("Watch error: {}", e);
+            println!("  {} Watch error: {}", "✗".red(), e);
+        }
+        Err(e) => {
+            tracing::error!("Task panicked: {}", e);
+            println!("  {} Watch task panicked: {}", "✗".red(), e);
         }
     }
 
@@ -82,13 +121,13 @@ async fn ingest_claude(db: &Database) -> Result<(), Box<dyn std::error::Error>> 
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    error!("Failed to insert session {}: {}", session.external_id, e);
+                    tracing::error!("Failed to insert session {}: {}", session.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                error!("Failed to parse session {:?}: {}", session_file.path, e);
+                tracing::error!("Failed to parse session {:?}: {}", session_file.path, e);
                 failed += 1;
             }
         }
@@ -142,13 +181,13 @@ async fn ingest_codex(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    error!("Failed to insert session {}: {}", session.external_id, e);
+                    tracing::error!("Failed to insert session {}: {}", session.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                error!("Failed to parse session {:?}: {}", session_file.path, e);
+                tracing::error!("Failed to parse session {:?}: {}", session_file.path, e);
                 failed += 1;
             }
         }
@@ -215,13 +254,13 @@ async fn ingest_opencode(db: &Database) -> Result<(), Box<dyn std::error::Error>
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    error!("Failed to insert session {}: {}", session_obj.external_id, e);
+                    tracing::error!("Failed to insert session {}: {}", session_obj.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                error!("Failed to parse session {}: {}", session.id, e);
+                tracing::error!("Failed to parse session {}: {}", session.id, e);
                 failed += 1;
             }
         }
@@ -271,13 +310,13 @@ async fn ingest_crush(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    error!("Failed to insert session {}: {}", session.external_id, e);
+                    tracing::error!("Failed to insert session {}: {}", session.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                error!("Failed to parse session {:?}: {}", session_file.path, e);
+                tracing::error!("Failed to parse session {:?}: {}", session_file.path, e);
                 failed += 1;
             }
         }

@@ -20,3 +20,4 @@ chrono = { version = "0.4", features = ["serde"] }
 agent-viz-adapters = { path = "../adapters" }
 agent-viz-core = { path = "../core" }
 agent-viz-store = { path = "../store" }
+agent-viz-ingest = { path = "../ingest" }
