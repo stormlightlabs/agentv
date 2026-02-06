@@ -14,6 +14,23 @@ pub const LIST_SESSIONS: &str = r#"
     LIMIT ?1 OFFSET ?2
 "#;
 
+/// List sessions with optional source filter
+pub const LIST_SESSIONS_FILTERED: &str = r#"
+    SELECT
+        id,
+        source,
+        external_id,
+        project,
+        title,
+        created_at,
+        updated_at,
+        raw_payload
+    FROM sessions
+    WHERE (?1 = '' OR source = ?1)
+    ORDER BY updated_at DESC
+    LIMIT ?2 OFFSET ?3
+"#;
+
 /// Get events for a specific session
 pub const GET_SESSION_EVENTS: &str = r#"
     SELECT

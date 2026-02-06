@@ -5,7 +5,11 @@ pub async fn sessions(source_filter: Option<String>) -> Result<(), Box<dyn std::
     let db = Database::open_default().await?;
     db.migrate().await?;
 
-    let sessions = db.list_sessions(100, 0).await?;
+    let sessions = if let Some(ref filter) = source_filter {
+        db.list_sessions_filtered(Some(filter), 100, 0).await?
+    } else {
+        db.list_sessions(100, 0).await?
+    };
 
     if sessions.is_empty() {
         println!("{}", "No sessions found.".yellow());
@@ -27,12 +31,6 @@ pub async fn sessions(source_filter: Option<String>) -> Result<(), Box<dyn std::
     println!("{}", "-".repeat(80).dimmed());
 
     for session in sessions {
-        if let Some(ref filter) = source_filter
-            && session.source != *filter
-        {
-            continue;
-        }
-
         let project = session.project.as_deref().unwrap_or("-");
         let title = session.title.as_deref().unwrap_or("Untitled");
 

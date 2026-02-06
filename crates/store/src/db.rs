@@ -180,6 +180,33 @@ impl Database {
             .await
     }
 
+    /// Get sessions with optional source filter (paginated)
+    pub async fn list_sessions_filtered(
+        &self, source_filter: Option<&str>, limit: i64, offset: i64,
+    ) -> Result<Vec<SessionRow>, tokio_rusqlite::Error> {
+        let source = source_filter.unwrap_or("").to_string();
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::LIST_SESSIONS_FILTERED)?;
+                let rows = stmt
+                    .query_map([&source, &limit.to_string(), &offset.to_string()], |row| {
+                        Ok(SessionRow {
+                            id: row.get(0)?,
+                            source: row.get(1)?,
+                            external_id: row.get(2)?,
+                            project: row.get(3)?,
+                            title: row.get(4)?,
+                            created_at: row.get(5)?,
+                            updated_at: row.get(6)?,
+                            raw_payload: row.get(7)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
     /// Get events for a session
     pub async fn get_session_events(&self, session_id: String) -> Result<Vec<EventRow>, tokio_rusqlite::Error> {
         self.conn

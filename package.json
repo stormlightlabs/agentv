@@ -16,7 +16,8 @@
     "format": "cargo fmt"
   },
   "devDependencies": {
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "prettier-plugin-svelte": "^3.4.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
