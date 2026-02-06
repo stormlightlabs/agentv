@@ -1,5 +1,7 @@
 <script lang="ts">
-  import type { SessionData } from "$lib/types";
+  import DataTable from "$lib/components/DataTable.svelte";
+  import type { DataTableColumn, SessionData } from "$lib/types";
+  import { fly } from "svelte/transition";
 
   type Props = {
     sessions: SessionData[];
@@ -23,35 +25,51 @@
     const parts = session.project.split("-");
     return parts[parts.length - 1] || session.project;
   }
+
+  function getSourceBadgeClass(source: string): string {
+    const classes: Record<string, string> = {
+      claude: "bg-blue text-bg",
+      codex: "bg-green text-bg",
+      opencode: "bg-purple text-bg",
+      crush: "bg-yellow text-bg",
+    };
+    return classes[source.toLowerCase()] || "bg-bg-muted text-fg";
+  }
+
+  const columns: DataTableColumn<SessionData>[] = [
+    { key: "title", header: "Title", sortable: true, filterable: true, render: (row) => getSessionTitle(row) },
+    {
+      key: "source",
+      header: "Source",
+      sortable: true,
+      filterable: true,
+      width: "100px",
+      render: (row) => ({
+        text: row.source,
+        className: `text-2xs uppercase px-1.5 py-0.5 rounded shrink-0 ${getSourceBadgeClass(row.source)}`,
+      }),
+    },
+    { key: "project", header: "Project", sortable: true, filterable: true, render: (row) => getProjectName(row) },
+    {
+      key: "updated_at",
+      header: "Updated",
+      sortable: true,
+      width: "120px",
+      render: (row) => formatDate(row.updated_at),
+    },
+  ];
 </script>
 
-<div class="flex-1 flex flex-col overflow-hidden">
-  <div class="px-4 py-2 border-b border-bg-muted flex justify-between items-center">
+<div class="flex flex-col h-full overflow-hidden" in:fly={{ y: 10, duration: 200 }}>
+  <div class="px-4 py-2 border-b border-bg-muted flex justify-between items-center bg-bg-soft">
     <span class="text-xs text-fg-muted">{sessions.length} sessions</span>
   </div>
 
-  <div class="flex-1 overflow-y-auto p-2">
-    {#each sessions as session (session.id)}
-      <button
-        class="w-full p-3 mb-1 bg-transparent border border-transparent rounded text-left cursor-pointer transition-all font-inherit hover:bg-bg-muted"
-        class:bg-bg-muted={selectedSession?.id === session.id}
-        class:border-blue={selectedSession?.id === session.id}
-        onclick={() => onSelect(session)}>
-        <div class="flex justify-between items-center mb-1">
-          <span class="font-medium text-fg text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-2">
-            {getSessionTitle(session)}
-          </span>
-          <span class="text-2xs uppercase px-1.5 py-0.5 bg-blue text-bg rounded shrink-0">
-            {session.source}
-          </span>
-        </div>
-        <div class="flex justify-between items-center text-xs text-fg-dim">
-          <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-2">
-            {getProjectName(session)}
-          </span>
-          <span class="shrink-0">{formatDate(session.updated_at)}</span>
-        </div>
-      </button>
-    {/each}
-  </div>
+  <DataTable
+    data={sessions}
+    {columns}
+    keyExtractor={(row) => row.id}
+    pageSize={100}
+    {onSelect}
+    selectedId={selectedSession?.id ?? null} />
 </div>

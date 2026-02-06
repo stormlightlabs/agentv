@@ -57,3 +57,23 @@ export type ActivityStats = { day: string; event_count: number; session_count: n
 export type ErrorStats = { day: string; error_count: number; signature: string | null };
 
 export type GroupedStats = { dimension: string; count: number; sessions?: number; earliest?: string; latest?: string };
+
+export type SourceHealth = {
+  source: "claude" | "codex" | "opencode" | "crush";
+  status: "healthy" | "degraded" | "unhealthy" | "unknown";
+  path: string | null;
+  message: string | null;
+};
+
+export type IngestResult = { imported: number; failed: number; total: number; source: string; duration_ms: number };
+
+export type ToastNotification = { id: string; type: "success" | "error" | "info"; message: string; duration?: number };
+
+export type DataTableColumn<T = Record<string, unknown>> = {
+  key: keyof T | string;
+  header: string;
+  sortable?: boolean;
+  filterable?: boolean;
+  width?: string;
+  render?: (row: T) => string | { text: string; className?: string };
+};

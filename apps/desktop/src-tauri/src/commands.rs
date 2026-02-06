@@ -1,5 +1,8 @@
-use agent_viz_store::Database;
+use agent_viz_adapters::{ClaudeAdapter, CodexAdapter, CrushAdapter, OpenCodeAdapter};
+use agent_viz_core::Source;
+use agent_viz_store::{check_sources_health, Database};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Session data for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +33,8 @@ pub struct IngestResult {
     pub imported: usize,
     pub failed: usize,
     pub total: usize,
+    pub source: String,
+    pub duration_ms: u64,
 }
 
 /// Search result for the frontend
@@ -142,10 +147,6 @@ pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, St
 /// Trigger ingestion from a source
 #[tauri::command]
 pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
-    use agent_viz_adapters::claude::ClaudeAdapter;
-    use agent_viz_core::Source;
-    use std::str::FromStr;
-
     let db = Database::open_default()
         .await
         .map_err(|e| format!("Failed to open database: {}", e))?;
@@ -156,16 +157,15 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
 
     let source = Source::from_str(&source).map_err(|e| e.to_string())?;
 
-    match source {
+    let start = std::time::Instant::now();
+    let (imported, failed) = match source {
         Source::Claude => {
             let adapter = ClaudeAdapter::new();
             let sessions = adapter.discover_sessions().await;
             let mut imported = 0;
             let mut failed = 0;
-
             for session_file in sessions {
-                let parse_result = adapter.parse_session(&session_file).await;
-                match parse_result {
+                match adapter.parse_session(&session_file).await {
                     Ok((session, events)) => {
                         if db.insert_session_with_events(&session, &events).await.is_ok() {
                             imported += 1;
@@ -176,11 +176,70 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
                     Err(_) => failed += 1,
                 }
             }
-
-            Ok(IngestResult { imported, failed, total: imported + failed })
+            (imported, failed)
         }
-        _ => Err(format!("Source '{}' not yet implemented", source)),
-    }
+        Source::Codex => {
+            let adapter = CodexAdapter::new();
+            let sessions = adapter.discover_sessions().await;
+            let mut imported = 0;
+            let mut failed = 0;
+            for session_file in sessions {
+                match adapter.parse_session(&session_file).await {
+                    Ok((session, events)) => {
+                        if db.insert_session_with_events(&session, &events).await.is_ok() {
+                            imported += 1;
+                        } else {
+                            failed += 1;
+                        }
+                    }
+                    Err(_) => failed += 1,
+                }
+            }
+            (imported, failed)
+        }
+        Source::OpenCode => {
+            let adapter = OpenCodeAdapter::new();
+            let sessions = adapter.discover_sessions().await;
+            let mut imported = 0;
+            let mut failed = 0;
+            for session_file in sessions {
+                match adapter.parse_session(&session_file).await {
+                    Ok((session, events)) => {
+                        if db.insert_session_with_events(&session, &events).await.is_ok() {
+                            imported += 1;
+                        } else {
+                            failed += 1;
+                        }
+                    }
+                    Err(_) => failed += 1,
+                }
+            }
+            (imported, failed)
+        }
+        Source::Crush => {
+            let adapter = CrushAdapter::new();
+            let sessions = adapter.discover_sessions().await;
+            let mut imported = 0;
+            let mut failed = 0;
+            for session_file in sessions {
+                match adapter.parse_session(&session_file).await {
+                    Ok((session, events)) => {
+                        if db.insert_session_with_events(&session, &events).await.is_ok() {
+                            imported += 1;
+                        } else {
+                            failed += 1;
+                        }
+                    }
+                    Err(_) => failed += 1,
+                }
+            }
+            (imported, failed)
+        }
+    };
+
+    let duration = start.elapsed().as_millis() as u64;
+
+    Ok(IngestResult { imported, failed, total: imported + failed, source: source.to_string(), duration_ms: duration })
 }
 
 /// Search events with FTS5 and faceted filtering
@@ -368,4 +427,120 @@ fn parse_duration(s: &str) -> Option<chrono::Duration> {
     } else {
         None
     }
+}
+
+/// Get health status for all data sources
+#[tauri::command]
+pub async fn get_source_health() -> Result<Vec<agent_viz_core::SourceHealth>, String> {
+    let health_results = check_sources_health().await;
+    Ok(health_results)
+}
+
+/// Ingest from all available sources
+#[tauri::command]
+pub async fn ingest_all_sources() -> Result<Vec<IngestResult>, String> {
+    let db = Database::open_default()
+        .await
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    db.migrate()
+        .await
+        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+    let mut results = Vec::new();
+    let sources = vec![Source::Claude, Source::Codex, Source::OpenCode, Source::Crush];
+
+    for source in sources {
+        let start = std::time::Instant::now();
+        let (imported, failed) = match source {
+            Source::Claude => {
+                let adapter = ClaudeAdapter::new();
+                let sessions = adapter.discover_sessions().await;
+                let mut imported = 0;
+                let mut failed = 0;
+                for session_file in sessions {
+                    match adapter.parse_session(&session_file).await {
+                        Ok((session, events)) => {
+                            if db.insert_session_with_events(&session, &events).await.is_ok() {
+                                imported += 1;
+                            } else {
+                                failed += 1;
+                            }
+                        }
+                        Err(_) => failed += 1,
+                    }
+                }
+                (imported, failed)
+            }
+            Source::Codex => {
+                let adapter = CodexAdapter::new();
+                let sessions = adapter.discover_sessions().await;
+                let mut imported = 0;
+                let mut failed = 0;
+                for session_file in sessions {
+                    match adapter.parse_session(&session_file).await {
+                        Ok((session, events)) => {
+                            if db.insert_session_with_events(&session, &events).await.is_ok() {
+                                imported += 1;
+                            } else {
+                                failed += 1;
+                            }
+                        }
+                        Err(_) => failed += 1,
+                    }
+                }
+                (imported, failed)
+            }
+            Source::OpenCode => {
+                let adapter = OpenCodeAdapter::new();
+                let sessions = adapter.discover_sessions().await;
+                let mut imported = 0;
+                let mut failed = 0;
+                for session_file in sessions {
+                    match adapter.parse_session(&session_file).await {
+                        Ok((session, events)) => {
+                            if db.insert_session_with_events(&session, &events).await.is_ok() {
+                                imported += 1;
+                            } else {
+                                failed += 1;
+                            }
+                        }
+                        Err(_) => failed += 1,
+                    }
+                }
+                (imported, failed)
+            }
+            Source::Crush => {
+                let adapter = CrushAdapter::new();
+                let sessions = adapter.discover_sessions().await;
+                let mut imported = 0;
+                let mut failed = 0;
+                for session_file in sessions {
+                    match adapter.parse_session(&session_file).await {
+                        Ok((session, events)) => {
+                            if db.insert_session_with_events(&session, &events).await.is_ok() {
+                                imported += 1;
+                            } else {
+                                failed += 1;
+                            }
+                        }
+                        Err(_) => failed += 1,
+                    }
+                }
+                (imported, failed)
+            }
+        };
+
+        let duration = start.elapsed().as_millis() as u64;
+
+        results.push(IngestResult {
+            imported,
+            failed,
+            total: imported + failed,
+            source: source.to_string(),
+            duration_ms: duration,
+        });
+    }
+
+    Ok(results)
 }
