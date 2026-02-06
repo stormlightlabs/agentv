@@ -162,10 +162,10 @@ For all adapters, verify with:
 
 **Tasks:**
 
-- [ ] Adapter: discover `~/.local/share/opencode/log/` (timestamp-named log files)
-- [ ] Adapter: parse log files and session JSONs from `project/` storage
-- [ ] Adapter: read auth.json for provider/model context
-- [ ] CLI: `ingest --source opencode`
+- [x] Adapter: discover `~/.local/share/opencode/log/` (timestamp-named log files)
+- [x] Adapter: parse log files and session JSONs from `project/` storage
+- [x] Adapter: read auth.json for provider/model context
+- [x] CLI: `ingest --source opencode`
 - [ ] Cross-tool search: query across all sources
 
 **CLI Testing:**
@@ -182,9 +182,9 @@ For all adapters, verify with:
 
 **Tasks:**
 
-- [ ] Adapter: discover `.crush/crush.db` (project-local) and `~/.crush/crush.db` (global)
-- [ ] Adapter: schema probing + graceful degradation (feature probes for table/column existence)
-- [ ] CLI: `ingest --source crush`
+- [x] Adapter: discover `.crush/crush.db` (project-local) and `~/.crush/crush.db` (global)
+- [x] Adapter: schema probing + graceful degradation (feature probes for table/column existence)
+- [x] CLI: `ingest --source crush`
 - [ ] Desktop: sessions + messages with raw JSON fallback
 
 **CLI Testing:**

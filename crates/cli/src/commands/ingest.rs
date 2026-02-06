@@ -1,4 +1,4 @@
-use agent_viz_adapters::{claude::ClaudeAdapter, codex::CodexAdapter, opencode::OpenCodeAdapter};
+use agent_viz_adapters::{claude::ClaudeAdapter, codex::CodexAdapter, crush::CrushAdapter, opencode::OpenCodeAdapter};
 use agent_viz_core::Source;
 use agent_viz_store::Database;
 use owo_colors::OwoColorize;
@@ -26,9 +26,7 @@ pub async fn run(source: Option<String>, watch: bool) -> Result<(), Box<dyn std:
                 Source::Claude => ingest_claude(&db).await?,
                 Source::Codex => ingest_codex(&db).await?,
                 Source::OpenCode => ingest_opencode(&db).await?,
-                Source::Crush => {
-                    println!("{}", format!("Source '{}' not yet implemented", src).yellow())
-                }
+                Source::Crush => ingest_crush(&db).await?,
             }
         }
         None => {
@@ -224,6 +222,62 @@ async fn ingest_opencode(db: &Database) -> Result<(), Box<dyn std::error::Error>
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
                 error!("Failed to parse session {}: {}", session.id, e);
+                failed += 1;
+            }
+        }
+    }
+
+    println!();
+    println!("{}", "Ingest complete".bold().underline());
+    println!("  {} Imported: {}", "✓".green(), imported.to_string().bold());
+    if failed > 0 {
+        println!("  {} Failed: {}", "✗".red(), failed.to_string().bold());
+    }
+
+    Ok(())
+}
+
+async fn ingest_crush(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
+    let adapter = CrushAdapter::new();
+
+    println!("  {} Discovering sessions...", "→".dimmed());
+    let sessions = adapter.discover_sessions().await;
+
+    if sessions.is_empty() {
+        println!("  {} No Crush sessions found", "✗".red());
+        println!();
+        println!("{}", "Make sure Crush is installed and has sessions.".dimmed());
+        println!(
+            "{}",
+            "Sessions should be in ~/.crush/crush.db or ./.crush/crush.db".dimmed()
+        );
+        return Ok(());
+    }
+
+    println!("  {} Found {} sessions", "✓".green(), sessions.len().to_string().bold());
+    println!();
+
+    let mut imported = 0;
+    let mut failed = 0;
+
+    for session_file in sessions {
+        print!("  {} {} ... ", "→".dimmed(), session_file.session_id.cyan());
+
+        match adapter.parse_session(&session_file).await {
+            Ok((session, events)) => match db.insert_session_with_events(&session, &events).await {
+                Ok(_) => {
+                    println!("{} ({} events)", "✓".green(), events.len().to_string().dimmed());
+                    imported += 1;
+                }
+                Err(e) => {
+                    println!("{} {}", "✗".red(), e.to_string().dimmed());
+                    error!("Failed to insert session {}: {}", session.external_id, e);
+                    failed += 1;
+                }
+            },
+            Err(e) => {
+                println!("{} {}", "✗".red(), e.to_string().dimmed());
+                error!("Failed to parse session {:?}: {}", session_file.path, e);
                 failed += 1;
             }
         }
