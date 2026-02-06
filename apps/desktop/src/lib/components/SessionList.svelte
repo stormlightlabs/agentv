@@ -41,7 +41,7 @@
           <span class="font-medium text-fg text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-2">
             {getSessionTitle(session)}
           </span>
-          <span class="text-2xs uppercase px-1.5 py-0.5 bg-blue text-bg rounded flex-shrink-0">
+          <span class="text-2xs uppercase px-1.5 py-0.5 bg-blue text-bg rounded shrink-0">
             {session.source}
           </span>
         </div>

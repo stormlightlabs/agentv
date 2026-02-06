@@ -127,15 +127,25 @@ cargo build -p agent-viz-cli
 ./target/debug/agent-viz stats --by tool
 ```
 
+### Note
+
+For all adapters, verify with:
+
+```sh
+./target/debug/agent-viz show <session-id>
+./target/debug/agent-viz stats --by source
+./target/debug/agent-viz doctor
+```
+
 ### M3 — Codex Adapter
 
 **Goal:** Ingest Codex CLI rollout logs.
 
 **Tasks:**
 
-- [ ] Adapter: discover `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`
-- [ ] Adapter: parse rollout records into canonical events
-- [ ] CLI: `ingest --source codex`
+- [x] Adapter: discover `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`
+- [x] Adapter: parse rollout records into canonical events
+- [x] CLI: `ingest --source codex`
 - [ ] Desktop: source filter + per-source health status
 
 **CLI Testing:**
