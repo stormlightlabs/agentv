@@ -36,6 +36,7 @@ A Rust workspace shipping a desktop app (SvelteKit + Tauri) and CLI (clap) for i
 ```sh
 .
   Cargo.toml                 # workspace
+  justfile                   # Common development recipes
   crates/
     core/                    # canonical model + normalization types
     adapters/                # per-tool adapters + shared parsing utils
@@ -50,7 +51,10 @@ A Rust workspace shipping a desktop app (SvelteKit + Tauri) and CLI (clap) for i
   apps/
     desktop/                 # Tauri + SvelteKit
       src-tauri/             # minimal Rust glue calling crates/api
-      web/                   # SvelteKit app
+      src/                   # SvelteKit app
+    worker/                  # Cloudflare Worker updater endpoint
+      src/index.ts           # Update manifest serving
+      wrangler.toml          # Worker configuration
 ```
 
 ## Milestones
@@ -246,9 +250,10 @@ For all adapters, verify with:
 
 **Tasks:**
 
-- [ ] Enable Tauri updater in desktop app with signed update verification
-- [ ] Deploy Cloudflare Worker updater endpoint (serving platform-specific manifests/artifacts)
-- [ ] Add CI release pipeline to build + sign bundles and publish update metadata
+- [x] Enable Tauri updater in desktop app with signed update verification
+- [x] Write Cloudflare Worker updater endpoint (serving platform-specific manifests/artifacts)
+- [x] Add Github Actions release pipeline to build + sign bundles and publish update metadata
+- [ ] Deploy Worker
 - [ ] Implement in-app update UX (check/download/install/restart + release notes)
 - [ ] Add first-run onboarding (source health check, one-click ingest, empty-state guidance)
 - [ ] Add diagnostics flow (log file location, copy debug bundle, actionable error messages)
@@ -258,12 +263,12 @@ For all adapters, verify with:
 
 ```bash
 # Build release artifacts
-pnpm --filter agent-v-gui tauri build
+just build-desktop
 
 # Verify local health + baseline functionality
-./target/debug/agent-v doctor
-./target/debug/agent-v ingest --source claude
-./target/debug/agent-v list sessions
+just doctor
+just ingest-source claude
+just list
 ```
 
 ### M9 — Log Browser Core

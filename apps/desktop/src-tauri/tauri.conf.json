@@ -1,18 +1,25 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "agent-v-gui",
-  "version": "0.1.0",
-  "identifier": "org.stormlightlabs.agent-v-gui",
+  "productName": "Agent V",
+  "version": "0.8.0",
+  "identifier": "org.stormlightlabs.agent-v",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm build",
     "frontendDist": "../build"
   },
-  "app": { "windows": [{ "title": "agent-v-gui", "width": 800, "height": 600 }], "security": { "csp": null } },
+  "app": { "windows": [{ "title": "Agent V", "width": 1200, "height": 800 }], "security": { "csp": null } },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["dmg", "app", "nsis", "appimage"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": ["https://apps.stormlightlabs.org/agentv/{{target}}-{{arch}}/{{current_version}}"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyNEMzQjYyNDU0QjI1NjEKUldRbkt6bFNBQ0dpRjE1NEpBWTl2Uk44RXZYa2ZHSXBna3RVUnJKMGdtQW5rY2tHaHhvd2t2aEEK"
+    }
   }
 }
