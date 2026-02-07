@@ -240,111 +240,103 @@ For all adapters, verify with:
 ./target/debug/agent-viz export --search "error" --format jsonl
 ```
 
-### M8 — CCV Parity: Interactive Client
+### M8 — Alpha Release: Installable App + Updates
 
-**Goal:** Start/resume/continue Claude Code sessions from UI.
+**Goal:** Ship a downloadable alpha that users can install, update, and evaluate without local dev setup.
 
 **Tasks:**
 
-- [ ] Configure Claude Code executable path
-- [ ] Spawn Claude Code process with PTY
-- [ ] Stream stdin/stdout into UI
-- [ ] Resume by session-id
-- [ ] Continue without session-id reassignment
-- [ ] Pause/resume controls
-- [ ] Tool approval flow
+- [ ] Enable Tauri updater in desktop app with signed update verification
+- [ ] Deploy Cloudflare Worker updater endpoint (serving platform-specific manifests/artifacts)
+- [ ] Add CI release pipeline to build + sign bundles and publish update metadata
+- [ ] Implement in-app update UX (check/download/install/restart + release notes)
+- [ ] Add first-run onboarding (source health check, one-click ingest, empty-state guidance)
+- [ ] Add diagnostics flow (log file location, copy debug bundle, actionable error messages)
+- [ ] Publish alpha install docs (macOS/Windows/Linux), known limits, and rollback steps
 
-**CLI Testing:**
+**Release Testing:**
 
 ```bash
-# Configure and test runtime
-./target/debug/agent-viz config set claude.executable /usr/local/bin/claude
-./target/debug/agent-viz runtime start --project <path>
-./target/debug/agent-viz runtime list
-./target/debug/agent-viz runtime attach <session-id>
+# Build release artifacts
+pnpm --filter agent-viz-gui tauri build
+
+# Verify local health + baseline functionality
+./target/debug/agent-viz doctor
+./target/debug/agent-viz ingest --source claude
+./target/debug/agent-viz list sessions
 ```
 
-### M9 — CCV Parity: Project Management
+### M9 — Log Browser Core
 
-**Goal:** Create projects and auto-discovery.
-
-**Tasks:**
-
-- [ ] Create project UI (select directory, run `/init`)
-- [ ] Auto-discover projects from `~/.claude/projects/`
-- [ ] Setting: hide sessions without user messages
-- [ ] Setting: unify sessions with same title
-
-### M10 — CCV Parity: File Upload & Preview
-
-**Goal:** Upload and preview attachments.
+**Goal:** Make high-volume agent event logs fast to browse and filter.
 
 **Tasks:**
 
-- [ ] Upload images (PNG, JPEG, GIF, WebP), PDFs, text files
-- [ ] Inline preview components
-- [ ] Store attachments in app data dir
-- [ ] Reference in event stream
+- [ ] Add global event browser with virtualization (100k+ events)
+- [ ] Add unified filter bar (source/project/kind/role/tool/date/full-text)
+- [ ] Add deep-linkable URL state for active query + selected session/event
+- [ ] Add keyboard-first navigation and quick actions (copy id/payload/open session)
+- [ ] Add saved filter presets for recurring investigations
 
-### M11 — CCV Parity: Browser Preview
+### M10 — Event Inspector + Correlation
 
-**Goal:** Right-side browser panel.
-
-**Tasks:**
-
-- [ ] Detect URLs in messages
-- [ ] Resizable right-side panel
-- [ ] URL input + reload
-- [ ] Track URL changes same-origin
-
-### M12 — CCV Parity: Git Workflow
-
-**Goal:** In-app git diff viewer + commit/push.
+**Goal:** Make each event inspectable, explainable, and traceable.
 
 **Tasks:**
 
-- [ ] Diff viewer (staged/unstaged, file tree + hunks)
-- [ ] Commit UI
-- [ ] Push UI (push-only, commit+push)
-- [ ] Session context integration
+- [ ] Side-by-side normalized fields + raw payload JSON view
+- [ ] Schema-aware renderers for message, tool call, tool result, error, and system events
+- [ ] Correlation graph navigation (tool_call -> tool_result, parent/child chains)
+- [ ] Adjacent-event diff mode for prompt/response and tool output changes
+- [ ] Sensitive-field redaction toggles for copy/export safety
 
-### M13 — CCV Parity: Scheduler + MCP
+### M11 — Visual Analytics Workbench
 
-**Goal:** Message scheduling and system monitoring.
-
-**Tasks:**
-
-- [ ] Scheduler: one-off datetime + cron recurring
-- [ ] Concurrency policies (skip/run)
-- [ ] Rate limit auto-continue
-- [ ] MCP server viewer in sidebar
-- [ ] System info monitor
-
-### M14 — CCV Parity: i18n + Polish
-
-**Goal:** Multi-language support and final UX.
+**Goal:** Turn logs into interactive operational insights.
 
 **Tasks:**
 
-- [ ] i18n framework (en/ja/zh-Hans)
-- [ ] Theme: system/dark/light
-- [ ] Audio notifications
-- [ ] Mobile-optimized layouts
+- [ ] Reusable chart primitives for timeseries, histogram, and leaderboard views
+- [ ] Multi-series throughput charts (events/sessions by source/project/model)
+- [ ] Latency distributions (p50/p95/p99) with outlier drill-down
+- [ ] Error signature trends and top-regression views
+- [ ] Click-through from chart points into pre-filtered event browser results
 
-## Quick Start for Development
+### M12 — Compare Modes + Regression Signals
 
-```bash
-# Build entire workspace
-cargo build
+**Goal:** Explain what changed between runs, projects, or date windows.
 
-# Run CLI commands during development
-cargo run -p agent-viz-cli -- doctor
-cargo run -p agent-viz-cli -- list sessions
-cargo run -p agent-viz-cli -- ingest --source claude
+**Tasks:**
 
-# Run desktop app (after M1)
-cargo tauri dev
-```
+- [ ] Side-by-side compare mode for two time windows or project scopes
+- [ ] Delta panels for volume, latency, tool usage, churn, and error rates
+- [ ] Configurable anomaly detection for spikes/drops with threshold controls
+- [ ] Timeline annotations (release markers, ingest incidents, manual notes)
+- [ ] Export comparison reports (`md`/`json`) with reproducible query parameters
+
+### M13 — Ingestion Freshness + Reliability
+
+**Goal:** Ensure near-real-time ingest is trustworthy at scale.
+
+**Tasks:**
+
+- [ ] Add per-source ingest history (last success, duration, failures, lag)
+- [ ] Complete OpenCode watcher support and close current watch-path gap
+- [ ] Add retry/backoff + dead-letter handling for parse/ingest failures
+- [ ] Add stale-source alerts in desktop status panel
+- [ ] Add idempotency and duplicate-ingest verification checks
+
+### M14 — Daily Driver Polish for Analysts
+
+**Goal:** Make the app a default workflow for log triage and performance analysis.
+
+**Tasks:**
+
+- [ ] Command palette for search/filter/navigation actions
+- [ ] Favorites + investigation bookmarks for sessions, filters, and chart states
+- [ ] Workspace profiles (path sets, defaults, and per-profile source preferences)
+- [ ] One-click export bundles (charts + stats + referenced sessions)
+- [ ] Performance targets on reference dataset (startup, query p95, memory budget)
 
 ## Acceptance Criteria by Phase
 
@@ -353,11 +345,15 @@ cargo tauri dev
 - **M3-M5:** Can ingest all four agent sources and search across them
 - **M6:** New sessions appear automatically without manual re-ingest
 - **M7:** Can export sessions and view comprehensive analytics
-- **M8-M14:** Feature parity with claude-code-viewer
+- **M8:** Users can download an alpha build, install it, and receive updates via Cloudflare Worker-backed Tauri updater
+- **M9-M10:** Users can browse large log volumes and deeply inspect correlated event details
+- **M11-M12:** Users can visualize trends and compare windows/projects to detect regressions
+- **M13:** Continuous ingest is observable, resilient, and freshness-aware across all sources
+- **M14:** The tool is polished enough for daily investigation workflows
 
 ## References
 
-- [claude-code-viewer](https://github.com/d-kimuson/claude-code-viewer) - Gold standard for progressive disclosure UI + strict schema validation
+- [claude-code-viewer](https://github.com/d-kimuson/claude-code-viewer) - Progressive disclosure UI inspiration
 - [Codex CLI Issue #2288](https://github.com/openai/codex/issues/2288) - JSON output feature request
 - [OpenCode Troubleshooting](https://opencode.ai/docs/troubleshooting/) - Log locations and storage details
 - [OpenCode CLI](https://opencode.ai/docs/cli/) - Session export commands

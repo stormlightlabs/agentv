@@ -10,7 +10,7 @@ Agent Viz provides a unified view of interactions with AI coding assistants like
     - Claude Code: JSONL sessions from `~/.claude/projects/`
     - Codex CLI: Rollout logs from `~/.codex/sessions/`
     - OpenCode: Session exports and logs via `opencode` CLI
-    - Crush: _(Planned)_ SQLite database ingestion
+    - Crush: SQLite database ingestion with schema probing
 - Unified Data Model: All agent events are normalized into a canonical format
   (Messages, Tool Calls, Results, Errors, System Events) while preserving raw payloads for debugging.
 - High-Performance Search: Full-text search (FTS5) across all session titles and message content.
