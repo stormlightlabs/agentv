@@ -261,13 +261,13 @@ For all adapters, verify with:
 - [ ] Publish alpha install docs (macOS/Windows/Linux), known limits, and rollback steps
 
 - [ ] Before v0.1.0, pull forward the following from later milestones:
-    - [ ] (from M9): unified filter bar (source/project/kind/role/tool/date/full-text) in session and log views
-    - [ ] (from M9): deep-linkable URL state for active query + selected session/event
-    - [ ] (from M9): keyboard-first navigation and quick actions (copy id/payload/open session)
-    - [ ] (from M10): schema-aware event inspector (normalized fields + raw payload JSON) for key event types
-    - [ ] (from M13): ingest status panel (last success, failures, lag) with stale-source alerts
-    - [ ] (from M14): command palette for core search/filter/navigation actions
-    - [ ] (from M14): investigation bookmarks/favorites for sessions, filters, and chart states
+    - [x] (from M9): unified filter bar (source/project/kind/role/tool/date/full-text) in session and log views
+    - [x] (from M9): deep-linkable URL state for active query + selected session/event
+    - [x] (from M9): keyboard-first navigation and quick actions (copy id/payload/open session)
+    - [x] (from M10): schema-aware event inspector (normalized fields + raw payload JSON) for key event types
+    - [x] (from M13): ingest status panel (last success, failures, lag) with stale-source alerts
+    - [x] (from M14): command palette for core search/filter/navigation actions
+    - [x] (from M14): investigation bookmarks/favorites for sessions, filters, and chart states
 
 **Release Testing:**
 

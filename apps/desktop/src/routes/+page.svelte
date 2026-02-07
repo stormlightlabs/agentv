@@ -1,12 +1,26 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
   import AnalyticsPanel from "$lib/components/AnalyticsPanel.svelte";
-  import DataTable from "$lib/components/DataTable.svelte";
+  import CommandPalette from "$lib/components/CommandPalette.svelte";
+  import EventInspector from "$lib/components/EventInspector.svelte";
+  import IngestStatusPanel from "$lib/components/IngestStatusPanel.svelte";
   import SearchPanel from "$lib/components/SearchPanel.svelte";
   import SessionList from "$lib/components/SessionList.svelte";
   import SessionViewer from "$lib/components/SessionViewer.svelte";
-  import StatusPanel from "$lib/components/StatusPanel.svelte";
   import Toast from "$lib/components/Toast.svelte";
   import WelcomeScreen from "$lib/components/WelcomeScreen.svelte";
+  import {
+    bookmarkStore,
+    getBookmarkColor,
+    getBookmarkDescription,
+    getBookmarkIcon,
+    type Bookmark,
+  } from "$lib/stores/bookmarks.svelte";
+  import { filterStore, syncFiltersFromURL, updateURLFromFilters } from "$lib/stores/filters.svelte";
+  import { keyboardStore, handleKeyboardEvent, registerShortcut } from "$lib/stores/keyboard.svelte";
+  import { logInfo } from "$lib/stores/logger.svelte";
   import { useToast } from "$lib/stores/toast";
   import type { EventData, IngestResult, SessionData } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
@@ -14,6 +28,10 @@
   import { fade, slide } from "svelte/transition";
 
   const toast = useToast();
+
+  let bookmarksOpen = $state(false);
+  let selectedEvent = $state<EventData | null>(null);
+  let showEventInspector = $state(false);
 
   let sessions = $state<SessionData[]>([]);
   let selectedSession = $state<SessionData | null>(null);
@@ -90,8 +108,10 @@
 
   async function selectSession(session: SessionData) {
     selectedSession = session;
+    filterStore.setFilter("sessionId", session.id);
     try {
       events = await invoke<EventData[]>("get_session_events", { sessionId: session.id });
+      logInfo("Session selected", { sessionId: session.id, eventCount: events.length });
     } catch (e) {
       console.error("Failed to load events:", e);
       toast.error(`Failed to load events: ${e}`);
@@ -105,6 +125,13 @@
       await selectSession(session);
       activeTab = "sessions";
     }
+  }
+
+  function selectEvent(event: EventData) {
+    selectedEvent = event;
+    showEventInspector = true;
+    filterStore.setFilter("eventId", event.id);
+    logInfo("Event selected", { eventId: event.id });
   }
 
   async function ingestSource(sourceId: string) {
@@ -160,27 +187,404 @@
     }
   }
 
+  function bookmarkCurrentSession() {
+    if (selectedSession) {
+      bookmarkStore.add({
+        name: selectedSession.title || selectedSession.external_id.slice(0, 8),
+        type: "session",
+        description: selectedSession.project || undefined,
+        data: { sessionId: selectedSession.id },
+      });
+      toast.success("Session bookmarked");
+    }
+  }
+
+  function bookmarkCurrentFilters() {
+    const filters = {
+      source: filterStore.state.source,
+      project: filterStore.state.project,
+      kind: filterStore.state.kind,
+      role: filterStore.state.role,
+      tool: filterStore.state.tool,
+      since: filterStore.state.since,
+      until: filterStore.state.until,
+    };
+    bookmarkStore.add({
+      name: "Filter Set",
+      type: "filter",
+      description: Object.entries(filters)
+        .filter(([, v]) => v)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ")
+        .slice(0, 50),
+      data: { filters },
+    });
+    toast.success("Filters bookmarked");
+  }
+
+  function applyBookmark(bookmark: Bookmark) {
+    switch (bookmark.type) {
+      case "session":
+        if (bookmark.data.sessionId) {
+          selectSessionById(bookmark.data.sessionId);
+        }
+        break;
+      case "filter":
+        if (bookmark.data.filters) {
+          Object.entries(bookmark.data.filters).forEach(([key, value]) => {
+            if (value) filterStore.setFilter(key as keyof typeof filterStore.state, value);
+          });
+        }
+        break;
+      case "search":
+        if (bookmark.data.query) {
+          filterStore.setFilter("query", bookmark.data.query);
+          activeTab = "search";
+        }
+        break;
+    }
+    bookmarksOpen = false;
+  }
+
+  function deleteBookmark(id: string) {
+    bookmarkStore.remove(id);
+  }
+
+  function setupKeyboardShortcuts() {
+    if (!browser) return;
+
+    registerShortcut({
+      key: "k",
+      modifiers: { meta: true },
+      description: "Open command palette",
+      scope: "global",
+      handler: keyboardStore.openCommandPalette,
+    });
+
+    registerShortcut({
+      key: "1",
+      modifiers: { meta: true },
+      description: "Go to sessions",
+      scope: "global",
+      handler: () => (activeTab = "sessions"),
+    });
+
+    registerShortcut({
+      key: "2",
+      modifiers: { meta: true },
+      description: "Go to search",
+      scope: "global",
+      handler: () => (activeTab = "search"),
+    });
+
+    registerShortcut({
+      key: "3",
+      modifiers: { meta: true },
+      description: "Go to analytics",
+      scope: "global",
+      handler: () => (activeTab = "analytics"),
+    });
+
+    registerShortcut({
+      key: "4",
+      modifiers: { meta: true },
+      description: "Go to status",
+      scope: "global",
+      handler: () => (activeTab = "status"),
+    });
+
+    registerShortcut({
+      key: "r",
+      modifiers: { meta: true },
+      description: "Refresh sessions",
+      scope: "global",
+      handler: loadSessions,
+    });
+
+    registerShortcut({
+      key: "b",
+      modifiers: { meta: true },
+      description: "Toggle bookmarks",
+      scope: "global",
+      handler: () => (bookmarksOpen = !bookmarksOpen),
+    });
+
+    if (selectedSession) {
+      registerShortcut({
+        key: "d",
+        modifiers: { meta: true },
+        description: "Bookmark current session",
+        scope: "global",
+        handler: bookmarkCurrentSession,
+      });
+    }
+  }
+
+  function updateCommandPalette() {
+    const commands: typeof keyboardStore.commandPaletteItems = [
+      {
+        id: "sessions",
+        title: "Go to Sessions",
+        subtitle: "View all sessions",
+        icon: "i-ri-chat-3-line",
+        category: "navigation",
+        shortcut: "Cmd+1",
+        action: () => (activeTab = "sessions"),
+      },
+      {
+        id: "search",
+        title: "Go to Search",
+        subtitle: "Search across events",
+        icon: "i-ri-search-line",
+        category: "navigation",
+        shortcut: "Cmd+2",
+        action: () => (activeTab = "search"),
+      },
+      {
+        id: "analytics",
+        title: "Go to Analytics",
+        subtitle: "View charts and statistics",
+        icon: "i-ri-bar-chart-line",
+        category: "navigation",
+        shortcut: "Cmd+3",
+        action: () => (activeTab = "analytics"),
+      },
+      {
+        id: "status",
+        title: "Go to Status",
+        subtitle: "View ingest status",
+        icon: "i-ri-heart-pulse-line",
+        category: "navigation",
+        shortcut: "Cmd+4",
+        action: () => (activeTab = "status"),
+      },
+      {
+        id: "refresh",
+        title: "Refresh Sessions",
+        subtitle: "Reload all sessions",
+        icon: "i-ri-refresh-line",
+        category: "action",
+        shortcut: "Cmd+R",
+        action: loadSessions,
+      },
+      {
+        id: "ingest-all",
+        title: "Ingest All Sources",
+        subtitle: "Import from all sources",
+        icon: "i-ri-download-cloud-line",
+        category: "action",
+        action: ingestAllSources,
+      },
+      {
+        id: "toggle-bookmarks",
+        title: "Toggle Bookmarks",
+        subtitle: "Show/hide bookmarks panel",
+        icon: "i-ri-bookmark-line",
+        category: "action",
+        shortcut: "Cmd+B",
+        action: () => (bookmarksOpen = !bookmarksOpen),
+      },
+      ...bookmarkStore.bookmarks.map((bookmark: Bookmark) => ({
+        id: `bookmark-${bookmark.id}`,
+        title: bookmark.name,
+        subtitle: getBookmarkDescription(bookmark),
+        icon: getBookmarkIcon(bookmark.type),
+        category: "view" as const,
+        action: () => applyBookmark(bookmark),
+      })),
+    ];
+
+    keyboardStore.setCommandPaletteItems(commands);
+  }
+
+  function handleUrlParams() {
+    if (!browser) return;
+
+    syncFiltersFromURL();
+
+    const sessionId = $page.url.searchParams.get("session");
+    if (sessionId) {
+      selectSessionById(sessionId);
+    }
+
+    const tab = $page.url.searchParams.get("tab");
+    if (tab && ["sessions", "search", "analytics", "status"].includes(tab)) {
+      activeTab = tab as typeof activeTab;
+    }
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    handleKeyboardEvent(event);
+  }
+
   onMount(() => {
+    bookmarkStore.init();
     loadSessions();
     startAutoRefresh();
+    setupKeyboardShortcuts();
+    handleUrlParams();
+
+    window.addEventListener("keydown", handleKeydown);
+
+    return () => {
+      stopAutoRefresh();
+      window.removeEventListener("keydown", handleKeydown);
+    };
   });
 
   onDestroy(() => {
     stopAutoRefresh();
   });
+
+  $effect(() => {
+    updateCommandPalette();
+  });
+
+  $effect(() => {
+    if (browser) {
+      const params = new URLSearchParams();
+      if (activeTab !== "sessions") params.set("tab", activeTab);
+      if (filterStore.state.query) params.set("q", filterStore.state.query);
+      if (filterStore.state.sessionId) params.set("session", filterStore.state.sessionId);
+      if (filterStore.state.source) params.set("source", filterStore.state.source);
+      if (filterStore.state.project) params.set("project", filterStore.state.project);
+      if (filterStore.state.kind) params.set("kind", filterStore.state.kind);
+      if (filterStore.state.role) params.set("role", filterStore.state.role);
+      if (filterStore.state.since) params.set("since", filterStore.state.since);
+
+      const url = params.toString() ? `?${params.toString()}` : "/";
+      goto(url, { replaceState: true, keepFocus: true });
+    }
+  });
 </script>
 
-<!-- Toast Notifications -->
+<svelte:window onkeydown={handleKeydown} />
+
 <div class="fixed top-4 right-4 z-50 flex flex-col gap-2">
   {#each toast.notifications as notification (notification.id)}
     <Toast {notification} onDismiss={toast.removeToast} />
   {/each}
 </div>
 
+<CommandPalette />
+
+{#if bookmarksOpen}
+  <div
+    class="fixed inset-0 z-40 bg-black/50"
+    onclick={() => (bookmarksOpen = false)}
+    onkeydown={(e) => {
+      if (e.key === "Escape") bookmarksOpen = false;
+    }}
+    role="dialog"
+    aria-label="Bookmarks"
+    tabindex="-1"
+    transition:fade={{ duration: 200 }}>
+    <div
+      class="absolute right-0 top-0 h-full w-80 bg-bg border-l border-bg-muted shadow-xl"
+      onclick={(e) => e.stopPropagation()}
+      transition:slide={{ axis: "x", duration: 200 }}>
+      <div class="flex flex-col h-full">
+        <div class="flex items-center justify-between p-4 border-b border-bg-muted">
+          <h2 class="text-lg font-semibold text-fg m-0">Bookmarks</h2>
+          <button class="p-2 text-fg-dim hover:text-fg transition-colors" onclick={() => (bookmarksOpen = false)}>
+            <span class="i-ri-close-line"></span>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-2">
+          {#if bookmarkStore.bookmarks.length === 0}
+            <div class="text-center text-fg-dim py-8">
+              <div class="i-ri-bookmark-line text-3xl mb-2 opacity-50"></div>
+              <p>No bookmarks yet</p>
+              <p class="text-sm">Use Cmd+D to bookmark sessions</p>
+            </div>
+          {:else}
+            {#each bookmarkStore.bookmarks as bookmark (bookmark.id)}
+              <div
+                class="group flex items-start gap-3 p-3 bg-bg-soft rounded border border-bg-muted hover:border-blue transition-colors"
+                onclick={() => applyBookmark(bookmark)}
+                role="button"
+                tabindex="0"
+                onkeydown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    applyBookmark(bookmark);
+                  }
+                }}>
+                <span class="{getBookmarkIcon(bookmark.type)} {getBookmarkColor(bookmark.type)} mt-0.5"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-fg truncate">{bookmark.name}</div>
+                  {#if bookmark.description}
+                    <div class="text-xs text-fg-dim truncate">{bookmark.description}</div>
+                  {/if}
+                </div>
+                <button
+                  class="opacity-0 group-hover:opacity-100 p-1 text-fg-dim hover:text-red transition-all"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    deleteBookmark(bookmark.id);
+                  }}
+                  aria-label="Delete bookmark"
+                  type="button">
+                  <span class="i-ri-delete-bin-line"></span>
+                </button>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- TODO: Modal component -->
+{#if showEventInspector && selectedEvent}
+  <div
+    class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+    onclick={() => (showEventInspector = false)}
+    onkeydown={(e) => {
+      if (e.key === "Escape") showEventInspector = false;
+    }}
+    role="dialog"
+    aria-label="Event inspector"
+    tabindex="-1"
+    transition:fade={{ duration: 150 }}>
+    <div
+      class="w-full max-w-4xl h-[80vh] bg-bg rounded-lg shadow-2xl overflow-hidden"
+      onclick={(e) => e.stopPropagation()}
+      transition:slide={{ duration: 150 }}>
+      <EventInspector
+        event={selectedEvent}
+        onCopyId={() => toast.success("ID copied")}
+        onCopyPayload={() => toast.success("Payload copied")}
+        onNavigateParent={(parentId) => {
+          if (parentId) {
+            toast.info(`Navigate to parent: ${parentId}`);
+          }
+        }} />
+    </div>
+  </div>
+{/if}
+
 <div class="flex h-screen overflow-hidden">
   <aside class="w-80 min-w-80 bg-bg-soft border-r border-bg-muted flex flex-col overflow-hidden">
     <div class="p-4 border-b border-bg-muted flex flex-col gap-3">
-      <h1 class="m-0 text-xl font-semibold text-fg">Agent V</h1>
+      <div class="flex items-center justify-between">
+        <h1 class="m-0 text-xl font-semibold text-fg">Agent V</h1>
+        <button
+          class="p-2 text-fg-dim hover:text-fg transition-colors relative"
+          onclick={() => (bookmarksOpen = !bookmarksOpen)}
+          title="Bookmarks (Cmd+B)">
+          <span class="i-ri-bookmark-line"></span>
+          {#if bookmarkStore.bookmarks.length > 0}
+            <span class="absolute top-1 right-1 w-2 h-2 bg-blue rounded-full" aria-hidden="true"> </span>
+          {/if}
+        </button>
+      </div>
 
       {#if newSessionsAvailable}
         <div
@@ -223,7 +627,7 @@
         {/each}
       </div>
 
-      <div class="flex items-center gap-2 text-2xs text-fg-dim">
+      <div class="flex items-center justify-between text-2xs text-fg-dim">
         <button
           class="flex items-center gap-1.5 cursor-pointer bg-transparent border-none p-0 text-inherit hover:text-fg"
           onclick={toggleAutoRefresh}>
@@ -234,6 +638,12 @@
             <span class="i-ri-checkbox-blank-circle-line"></span>
             <span>Auto-refresh off</span>
           {/if}
+        </button>
+        <button
+          class="cursor-pointer bg-transparent border-none p-0 text-inherit hover:text-fg flex items-center gap-1"
+          onclick={keyboardStore.openCommandPalette}>
+          <span class="i-ri-command-line"></span>
+          <span>Cmd+K</span>
         </button>
       </div>
     </div>
@@ -287,11 +697,11 @@
       {#if activeTab === "sessions"}
         <SessionList {sessions} {selectedSession} onSelect={selectSession} />
       {:else if activeTab === "search"}
-        <SearchPanel onSelectSession={selectSessionById} />
+        <SearchPanel onSelectSession={selectSessionById} onSelectEvent={selectEvent} />
       {:else if activeTab === "analytics"}
         <AnalyticsPanel />
       {:else}
-        <StatusPanel onRefresh={loadSessions} />
+        <IngestStatusPanel onRefresh={loadSessions} />
       {/if}
     </div>
 
@@ -299,9 +709,7 @@
       <div class="flex justify-between items-center">
         <span>{sessions.length} sessions</span>
         {#if lastIngestTime}
-          <span>
-            Last update: {lastIngestTime.toLocaleTimeString()}
-          </span>
+          <span>Last update: {lastIngestTime.toLocaleTimeString()}</span>
         {/if}
       </div>
     </div>
@@ -311,12 +719,13 @@
     {#if sessions.length === 0 && !loading}
       <WelcomeScreen onGetStarted={ingestAllSources} />
     {:else if selectedSession}
-      <SessionViewer session={selectedSession} {events} />
+      <SessionViewer session={selectedSession} {events} onSelectEvent={selectEvent} />
     {:else}
       <div class="flex-1 flex items-center justify-center text-fg-dim" in:fade>
         <div class="text-center">
           <div class="i-ri-chat-3-line text-4xl mb-3 opacity-50"></div>
           <p>Select a session to view details</p>
+          <p class="text-sm text-fg-muted mt-2">Use Cmd+K for quick actions</p>
         </div>
       </div>
     {/if}

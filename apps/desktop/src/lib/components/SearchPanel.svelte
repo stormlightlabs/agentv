@@ -3,9 +3,11 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
 
-  type Props = { onSelectSession?: (sessionId: string) => void };
+  import type { EventData } from "$lib/types";
 
-  let { onSelectSession }: Props = $props();
+  type Props = { onSelectSession?: (sessionId: string) => void; onSelectEvent?: (event: EventData) => void };
+
+  let { onSelectSession, onSelectEvent }: Props = $props();
 
   let query = $state("");
   let results = $state<SearchResult[]>([]);
@@ -263,7 +265,18 @@
 
       <div class="flex-1 overflow-y-auto p-2">
         {#each results as result (result.event.id)}
-          <div class="p-3 mb-2 bg-bg-soft border border-bg-muted rounded transition-colors hover:border-blue">
+          <div
+            class="p-3 mb-2 bg-bg-soft border border-bg-muted rounded transition-colors hover:border-blue cursor-pointer"
+            onclick={() => onSelectEvent?.(result.event)}
+            onkeydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelectEvent?.(result.event);
+              }
+            }}
+            role="button"
+            tabindex="0"
+            aria-label="View event details">
             <div class="flex items-center gap-2 mb-2">
               <span class="text-xs text-fg-dim">{formatTimestamp(result.event.timestamp)}</span>
               <span class="text-2xs font-semibold px-1.5 py-0.5 rounded uppercase {getKindClass(result.event.kind)}">

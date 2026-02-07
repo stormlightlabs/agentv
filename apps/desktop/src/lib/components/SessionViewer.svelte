@@ -3,9 +3,9 @@
   import type { ContentBlock, EventData, EventPayload, SessionData } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
 
-  type Props = { session: SessionData; events: EventData[] };
+  type Props = { session: SessionData; events: EventData[]; onSelectEvent?: (event: EventData) => void };
 
-  let { session, events }: Props = $props();
+  let { session, events, onSelectEvent }: Props = $props();
 
   const toast = useToast();
   let exporting = $state(false);
@@ -122,7 +122,6 @@
     try {
       const content = await invoke<string>("export_session", { sessionId: session.id, format });
 
-      // Create and download file
       const blob = new Blob([content], { type: format === "md" ? "text/markdown" : "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -236,16 +235,20 @@
               {@const cwd = extractCwd(event.raw_payload)}
               {@const isExpanded = expandedEvents.has(event.id)}
 
-              <button
-                class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted cursor-pointer w-full text-left"
+              <div
+                class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted cursor-pointer group"
                 onclick={() => toggleEvent(event.id)}
+                ondblclick={() => onSelectEvent?.(event)}
                 onkeydown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     toggleEvent(event.id);
+                  } else if (e.key === "i") {
+                    onSelectEvent?.(event);
                   }
                 }}
-                type="button"
+                role="button"
+                tabindex="0"
                 aria-expanded={isExpanded}>
                 <div class="shrink-0 w-6 flex items-start justify-center pt-0.5">
                   <span class="{getEventIcon(event.kind)} text-fg-dim text-base"></span>
@@ -309,13 +312,35 @@
 
                   {#if isExpanded && event.raw_payload && Object.keys(event.raw_payload).length > 0}
                     <div class="mt-3 p-2 bg-bg-muted rounded">
-                      <div class="text-xs font-semibold text-fg-muted mb-1">Raw Data</div>
+                      <div class="flex items-center justify-between mb-1">
+                        <div class="text-xs font-semibold text-fg-muted">Raw Data</div>
+                        <button
+                          class="text-xs text-blue hover:text-blue-bright flex items-center gap-1 z-10"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvent?.(event);
+                          }}
+                          type="button">
+                          <span class="i-ri-eye-line"></span>
+                          Inspect
+                        </button>
+                      </div>
                       <pre class="text-xs text-fg-dim overflow-x-auto"><code
                           >{JSON.stringify(event.raw_payload, null, 2).slice(0, 1000)}</code></pre>
                     </div>
                   {/if}
                 </div>
-              </button>
+                <button
+                  class="opacity-0 group-hover:opacity-100 p-1 text-fg-dim hover:text-blue transition-opacity z-10"
+                  title="Inspect event (I)"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    onSelectEvent?.(event);
+                  }}
+                  type="button">
+                  <span class="i-ri-eye-line"></span>
+                </button>
+              </div>
             {/each}
           </div>
         </div>
