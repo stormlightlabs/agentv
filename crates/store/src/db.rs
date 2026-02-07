@@ -596,6 +596,305 @@ impl Database {
             })
             .await
     }
+
+    /// Insert or update session metrics
+    pub async fn upsert_session_metrics(
+        &self, metrics: &crate::models::SessionMetricsRow,
+    ) -> Result<(), tokio_rusqlite::Error> {
+        let session_id = metrics.session_id.clone();
+        let total_events = metrics.total_events;
+        let message_count = metrics.message_count;
+        let tool_call_count = metrics.tool_call_count;
+        let tool_result_count = metrics.tool_result_count;
+        let error_count = metrics.error_count;
+        let user_messages = metrics.user_messages;
+        let assistant_messages = metrics.assistant_messages;
+        let duration_seconds = metrics.duration_seconds;
+        let files_touched = metrics.files_touched;
+        let lines_added = metrics.lines_added;
+        let lines_removed = metrics.lines_removed;
+        let computed_at = metrics.computed_at.clone();
+
+        self.conn
+            .call(move |conn| {
+                conn.execute(
+                    queries::UPSERT_SESSION_METRICS,
+                    [
+                        session_id,
+                        total_events.to_string(),
+                        message_count.to_string(),
+                        tool_call_count.to_string(),
+                        tool_result_count.to_string(),
+                        error_count.to_string(),
+                        user_messages.to_string(),
+                        assistant_messages.to_string(),
+                        duration_seconds.map(|d| d.to_string()).unwrap_or_default(),
+                        files_touched.to_string(),
+                        lines_added.to_string(),
+                        lines_removed.to_string(),
+                        computed_at,
+                    ],
+                )?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Get tool call frequency stats
+    pub async fn get_tool_call_frequency(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<Vec<ToolFrequencyStats>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::TOOL_CALL_FREQUENCY)?;
+                let rows = stmt
+                    .query_map([since_str.unwrap_or_default(), until_str.unwrap_or_default()], |row| {
+                        Ok(ToolFrequencyStats {
+                            tool_name: row.get(0)?,
+                            call_count: row.get(1)?,
+                            sessions: row.get(2)?,
+                            avg_duration_ms: row.get(3)?,
+                            max_duration_ms: row.get(4)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get files touched leaderboard
+    pub async fn get_files_leaderboard(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>, limit: i64,
+    ) -> Result<Vec<FileLeaderboardEntry>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::FILES_TOUCHED_LEADERBOARD)?;
+                let rows = stmt
+                    .query_map(
+                        [
+                            since_str.unwrap_or_default(),
+                            until_str.unwrap_or_default(),
+                            limit.to_string(),
+                        ],
+                        |row| {
+                            Ok(FileLeaderboardEntry {
+                                file_path: row.get(0)?,
+                                touch_count: row.get(1)?,
+                                sessions: row.get(2)?,
+                                total_lines_added: row.get(3)?,
+                                total_lines_removed: row.get(4)?,
+                            })
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get patch churn stats by day
+    pub async fn get_patch_churn_by_day(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<Vec<PatchChurnStats>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::PATCH_CHURN_BY_DAY)?;
+                let rows = stmt
+                    .query_map([since_str.unwrap_or_default(), until_str.unwrap_or_default()], |row| {
+                        let day_str: String = row.get(0)?;
+                        let day =
+                            NaiveDate::parse_from_str(&day_str, "%Y-%m-%d").unwrap_or_else(|_| Utc::now().date_naive());
+                        Ok(PatchChurnStats {
+                            day,
+                            lines_added: row.get(1)?,
+                            lines_removed: row.get(2)?,
+                            files_changed: row.get(3)?,
+                            sessions: row.get(4)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get long-running tool calls
+    pub async fn get_long_running_tool_calls(
+        &self, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>, min_duration_ms: i64, limit: i64,
+    ) -> Result<Vec<LongRunningToolCall>, tokio_rusqlite::Error> {
+        let since_str = since.map(|dt| dt.to_rfc3339());
+        let until_str = until.map(|dt| dt.to_rfc3339());
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::LONG_RUNNING_TOOL_CALLS)?;
+                let rows = stmt
+                    .query_map(
+                        [
+                            since_str.unwrap_or_default(),
+                            until_str.unwrap_or_default(),
+                            min_duration_ms.to_string(),
+                            limit.to_string(),
+                        ],
+                        |row| {
+                            Ok(LongRunningToolCall {
+                                tool_name: row.get(0)?,
+                                duration_ms: row.get(1)?,
+                                started_at: row.get(2)?,
+                                session_external_id: row.get(3)?,
+                                project: row.get(4)?,
+                                error_message: row.get(5)?,
+                            })
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get session metrics
+    pub async fn get_session_metrics(
+        &self, session_id: &str,
+    ) -> Result<Option<crate::models::SessionMetricsRow>, tokio_rusqlite::Error> {
+        let session_id = session_id.to_string();
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::GET_SESSION_METRICS)?;
+                let row = stmt
+                    .query_row([session_id], |row| {
+                        Ok(crate::models::SessionMetricsRow {
+                            session_id: row.get(0)?,
+                            total_events: row.get(1)?,
+                            message_count: row.get(2)?,
+                            tool_call_count: row.get(3)?,
+                            tool_result_count: row.get(4)?,
+                            error_count: row.get(5)?,
+                            user_messages: row.get(6)?,
+                            assistant_messages: row.get(7)?,
+                            duration_seconds: row.get(8)?,
+                            files_touched: row.get(9)?,
+                            lines_added: row.get(10)?,
+                            lines_removed: row.get(11)?,
+                            computed_at: row.get(12)?,
+                        })
+                    })
+                    .ok();
+                Ok(row)
+            })
+            .await
+    }
+
+    /// Get all sessions with their metrics for export
+    pub async fn get_sessions_with_metrics(
+        &self, limit: i64, offset: i64,
+    ) -> Result<Vec<(SessionRow, Option<crate::models::SessionMetricsRow>)>, tokio_rusqlite::Error> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(
+                    r#"
+                    SELECT
+                        s.id, s.source, s.external_id, s.project, s.title, s.created_at, s.updated_at, s.raw_payload,
+                        m.total_events, m.message_count, m.tool_call_count, m.tool_result_count,
+                        m.error_count, m.user_messages, m.assistant_messages, m.duration_seconds,
+                        m.files_touched, m.lines_added, m.lines_removed, m.computed_at
+                    FROM sessions s
+                    LEFT JOIN session_metrics m ON s.id = m.session_id
+                    ORDER BY s.updated_at DESC
+                    LIMIT ?1 OFFSET ?2
+                "#,
+                )?;
+                let rows = stmt
+                    .query_map([limit, offset], |row| {
+                        let session = SessionRow {
+                            id: row.get(0)?,
+                            source: row.get(1)?,
+                            external_id: row.get(2)?,
+                            project: row.get(3)?,
+                            title: row.get(4)?,
+                            created_at: row.get(5)?,
+                            updated_at: row.get(6)?,
+                            raw_payload: row.get(7)?,
+                        };
+                        let metrics: Option<crate::models::SessionMetricsRow> =
+                            if row.get::<_, Option<i64>>(8)?.is_some() {
+                                Some(crate::models::SessionMetricsRow {
+                                    session_id: session.id.clone(),
+                                    total_events: row.get(8)?,
+                                    message_count: row.get(9)?,
+                                    tool_call_count: row.get(10)?,
+                                    tool_result_count: row.get(11)?,
+                                    error_count: row.get(12)?,
+                                    user_messages: row.get(13)?,
+                                    assistant_messages: row.get(14)?,
+                                    duration_seconds: row.get(15)?,
+                                    files_touched: row.get(16)?,
+                                    lines_added: row.get(17)?,
+                                    lines_removed: row.get(18)?,
+                                    computed_at: row.get(19)?,
+                                })
+                            } else {
+                                None
+                            };
+                        Ok((session, metrics))
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+}
+
+/// Stats for tool call frequency
+#[derive(Debug, Clone)]
+pub struct ToolFrequencyStats {
+    pub tool_name: String,
+    pub call_count: i64,
+    pub sessions: i64,
+    pub avg_duration_ms: Option<f64>,
+    pub max_duration_ms: Option<i64>,
+}
+
+/// Entry in the files touched leaderboard
+#[derive(Debug, Clone)]
+pub struct FileLeaderboardEntry {
+    pub file_path: String,
+    pub touch_count: i64,
+    pub sessions: i64,
+    pub total_lines_added: i64,
+    pub total_lines_removed: i64,
+}
+
+/// Patch churn stats for a day
+#[derive(Debug, Clone)]
+pub struct PatchChurnStats {
+    pub day: NaiveDate,
+    pub lines_added: i64,
+    pub lines_removed: i64,
+    pub files_changed: i64,
+    pub sessions: i64,
+}
+
+/// Long-running tool call entry
+#[derive(Debug, Clone)]
+pub struct LongRunningToolCall {
+    pub tool_name: String,
+    pub duration_ms: i64,
+    pub started_at: String,
+    pub session_external_id: String,
+    pub project: Option<String>,
+    pub error_message: Option<String>,
 }
 
 /// Check health of all configured data sources

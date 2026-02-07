@@ -91,4 +91,61 @@ pub const MIGRATIONS: &[Migration] = &[
             END;
         "#,
     },
+    Migration {
+        name: "003_session_metrics_and_tool_calls",
+        sql: r#"
+            -- Session metrics table for computed analytics
+            CREATE TABLE IF NOT EXISTS session_metrics (
+                session_id TEXT PRIMARY KEY,
+                total_events INTEGER NOT NULL DEFAULT 0,
+                message_count INTEGER NOT NULL DEFAULT 0,
+                tool_call_count INTEGER NOT NULL DEFAULT 0,
+                tool_result_count INTEGER NOT NULL DEFAULT 0,
+                error_count INTEGER NOT NULL DEFAULT 0,
+                user_messages INTEGER NOT NULL DEFAULT 0,
+                assistant_messages INTEGER NOT NULL DEFAULT 0,
+                duration_seconds INTEGER,
+                files_touched INTEGER NOT NULL DEFAULT 0,
+                lines_added INTEGER NOT NULL DEFAULT 0,
+                lines_removed INTEGER NOT NULL DEFAULT 0,
+                computed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+            );
+
+            -- Tool calls table for detailed tool usage analytics
+            CREATE TABLE IF NOT EXISTS tool_calls (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                event_id TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                started_at TIMESTAMP NOT NULL,
+                completed_at TIMESTAMP,
+                duration_ms INTEGER,
+                success BOOLEAN,
+                error_message TEXT,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+                FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+            );
+
+            -- Files touched table for file operation tracking
+            CREATE TABLE IF NOT EXISTS files_touched (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                lines_added INTEGER NOT NULL DEFAULT 0,
+                lines_removed INTEGER NOT NULL DEFAULT 0,
+                touched_at TIMESTAMP NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+            );
+
+            -- Indexes for performance
+            CREATE INDEX IF NOT EXISTS idx_session_metrics_session ON session_metrics(session_id);
+            CREATE INDEX IF NOT EXISTS idx_tool_calls_session ON tool_calls(session_id);
+            CREATE INDEX IF NOT EXISTS idx_tool_calls_name ON tool_calls(tool_name);
+            CREATE INDEX IF NOT EXISTS idx_tool_calls_duration ON tool_calls(duration_ms);
+            CREATE INDEX IF NOT EXISTS idx_files_touched_session ON files_touched(session_id);
+            CREATE INDEX IF NOT EXISTS idx_files_touched_path ON files_touched(file_path);
+        "#,
+    },
 ];

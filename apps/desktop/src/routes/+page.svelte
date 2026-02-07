@@ -66,7 +66,7 @@
 
     refreshInterval = window.setInterval(() => {
       checkForNewSessions();
-    }, 30000); // Check every 30 seconds
+    }, 30000);
   }
 
   function stopAutoRefresh() {

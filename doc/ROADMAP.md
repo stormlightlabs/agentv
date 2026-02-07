@@ -221,17 +221,21 @@ For all adapters, verify with:
 
 **Tasks:**
 
-- [ ] Session metrics table (computed at ingest)
-- [ ] Tool-call frequency chart
-- [ ] Files touched leaderboard
-- [ ] Patch churn (lines added/removed)
-- [ ] Latency tracking (long-running tool calls)
-- [ ] Export: `md`, `json`, `jsonl` formats
+- [x] Session metrics table (computed at ingest)
+- [x] Tool-call frequency chart (`stats --by tools`)
+- [x] Files touched leaderboard (`stats --by files`)
+- [x] Patch churn (lines added/removed) (`stats --by churn`)
+- [x] Latency tracking (long-running tool calls) (`stats --by latency`)
+- [x] Export: `md`, `json`, `jsonl` formats (`export --session <id> --format md`)
 
 **CLI Testing:**
 
 ```bash
 ./target/debug/agent-viz stats --by project
+./target/debug/agent-viz stats --by tools
+./target/debug/agent-viz stats --by files
+./target/debug/agent-viz stats --by churn
+./target/debug/agent-viz stats --by latency
 ./target/debug/agent-viz export --session <id> --format md
 ./target/debug/agent-viz export --search "error" --format jsonl
 ```

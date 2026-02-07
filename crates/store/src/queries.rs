@@ -238,3 +238,136 @@ pub const GET_PROJECTS: &str = r#"
 pub const GET_EVENT_KINDS: &str = r#"
     SELECT DISTINCT kind FROM events ORDER BY kind
 "#;
+
+/// Insert or update session metrics
+pub const UPSERT_SESSION_METRICS: &str = r#"
+    INSERT INTO session_metrics (
+        session_id, total_events, message_count, tool_call_count, tool_result_count,
+        error_count, user_messages, assistant_messages, duration_seconds,
+        files_touched, lines_added, lines_removed, computed_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+    ON CONFLICT(session_id) DO UPDATE SET
+        total_events = excluded.total_events,
+        message_count = excluded.message_count,
+        tool_call_count = excluded.tool_call_count,
+        tool_result_count = excluded.tool_result_count,
+        error_count = excluded.error_count,
+        user_messages = excluded.user_messages,
+        assistant_messages = excluded.assistant_messages,
+        duration_seconds = excluded.duration_seconds,
+        files_touched = excluded.files_touched,
+        lines_added = excluded.lines_added,
+        lines_removed = excluded.lines_removed,
+        computed_at = excluded.computed_at
+"#;
+
+/// Insert a tool call record
+pub const INSERT_TOOL_CALL: &str = r#"
+    INSERT INTO tool_calls (
+        id, session_id, event_id, tool_name, started_at, completed_at, duration_ms, success, error_message
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+    ON CONFLICT(id) DO UPDATE SET
+        completed_at = excluded.completed_at,
+        duration_ms = excluded.duration_ms,
+        success = excluded.success,
+        error_message = excluded.error_message
+"#;
+
+/// Insert a file touched record
+pub const INSERT_FILE_TOUCHED: &str = r#"
+    INSERT INTO files_touched (
+        id, session_id, file_path, operation, lines_added, lines_removed, touched_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    ON CONFLICT(id) DO UPDATE SET
+        lines_added = excluded.lines_added,
+        lines_removed = excluded.lines_removed
+"#;
+
+/// Get tool call frequency stats
+pub const TOOL_CALL_FREQUENCY: &str = r#"
+    SELECT
+        tool_name,
+        COUNT(*) as call_count,
+        COUNT(DISTINCT session_id) as sessions,
+        AVG(CASE WHEN duration_ms IS NOT NULL THEN duration_ms END) as avg_duration_ms,
+        MAX(duration_ms) as max_duration_ms
+    FROM tool_calls
+    WHERE (?1 = '' OR started_at >= ?1)
+        AND (?2 = '' OR started_at < ?2)
+    GROUP BY tool_name
+    ORDER BY call_count DESC
+"#;
+
+/// Get files touched leaderboard
+pub const FILES_TOUCHED_LEADERBOARD: &str = r#"
+    SELECT
+        file_path,
+        COUNT(*) as touch_count,
+        COUNT(DISTINCT session_id) as sessions,
+        SUM(lines_added) as total_lines_added,
+        SUM(lines_removed) as total_lines_removed
+    FROM files_touched
+    WHERE (?1 = '' OR touched_at >= ?1)
+        AND (?2 = '' OR touched_at < ?2)
+    GROUP BY file_path
+    ORDER BY touch_count DESC
+    LIMIT ?3
+"#;
+
+/// Get patch churn stats (lines added/removed) by day
+pub const PATCH_CHURN_BY_DAY: &str = r#"
+    SELECT
+        DATE(touched_at) as day,
+        SUM(lines_added) as lines_added,
+        SUM(lines_removed) as lines_removed,
+        COUNT(DISTINCT file_path) as files_changed,
+        COUNT(DISTINCT session_id) as sessions
+    FROM files_touched
+    WHERE (?1 = '' OR touched_at >= ?1)
+        AND (?2 = '' OR touched_at < ?2)
+    GROUP BY DATE(touched_at)
+    ORDER BY day DESC
+"#;
+
+/// Get long-running tool calls (latency tracking)
+pub const LONG_RUNNING_TOOL_CALLS: &str = r#"
+    SELECT
+        tc.tool_name,
+        tc.duration_ms,
+        tc.started_at,
+        s.external_id as session_external_id,
+        s.project,
+        tc.error_message
+    FROM tool_calls tc
+    JOIN sessions s ON tc.session_id = s.id
+    WHERE tc.duration_ms IS NOT NULL
+        AND (?1 = '' OR tc.started_at >= ?1)
+        AND (?2 = '' OR tc.started_at < ?2)
+        AND tc.duration_ms >= ?3
+    ORDER BY tc.duration_ms DESC
+    LIMIT ?4
+"#;
+
+/// Get session metrics for a specific session
+pub const GET_SESSION_METRICS: &str = r#"
+    SELECT
+        session_id, total_events, message_count, tool_call_count, tool_result_count,
+        error_count, user_messages, assistant_messages, duration_seconds,
+        files_touched, lines_added, lines_removed, computed_at
+    FROM session_metrics
+    WHERE session_id = ?1
+"#;
+
+/// Get aggregated session metrics summary
+pub const GET_SESSION_METRICS_SUMMARY: &str = r#"
+    SELECT
+        COUNT(DISTINCT session_id) as total_sessions,
+        SUM(total_events) as total_events,
+        SUM(tool_call_count) as total_tool_calls,
+        SUM(error_count) as total_errors,
+        SUM(files_touched) as total_files_touched,
+        SUM(lines_added) as total_lines_added,
+        SUM(lines_removed) as total_lines_removed,
+        AVG(duration_seconds) as avg_duration_seconds
+    FROM session_metrics
+"#;
