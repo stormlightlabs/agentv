@@ -373,8 +373,7 @@ impl ClaudeAdapter {
             .get("timestamp")
             .and_then(|t| t.as_str())
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(Utc::now);
+            .map(|dt| dt.with_timezone(&Utc))?;
 
         let (kind, role, content) = match entry_type {
             "user" => {

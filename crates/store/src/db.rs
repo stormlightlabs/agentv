@@ -5,7 +5,7 @@ use tokio_rusqlite::Connection;
 use tracing::{error, info};
 
 use crate::migrations::MIGRATIONS;
-use crate::models::{EventRow, SessionRow};
+use crate::models::{EventRow, SessionMetricsRow, SessionRow};
 use crate::queries;
 
 /// Search result with highlighted snippet
@@ -245,12 +245,12 @@ impl Database {
             .call(move |conn| {
                 conn.execute(
                     queries::INSERT_SESSION,
-                    [
+                    rusqlite::params![
                         id,
                         source,
                         external_id,
-                        project.unwrap_or_default(),
-                        title.unwrap_or_default(),
+                        project,
+                        title,
                         created_at,
                         updated_at,
                         raw_payload,
@@ -633,9 +633,7 @@ impl Database {
     }
 
     /// Insert or update session metrics
-    pub async fn upsert_session_metrics(
-        &self, metrics: &crate::models::SessionMetricsRow,
-    ) -> Result<(), tokio_rusqlite::Error> {
+    pub async fn upsert_session_metrics(&self, metrics: &SessionMetricsRow) -> Result<(), tokio_rusqlite::Error> {
         let session_id = metrics.session_id.clone();
         let total_events = metrics.total_events;
         let message_count = metrics.message_count;
@@ -801,7 +799,7 @@ impl Database {
     /// Get session metrics
     pub async fn get_session_metrics(
         &self, session_id: &str,
-    ) -> Result<Option<crate::models::SessionMetricsRow>, tokio_rusqlite::Error> {
+    ) -> Result<Option<SessionMetricsRow>, tokio_rusqlite::Error> {
         let session_id = session_id.to_string();
 
         self.conn
@@ -809,7 +807,7 @@ impl Database {
                 let mut stmt = conn.prepare(queries::GET_SESSION_METRICS)?;
                 let row = stmt
                     .query_row([session_id], |row| {
-                        Ok(crate::models::SessionMetricsRow {
+                        Ok(SessionMetricsRow {
                             session_id: row.get(0)?,
                             total_events: row.get(1)?,
                             message_count: row.get(2)?,
@@ -834,7 +832,7 @@ impl Database {
     /// Get all sessions with their metrics for export
     pub async fn get_sessions_with_metrics(
         &self, limit: i64, offset: i64,
-    ) -> Result<Vec<(SessionRow, Option<crate::models::SessionMetricsRow>)>, tokio_rusqlite::Error> {
+    ) -> Result<Vec<(SessionRow, Option<SessionMetricsRow>)>, tokio_rusqlite::Error> {
         self.conn
             .call(move |conn| {
                 let mut stmt = conn.prepare(queries::GET_SESSIONS_WITH_METRICS)?;
@@ -850,26 +848,25 @@ impl Database {
                             updated_at: row.get(6)?,
                             raw_payload: row.get(7)?,
                         };
-                        let metrics: Option<crate::models::SessionMetricsRow> =
-                            if row.get::<_, Option<i64>>(8)?.is_some() {
-                                Some(crate::models::SessionMetricsRow {
-                                    session_id: session.id.clone(),
-                                    total_events: row.get(8)?,
-                                    message_count: row.get(9)?,
-                                    tool_call_count: row.get(10)?,
-                                    tool_result_count: row.get(11)?,
-                                    error_count: row.get(12)?,
-                                    user_messages: row.get(13)?,
-                                    assistant_messages: row.get(14)?,
-                                    duration_seconds: row.get(15)?,
-                                    files_touched: row.get(16)?,
-                                    lines_added: row.get(17)?,
-                                    lines_removed: row.get(18)?,
-                                    computed_at: row.get(19)?,
-                                })
-                            } else {
-                                None
-                            };
+                        let metrics: Option<SessionMetricsRow> = if row.get::<_, Option<i64>>(8)?.is_some() {
+                            Some(SessionMetricsRow {
+                                session_id: session.id.clone(),
+                                total_events: row.get(8)?,
+                                message_count: row.get(9)?,
+                                tool_call_count: row.get(10)?,
+                                tool_result_count: row.get(11)?,
+                                error_count: row.get(12)?,
+                                user_messages: row.get(13)?,
+                                assistant_messages: row.get(14)?,
+                                duration_seconds: row.get(15)?,
+                                files_touched: row.get(16)?,
+                                lines_added: row.get(17)?,
+                                lines_removed: row.get(18)?,
+                                computed_at: row.get(19)?,
+                            })
+                        } else {
+                            None
+                        };
                         Ok((session, metrics))
                     })?
                     .collect::<Result<Vec<_>, _>>()?;

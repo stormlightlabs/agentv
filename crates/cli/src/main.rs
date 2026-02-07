@@ -9,7 +9,7 @@ use commands::{doctor, export, ingest, list, search, show, stats};
 #[derive(Parser)]
 #[command(name = "agent-viz")]
 #[command(about = "Agent session visualization and analysis tool")]
-#[command(version = "0.1.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
