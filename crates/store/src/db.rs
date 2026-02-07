@@ -282,46 +282,81 @@ impl Database {
             .await
     }
 
-    /// Insert a session with all its events in a transaction
+    /// Insert a session with all its events atomically in a transaction
     pub async fn insert_session_with_events(
         &self, session: &Session, events: &[Event],
     ) -> Result<(), tokio_rusqlite::Error> {
+        let session = session.clone();
+        let events: Vec<Event> = events.to_vec();
         let source = session.source.to_string();
         let external_id = session.external_id.clone();
+        let external_id_for_log = external_id.clone();
+        let event_count = events.len();
 
-        let existing_id: Option<String> = self
-            .conn
+        self.conn
             .call(move |conn| {
-                let mut stmt = conn.prepare("SELECT id FROM sessions WHERE source = ?1 AND external_id = ?2")?;
-                let id: Option<String> = stmt.query_row([&source, &external_id], |row| row.get(0)).ok();
-                Ok(id)
+                let tx = conn.transaction()?;
+
+                let existing_id: Option<String> = {
+                    let mut stmt = tx.prepare(queries::GET_SESSION_ID_BY_SOURCE_AND_EXTERNAL_ID)?;
+                    stmt.query_row([&source, &external_id], |row| row.get(0)).ok()
+                };
+
+                let (session_id_to_use, is_update) = match existing_id {
+                    Some(id) => (id, true),
+                    None => (session.id.to_string(), false),
+                };
+
+                if is_update {
+                    tx.execute(queries::DELETE_EVENTS_BY_SESSION_ID, [&session_id_to_use])?;
+                }
+
+                let id = session_id_to_use.clone();
+                let source = session.source.to_string();
+                let external_id = session.external_id.clone();
+                let project = session.project.clone();
+                let title = session.title.clone();
+                let created_at = session.created_at.to_rfc3339();
+                let updated_at = session.updated_at.to_rfc3339();
+                let raw_payload = serde_json::to_string(&session.raw_payload).unwrap_or_default();
+
+                tx.execute(
+                    queries::INSERT_SESSION,
+                    [
+                        id,
+                        source,
+                        external_id,
+                        project.unwrap_or_default(),
+                        title.unwrap_or_default(),
+                        created_at,
+                        updated_at,
+                        raw_payload,
+                    ],
+                )?;
+
+                for event in &events {
+                    let id = event.id.to_string();
+                    let session_id = uuid::Uuid::parse_str(&session_id_to_use)
+                        .map(|uuid| uuid.to_string())
+                        .unwrap_or_else(|_| event.session_id.to_string());
+                    let kind = event.kind.to_string();
+                    let role = event.role.map(|r| r.to_string()).unwrap_or_default();
+                    let content = event.content.clone().unwrap_or_default();
+                    let timestamp = event.timestamp.to_rfc3339();
+                    let raw_payload = serde_json::to_string(&event.raw_payload).unwrap_or_default();
+
+                    tx.execute(
+                        queries::INSERT_EVENT,
+                        [id, session_id, kind, role, content, timestamp, raw_payload],
+                    )?;
+                }
+
+                tx.commit()?;
+                Ok(())
             })
             .await?;
 
-        let (session_id_to_use, is_update) = match existing_id {
-            Some(id) => (id, true),
-            None => (session.id.to_string(), false),
-        };
-
-        if is_update {
-            let delete_id = session_id_to_use.clone();
-            self.conn
-                .call(move |conn| {
-                    conn.execute("DELETE FROM events WHERE session_id = ?1", [&delete_id])?;
-                    Ok(())
-                })
-                .await?;
-        }
-
-        self.insert_session(session).await?;
-
-        for event in events {
-            let mut event_with_correct_id = event.clone();
-            event_with_correct_id.session_id = uuid::Uuid::parse_str(&session_id_to_use).unwrap_or(event.session_id);
-            self.insert_event(&event_with_correct_id).await?;
-        }
-
-        info!("Inserted session {} with {} events", session.external_id, events.len());
+        info!("Inserted session {} with {} events", external_id_for_log, event_count);
 
         Ok(())
     }
@@ -802,19 +837,7 @@ impl Database {
     ) -> Result<Vec<(SessionRow, Option<crate::models::SessionMetricsRow>)>, tokio_rusqlite::Error> {
         self.conn
             .call(move |conn| {
-                let mut stmt = conn.prepare(
-                    r#"
-                    SELECT
-                        s.id, s.source, s.external_id, s.project, s.title, s.created_at, s.updated_at, s.raw_payload,
-                        m.total_events, m.message_count, m.tool_call_count, m.tool_result_count,
-                        m.error_count, m.user_messages, m.assistant_messages, m.duration_seconds,
-                        m.files_touched, m.lines_added, m.lines_removed, m.computed_at
-                    FROM sessions s
-                    LEFT JOIN session_metrics m ON s.id = m.session_id
-                    ORDER BY s.updated_at DESC
-                    LIMIT ?1 OFFSET ?2
-                "#,
-                )?;
+                let mut stmt = conn.prepare(queries::GET_SESSIONS_WITH_METRICS)?;
                 let rows = stmt
                     .query_map([limit, offset], |row| {
                         let session = SessionRow {

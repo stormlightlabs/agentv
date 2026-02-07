@@ -7,20 +7,13 @@ use agent_v_store::SearchFacets as DbSearchFacets;
 use agent_v_store::{check_sources_health, Database};
 use chrono::{Duration, Utc};
 use std::str::FromStr;
+use tauri::State;
 
 pub use models::*;
 
 /// List all sessions
 #[tauri::command]
-pub async fn list_sessions() -> Result<Vec<SessionData>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn list_sessions(db: State<'_, Database>) -> Result<Vec<SessionData>, String> {
     let rows = db
         .list_sessions(1000, 0)
         .await
@@ -44,15 +37,7 @@ pub async fn list_sessions() -> Result<Vec<SessionData>, String> {
 
 /// Get events for a session
 #[tauri::command]
-pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn get_session_events(db: State<'_, Database>, session_id: String) -> Result<Vec<EventData>, String> {
     let rows = db
         .get_session_events(session_id)
         .await
@@ -75,15 +60,7 @@ pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, St
 
 /// Trigger ingestion from a source
 #[tauri::command]
-pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn ingest_source(db: State<'_, Database>, source: String) -> Result<IngestResult, String> {
     let source = Source::from_str(&source)?;
 
     ingest::ingest_single_source(&db, source).await
@@ -91,15 +68,9 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
 
 /// Search events with FTS5 and faceted filtering
 #[tauri::command]
-pub async fn search_events(query: String, facets: SearchFacets, limit: i64) -> Result<Vec<SearchResult>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn search_events(
+    db: State<'_, Database>, query: String, facets: SearchFacets, limit: i64,
+) -> Result<Vec<SearchResult>, String> {
     let since_dt = facets
         .since
         .and_then(|s| parse_duration(&s))
@@ -132,15 +103,9 @@ pub async fn search_events(query: String, facets: SearchFacets, limit: i64) -> R
 
 /// Get activity stats by day
 #[tauri::command]
-pub async fn get_activity_stats(since: Option<String>, until: Option<String>) -> Result<Vec<ActivityStats>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn get_activity_stats(
+    db: State<'_, Database>, since: Option<String>, until: Option<String>,
+) -> Result<Vec<ActivityStats>, String> {
     let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
     let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
 
@@ -157,15 +122,9 @@ pub async fn get_activity_stats(since: Option<String>, until: Option<String>) ->
 
 /// Get error stats
 #[tauri::command]
-pub async fn get_error_stats(since: Option<String>, until: Option<String>) -> Result<Vec<ErrorStats>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn get_error_stats(
+    db: State<'_, Database>, since: Option<String>, until: Option<String>,
+) -> Result<Vec<ErrorStats>, String> {
     let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
     let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
 
@@ -182,15 +141,7 @@ pub async fn get_error_stats(since: Option<String>, until: Option<String>) -> Re
 
 /// Get available sources for faceting
 #[tauri::command]
-pub async fn get_sources() -> Result<Vec<String>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn get_sources(db: State<'_, Database>) -> Result<Vec<String>, String> {
     let sources = db
         .get_sources()
         .await
@@ -201,15 +152,7 @@ pub async fn get_sources() -> Result<Vec<String>, String> {
 
 /// Get available projects for faceting
 #[tauri::command]
-pub async fn get_projects() -> Result<Vec<String>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn get_projects(db: State<'_, Database>) -> Result<Vec<String>, String> {
     let projects = db
         .get_projects()
         .await
@@ -220,15 +163,7 @@ pub async fn get_projects() -> Result<Vec<String>, String> {
 
 /// Get available event kinds for faceting
 #[tauri::command]
-pub async fn get_event_kinds() -> Result<Vec<String>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn get_event_kinds(db: State<'_, Database>) -> Result<Vec<String>, String> {
     let kinds = db
         .get_event_kinds()
         .await
@@ -269,15 +204,7 @@ pub async fn get_source_health() -> Result<Vec<agent_v_core::SourceHealth>, Stri
 
 /// Ingest from all available sources
 #[tauri::command]
-pub async fn ingest_all_sources() -> Result<Vec<IngestResult>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn ingest_all_sources(db: State<'_, Database>) -> Result<Vec<IngestResult>, String> {
     let mut results = Vec::new();
     let sources = vec![Source::Claude, Source::Codex, Source::OpenCode, Source::Crush];
 
@@ -302,31 +229,15 @@ pub async fn ingest_all_sources() -> Result<Vec<IngestResult>, String> {
 
 /// Check for new sessions available in source directories
 #[tauri::command]
-pub async fn check_for_new_sessions() -> Result<bool, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn check_for_new_sessions(db: State<'_, Database>) -> Result<bool, String> {
     ingest::check_new_sessions_available(&db).await
 }
 
 /// Get tool call frequency stats
 #[tauri::command]
 pub async fn get_tool_call_frequency(
-    since: Option<String>, _until: Option<String>,
+    db: State<'_, Database>, since: Option<String>, _until: Option<String>,
 ) -> Result<Vec<ToolFrequencyStats>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
     let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
 
     let stats = db
@@ -349,17 +260,9 @@ pub async fn get_tool_call_frequency(
 /// Get files touched leaderboard
 #[tauri::command]
 pub async fn get_files_leaderboard(
-    since: Option<String>, _until: Option<String>, limit: Option<i64>,
+    db: State<'_, Database>, since: Option<String>, _until: Option<String>, limit: Option<i64>,
 ) -> Result<Vec<FileLeaderboardEntry>, String> {
     use chrono::Utc;
-
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
 
     let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
     let limit = limit.unwrap_or(20);
@@ -383,15 +286,9 @@ pub async fn get_files_leaderboard(
 
 /// Get patch churn stats by day
 #[tauri::command]
-pub async fn get_patch_churn(since: Option<String>, _until: Option<String>) -> Result<Vec<PatchChurnStats>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn get_patch_churn(
+    db: State<'_, Database>, since: Option<String>, _until: Option<String>,
+) -> Result<Vec<PatchChurnStats>, String> {
     let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
 
     let stats = db
@@ -414,16 +311,9 @@ pub async fn get_patch_churn(since: Option<String>, _until: Option<String>) -> R
 /// Get long-running tool calls
 #[tauri::command]
 pub async fn get_long_running_tools(
-    since: Option<String>, _until: Option<String>, min_duration_ms: Option<i64>, limit: Option<i64>,
+    db: State<'_, Database>, since: Option<String>, _until: Option<String>, min_duration_ms: Option<i64>,
+    limit: Option<i64>,
 ) -> Result<Vec<LongRunningToolCall>, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
     let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
     let min_duration = min_duration_ms.unwrap_or(5000);
     let limit = limit.unwrap_or(20);
@@ -448,15 +338,7 @@ pub async fn get_long_running_tools(
 
 /// Export a session to various formats
 #[tauri::command]
-pub async fn export_session(session_id: String, format: String) -> Result<String, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
+pub async fn export_session(db: State<'_, Database>, session_id: String, format: String) -> Result<String, String> {
     let mut session = None;
     let mut offset = 0;
     loop {
@@ -492,16 +374,9 @@ pub async fn export_session(session_id: String, format: String) -> Result<String
 /// Export search results to various formats
 #[tauri::command]
 pub async fn export_search(
-    query: String, source: Option<String>, since: Option<String>, kind: Option<String>, format: String,
+    db: State<'_, Database>, query: String, source: Option<String>, since: Option<String>, kind: Option<String>,
+    format: String,
 ) -> Result<String, String> {
-    let db = Database::open_default()
-        .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
-
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
-
     let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
 
     let db_facets = DbSearchFacets { source, project: None, kind, since: since_dt };

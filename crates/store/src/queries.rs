@@ -371,3 +371,26 @@ pub const GET_SESSION_METRICS_SUMMARY: &str = r#"
         AVG(duration_seconds) as avg_duration_seconds
     FROM session_metrics
 "#;
+
+/// Get session ID by source and external_id
+pub const GET_SESSION_ID_BY_SOURCE_AND_EXTERNAL_ID: &str = r#"
+    SELECT id FROM sessions WHERE source = ?1 AND external_id = ?2
+"#;
+
+/// Delete events for a session
+pub const DELETE_EVENTS_BY_SESSION_ID: &str = r#"
+    DELETE FROM events WHERE session_id = ?1
+"#;
+
+/// Get sessions with their metrics for export
+pub const GET_SESSIONS_WITH_METRICS: &str = r#"
+    SELECT
+        s.id, s.source, s.external_id, s.project, s.title, s.created_at, s.updated_at, s.raw_payload,
+        m.total_events, m.message_count, m.tool_call_count, m.tool_result_count,
+        m.error_count, m.user_messages, m.assistant_messages, m.duration_seconds,
+        m.files_touched, m.lines_added, m.lines_removed, m.computed_at
+    FROM sessions s
+    LEFT JOIN session_metrics m ON s.id = m.session_id
+    ORDER BY s.updated_at DESC
+    LIMIT ?1 OFFSET ?2
+"#;
