@@ -1,9 +1,14 @@
 <script lang="ts">
+  import { useToast } from "$lib/stores/toast";
   import type { ContentBlock, EventData, EventPayload, SessionData } from "$lib/types";
+  import { invoke } from "@tauri-apps/api/core";
 
   type Props = { session: SessionData; events: EventData[] };
 
   let { session, events }: Props = $props();
+
+  const toast = useToast();
+  let exporting = $state(false);
 
   function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
@@ -112,6 +117,30 @@
     return groups;
   }
 
+  async function exportSession(format: "md" | "json" | "jsonl") {
+    exporting = true;
+    try {
+      const content = await invoke<string>("export_session", { sessionId: session.id, format });
+
+      // Create and download file
+      const blob = new Blob([content], { type: format === "md" ? "text/markdown" : "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `session-${session.external_id.slice(0, 8)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported session as ${format.toUpperCase()}`);
+    } catch (e) {
+      toast.error(`Failed to export: ${e}`);
+    } finally {
+      exporting = false;
+    }
+  }
+
   let groupedEvents = $derived(groupEventsByDate(events));
   let expandedEvents = $state<Set<string>>(new Set());
 
@@ -158,9 +187,32 @@
         <span class="text-fg-muted">Created:</span>
         {formatDate(session.created_at)}
       </div>
-      <div>
+      <div class="mb-2">
         <span class="text-fg-muted">Updated:</span>
         {formatDate(session.updated_at)}
+      </div>
+      <div class="flex gap-1 justify-end">
+        <button
+          class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
+          onclick={() => exportSession("md")}
+          disabled={exporting}
+          title="Export as Markdown">
+          .md
+        </button>
+        <button
+          class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
+          onclick={() => exportSession("json")}
+          disabled={exporting}
+          title="Export as JSON">
+          .json
+        </button>
+        <button
+          class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
+          onclick={() => exportSession("jsonl")}
+          disabled={exporting}
+          title="Export as JSONL">
+          .jsonl
+        </button>
       </div>
     </div>
   </header>
@@ -184,9 +236,17 @@
               {@const cwd = extractCwd(event.raw_payload)}
               {@const isExpanded = expandedEvents.has(event.id)}
 
-              <div
-                class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted cursor-pointer"
-                onclick={() => toggleEvent(event.id)}>
+              <button
+                class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted cursor-pointer w-full text-left"
+                onclick={() => toggleEvent(event.id)}
+                onkeydown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleEvent(event.id);
+                  }
+                }}
+                type="button"
+                aria-expanded={isExpanded}>
                 <div class="shrink-0 w-6 flex items-start justify-center pt-0.5">
                   <span class="{getEventIcon(event.kind)} text-fg-dim text-base"></span>
                 </div>
@@ -255,7 +315,7 @@
                     </div>
                   {/if}
                 </div>
-              </div>
+              </button>
             {/each}
           </div>
         </div>

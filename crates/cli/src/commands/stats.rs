@@ -11,36 +11,16 @@ pub async fn run(by: Option<String>, since: Option<String>) -> Result<(), Box<dy
     let until_dt = Some(Utc::now());
 
     match by.as_deref() {
-        Some("day") | Some("daily") => {
-            show_activity_by_day(&db, since_dt, until_dt).await?;
-        }
-        Some("source") => {
-            show_stats_by_source(&db).await?;
-        }
-        Some("project") => {
-            show_stats_by_project(&db, None).await?;
-        }
-        Some("tool") => {
-            show_stats_by_tool(&db, since_dt, until_dt).await?;
-        }
-        Some("error") | Some("errors") => {
-            show_error_stats(&db, since_dt, until_dt).await?;
-        }
-        Some("tools") | Some("tool-calls") => {
-            show_tool_call_frequency(&db, since_dt, until_dt).await?;
-        }
-        Some("files") => {
-            show_files_leaderboard(&db, since_dt, until_dt).await?;
-        }
-        Some("churn") => {
-            show_patch_churn(&db, since_dt, until_dt).await?;
-        }
-        Some("latency") | Some("slow") => {
-            show_long_running_tools(&db, since_dt, until_dt).await?;
-        }
-        _ => {
-            show_summary(&db).await?;
-        }
+        Some("day") | Some("daily") => show_activity_by_day(&db, since_dt, until_dt).await?,
+        Some("source") => show_stats_by_source(&db).await?,
+        Some("project") => show_stats_by_project(&db, None).await?,
+        Some("tool") => show_stats_by_tool(&db, since_dt, until_dt).await?,
+        Some("error") | Some("errors") => show_error_stats(&db, since_dt, until_dt).await?,
+        Some("tools") | Some("tool-calls") => show_tool_call_frequency(&db, since_dt, until_dt).await?,
+        Some("files") => show_files_leaderboard(&db, since_dt, until_dt).await?,
+        Some("churn") => show_patch_churn(&db, since_dt, until_dt).await?,
+        Some("latency") | Some("slow") => show_long_running_tools(&db, since_dt, until_dt).await?,
+        _ => show_summary(&db).await?,
     }
 
     Ok(())

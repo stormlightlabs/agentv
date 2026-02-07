@@ -318,29 +318,26 @@ fn parse_since(since: &str) -> Result<Option<DateTime<Utc>>, String> {
     let err = Err(format!("Invalid duration format: {}. Use Nd, Nh, Nw", since));
 
     let duration = if since.ends_with('d') {
-        if let Some(days) = since.strip_suffix('d') {
-            let days: i64 = days.parse().map_err(|_| "Invalid days")?;
-            chrono::Duration::days(days)
-        } else {
-            return err;
-        }
+        since
+            .strip_suffix('d')
+            .and_then(|days| days.parse().ok())
+            .map(chrono::Duration::days)
     } else if since.ends_with('h') {
-        if let Some(hours) = since.strip_suffix('h') {
-            let hours: i64 = hours.parse().map_err(|_| "Invalid hours")?;
-            chrono::Duration::hours(hours)
-        } else {
-            return err;
-        }
+        since
+            .strip_suffix('h')
+            .and_then(|hours| hours.parse().ok())
+            .map(chrono::Duration::hours)
     } else if since.ends_with('w') {
-        if let Some(weeks) = since.strip_suffix('w') {
-            let weeks: i64 = weeks.parse().map_err(|_| "Invalid weeks")?;
-            chrono::Duration::weeks(weeks)
-        } else {
-            return err;
-        }
+        since
+            .strip_suffix('w')
+            .and_then(|weeks| weeks.parse().ok())
+            .map(chrono::Duration::weeks)
     } else {
         return err;
     };
 
-    Ok(Some(Utc::now() - duration))
+    match duration {
+        Some(duration) => Ok(Some(Utc::now() - duration)),
+        None => Ok(None),
+    }
 }

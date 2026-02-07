@@ -217,7 +217,9 @@
         <button
           class="px-2 py-1 rounded border border-bg-muted bg-bg text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           onclick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}>
+          disabled={currentPage === 1}
+          aria-label="Previous page"
+          title="Previous page">
           <span class="i-ri-arrow-left-s-line"></span>
         </button>
         <span class="px-2 text-fg-dim">
@@ -226,7 +228,9 @@
         <button
           class="px-2 py-1 rounded border border-bg-muted bg-bg text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           onclick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}>
+          disabled={currentPage === totalPages}
+          aria-label="Next page"
+          title="Next page">
           <span class="i-ri-arrow-right-s-line"></span>
         </button>
       </div>

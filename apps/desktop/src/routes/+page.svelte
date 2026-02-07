@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AnalyticsPanel from "$lib/components/AnalyticsPanel.svelte";
   import DataTable from "$lib/components/DataTable.svelte";
   import SearchPanel from "$lib/components/SearchPanel.svelte";
   import SessionList from "$lib/components/SessionList.svelte";
@@ -19,7 +20,7 @@
   let events = $state<EventData[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let activeTab = $state<"sessions" | "search" | "status">("sessions");
+  let activeTab = $state<"sessions" | "search" | "analytics" | "status">("sessions");
   let ingestLoading = $state(false);
   let lastIngestTime = $state<Date | null>(null);
   let newSessionsAvailable = $state(false);
@@ -258,6 +259,15 @@
       </button>
       <button
         class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
+        class:active={activeTab === "analytics"}
+        class:text-blue={activeTab === "analytics"}
+        class:border-b-blue={activeTab === "analytics"}
+        class:bg-bg-soft={activeTab === "analytics"}
+        onclick={() => (activeTab = "analytics")}>
+        Analytics
+      </button>
+      <button
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
         class:active={activeTab === "status"}
         class:text-blue={activeTab === "status"}
         class:border-b-blue={activeTab === "status"}
@@ -278,6 +288,8 @@
         <SessionList {sessions} {selectedSession} onSelect={selectSession} />
       {:else if activeTab === "search"}
         <SearchPanel onSelectSession={selectSessionById} />
+      {:else if activeTab === "analytics"}
+        <AnalyticsPanel />
       {:else}
         <StatusPanel onRefresh={loadSessions} />
       {/if}

@@ -150,12 +150,13 @@
   {#if showFilters}
     <div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 p-4 bg-bg border-b border-bg-muted">
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-fg-dim uppercase tracking-wide">Source</label>
+        <label for="since-filter" class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
         <select
+          id="since-filter"
           class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
-          value={facets.source || ""}
+          value={facets.since || ""}
           onchange={(e) => {
-            facets.source = e.currentTarget.value || undefined;
+            facets.since = e.currentTarget.value || undefined;
             performSearch();
           }}>
           <option value="">All sources</option>
@@ -166,8 +167,9 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-fg-dim uppercase tracking-wide">Project</label>
+        <label for="project-filter" class="text-xs text-fg-dim uppercase tracking-wide">Project</label>
         <select
+          id="project-filter"
           class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.project || ""}
           onchange={(e) => {
@@ -182,8 +184,9 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-fg-dim uppercase tracking-wide">Event Kind</label>
+        <label for="kind-filter" class="text-xs text-fg-dim uppercase tracking-wide">Event Kind</label>
         <select
+          id="kind-filter"
           class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.kind || ""}
           onchange={(e) => {
@@ -198,8 +201,9 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
+        <label for="since-filter" class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
         <select
+          id="since-filter"
           class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.since || ""}
           onchange={(e) => {

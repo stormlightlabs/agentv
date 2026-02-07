@@ -58,6 +58,42 @@ export type ErrorStats = { day: string; error_count: number; signature: string |
 
 export type GroupedStats = { dimension: string; count: number; sessions?: number; earliest?: string; latest?: string };
 
+// M7 Analytics Types
+export type ToolFrequencyStats = {
+  tool_name: string;
+  call_count: number;
+  sessions: number;
+  avg_duration_ms: number | null;
+  max_duration_ms: number | null;
+};
+
+export type FileLeaderboardEntry = {
+  file_path: string;
+  touch_count: number;
+  sessions: number;
+  total_lines_added: number;
+  total_lines_removed: number;
+};
+
+export type PatchChurnStats = {
+  day: string;
+  lines_added: number;
+  lines_removed: number;
+  files_changed: number;
+  sessions: number;
+};
+
+export type LongRunningToolCall = {
+  tool_name: string;
+  duration_ms: number;
+  started_at: string;
+  session_external_id: string;
+  project: string | null;
+  error_message: string | null;
+};
+
+export type ExportFormat = "md" | "json" | "jsonl";
+
 export type SourceHealth = {
   source: "claude" | "codex" | "opencode" | "crush";
   status: "healthy" | "degraded" | "unhealthy" | "unknown";
