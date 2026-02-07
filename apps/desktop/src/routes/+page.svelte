@@ -180,7 +180,7 @@
 <div class="flex h-screen overflow-hidden">
   <aside class="w-80 min-w-80 bg-bg-soft border-r border-bg-muted flex flex-col overflow-hidden">
     <div class="p-4 border-b border-bg-muted flex flex-col gap-3">
-      <h1 class="m-0 text-xl font-semibold text-fg">Agent Viz</h1>
+      <h1 class="m-0 text-xl font-semibold text-fg">Agent V</h1>
 
       {#if newSessionsAvailable}
         <div

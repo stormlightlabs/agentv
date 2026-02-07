@@ -1,5 +1,5 @@
 [package]
-name = "agent-viz-core"
+name = "agent-v-core"
 version = "0.1.0"
 edition = "2024"
 

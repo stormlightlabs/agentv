@@ -9,10 +9,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "agent-viz-adapters"
+name = "agent-v-adapters"
 version = "0.1.0"
 dependencies = [
- "agent-viz-core",
+ "agent-v-core",
  "chrono",
  "dirs",
  "rayon",
@@ -28,12 +28,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-viz-api"
+name = "agent-v-api"
 version = "0.1.0"
 dependencies = [
- "agent-viz-adapters",
- "agent-viz-core",
- "agent-viz-store",
+ "agent-v-adapters",
+ "agent-v-core",
+ "agent-v-store",
  "serde",
  "serde_json",
  "tauri",
@@ -43,13 +43,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-viz-cli"
+name = "agent-v-cli"
 version = "0.1.0"
 dependencies = [
- "agent-viz-adapters",
- "agent-viz-core",
- "agent-viz-ingest",
- "agent-viz-store",
+ "agent-v-adapters",
+ "agent-v-core",
+ "agent-v-ingest",
+ "agent-v-store",
  "chrono",
  "clap",
  "owo-colors",
@@ -61,7 +61,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-viz-core"
+name = "agent-v-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -71,12 +71,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-viz-gui"
+name = "agent-v-gui"
 version = "0.1.0"
 dependencies = [
- "agent-viz-adapters",
- "agent-viz-core",
- "agent-viz-store",
+ "agent-v-adapters",
+ "agent-v-core",
+ "agent-v-store",
  "chrono",
  "serde",
  "serde_json",
@@ -87,12 +87,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-viz-ingest"
+name = "agent-v-ingest"
 version = "0.1.0"
 dependencies = [
- "agent-viz-adapters",
- "agent-viz-core",
- "agent-viz-store",
+ "agent-v-adapters",
+ "agent-v-core",
+ "agent-v-store",
  "futures",
  "notify",
  "serde",
@@ -104,10 +104,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "agent-viz-store"
+name = "agent-v-store"
 version = "0.1.0"
 dependencies = [
- "agent-viz-core",
+ "agent-v-core",
  "chrono",
  "dirs",
  "rusqlite",

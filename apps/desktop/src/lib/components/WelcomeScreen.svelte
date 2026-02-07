@@ -15,7 +15,7 @@
       <span class="i-ri-brain-line text-5xl text-bg"></span>
     </div>
 
-    <h1 class="text-3xl font-bold text-fg mb-3" in:fly={{ y: 20, duration: 300, delay: 200 }}>Agent Viz</h1>
+    <h1 class="text-3xl font-bold text-fg mb-3" in:fly={{ y: 20, duration: 300, delay: 200 }}>Agent V</h1>
 
     <p class="text-fg-dim text-lg mb-8" in:fly={{ y: 20, duration: 300, delay: 300 }}>
       Visualize your AI agent sessions in one place

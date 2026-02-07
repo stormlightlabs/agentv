@@ -1,4 +1,4 @@
-use agent_viz_store::Database;
+use agent_v_store::Database;
 use serde::{Deserialize, Serialize};
 
 /// Session data for the frontend
@@ -92,8 +92,8 @@ pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, St
 /// Trigger ingestion from a source
 #[tauri::command]
 pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
-    use agent_viz_adapters::{claude::ClaudeAdapter, crush::CrushAdapter};
-    use agent_viz_core::Source;
+    use agent_v_adapters::{claude::ClaudeAdapter, crush::CrushAdapter};
+    use agent_v_core::Source;
     use std::str::FromStr;
 
     let db = Database::open_default()

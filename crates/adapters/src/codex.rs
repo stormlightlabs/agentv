@@ -1,4 +1,4 @@
-use agent_viz_core::{Event, EventKind, Role, Session, Source};
+use agent_v_core::{Event, EventKind, Role, Session, Source};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

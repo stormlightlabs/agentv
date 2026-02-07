@@ -1,5 +1,5 @@
 [package]
-name = "agent-viz-cli"
+name = "agent-v-cli"
 version = "0.1.0"
 edition = "2024"
 
@@ -17,7 +17,7 @@ serde_json = "1.0"
 owo-colors = { version = "4.1", features = ["supports-colors"] }
 chrono = { version = "0.4", features = ["serde"] }
 
-agent-viz-adapters = { path = "../adapters" }
-agent-viz-core = { path = "../core" }
-agent-viz-store = { path = "../store" }
-agent-viz-ingest = { path = "../ingest" }
+agent-v-adapters = { path = "../adapters" }
+agent-v-core = { path = "../core" }
+agent-v-store = { path = "../store" }
+agent-v-ingest = { path = "../ingest" }

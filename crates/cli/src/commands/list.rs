@@ -1,4 +1,4 @@
-use agent_viz_store::Database;
+use agent_v_store::Database;
 use owo_colors::OwoColorize;
 
 pub async fn sessions(source_filter: Option<String>) -> Result<(), Box<dyn std::error::Error>> {

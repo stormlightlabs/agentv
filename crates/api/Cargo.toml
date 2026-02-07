@@ -1,12 +1,12 @@
 [package]
-name = "agent-viz-api"
+name = "agent-v-api"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-agent-viz-adapters = { path = "../adapters" }
-agent-viz-core = { path = "../core" }
-agent-viz-store = { path = "../store" }
+agent-v-adapters = { path = "../adapters" }
+agent-v-core = { path = "../core" }
+agent-v-store = { path = "../store" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

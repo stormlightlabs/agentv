@@ -1,4 +1,4 @@
-# Agent Viz Roadmap
+# Agent V Roadmap
 
 A Rust workspace shipping a desktop app (SvelteKit + Tauri) and CLI (clap) for ingesting, normalizing, and visualizing local session artifacts from multiple AI agents.
 
@@ -72,9 +72,9 @@ A Rust workspace shipping a desktop app (SvelteKit + Tauri) and CLI (clap) for i
 
 ```bash
 # Build and test CLI
-cargo build -p agent-viz-cli
-./target/debug/agent-viz doctor
-./target/debug/agent-viz list sessions
+cargo build -p agent-v-cli
+./target/debug/agent-v doctor
+./target/debug/agent-v list sessions
 ```
 
 ### M1 — Claude Code Adapter (Read-Only)
@@ -94,12 +94,12 @@ cargo build -p agent-viz-cli
 
 ```bash
 # Ingest Claude Code sessions
-./target/debug/agent-viz ingest --source claude
+./target/debug/agent-v ingest --source claude
 
 # List and view sessions
-./target/debug/agent-viz list sessions --source claude
-./target/debug/agent-viz show session <session-id>
-./target/debug/agent-viz search "error"
+./target/debug/agent-v list sessions --source claude
+./target/debug/agent-v show session <session-id>
+./target/debug/agent-v search "error"
 ```
 
 ### M2 — Search + Charts
@@ -119,12 +119,12 @@ cargo build -p agent-viz-cli
 
 ```bash
 # Search with filters
-./target/debug/agent-viz search "panic" --since 7d --source claude
-./target/debug/agent-viz search "tool:call" --kind tool.call
+./target/debug/agent-v search "panic" --since 7d --source claude
+./target/debug/agent-v search "tool:call" --kind tool.call
 
 # Stats
-./target/debug/agent-viz stats --by day
-./target/debug/agent-viz stats --by tool
+./target/debug/agent-v stats --by day
+./target/debug/agent-v stats --by tool
 ```
 
 ### Note
@@ -132,9 +132,9 @@ cargo build -p agent-viz-cli
 For all adapters, verify with:
 
 ```sh
-./target/debug/agent-viz show <session-id>
-./target/debug/agent-viz stats --by source
-./target/debug/agent-viz doctor
+./target/debug/agent-v show <session-id>
+./target/debug/agent-v stats --by source
+./target/debug/agent-v doctor
 ```
 
 ### M3 — Codex Adapter
@@ -151,9 +151,9 @@ For all adapters, verify with:
 **CLI Testing:**
 
 ```bash
-./target/debug/agent-viz ingest --source codex
-./target/debug/agent-viz list sessions --source codex
-./target/debug/agent-viz search "rollout" --source codex
+./target/debug/agent-v ingest --source codex
+./target/debug/agent-v list sessions --source codex
+./target/debug/agent-v search "rollout" --source codex
 ```
 
 ### M4 — OpenCode Adapter
@@ -171,9 +171,9 @@ For all adapters, verify with:
 **CLI Testing:**
 
 ```bash
-./target/debug/agent-viz ingest --source opencode
-./target/debug/agent-viz list sessions
-./target/debug/agent-viz search "error" --source opencode
+./target/debug/agent-v ingest --source opencode
+./target/debug/agent-v list sessions
+./target/debug/agent-v search "error" --source opencode
 ```
 
 ### M5 — Crush Adapter
@@ -190,8 +190,8 @@ For all adapters, verify with:
 **CLI Testing:**
 
 ```bash
-./target/debug/agent-viz ingest --source crush
-./target/debug/agent-viz list sessions --source crush
+./target/debug/agent-v ingest --source crush
+./target/debug/agent-v list sessions --source crush
 ```
 
 ### M6 — Incremental Ingest + Watchers
@@ -209,10 +209,10 @@ For all adapters, verify with:
 
 ```bash
 # Watch mode (runs continuously)
-./target/debug/agent-viz ingest --watch
+./target/debug/agent-v ingest --watch
 
 # Or one-time incremental
-./target/debug/agent-viz ingest --incremental
+./target/debug/agent-v ingest --incremental
 ```
 
 ### M7 — Analytics Polish
@@ -231,13 +231,13 @@ For all adapters, verify with:
 **CLI Testing:**
 
 ```bash
-./target/debug/agent-viz stats --by project
-./target/debug/agent-viz stats --by tools
-./target/debug/agent-viz stats --by files
-./target/debug/agent-viz stats --by churn
-./target/debug/agent-viz stats --by latency
-./target/debug/agent-viz export --session <id> --format md
-./target/debug/agent-viz export --search "error" --format jsonl
+./target/debug/agent-v stats --by project
+./target/debug/agent-v stats --by tools
+./target/debug/agent-v stats --by files
+./target/debug/agent-v stats --by churn
+./target/debug/agent-v stats --by latency
+./target/debug/agent-v export --session <id> --format md
+./target/debug/agent-v export --search "error" --format jsonl
 ```
 
 ### M8 — Alpha Release: Installable App + Updates
@@ -258,12 +258,12 @@ For all adapters, verify with:
 
 ```bash
 # Build release artifacts
-pnpm --filter agent-viz-gui tauri build
+pnpm --filter agent-v-gui tauri build
 
 # Verify local health + baseline functionality
-./target/debug/agent-viz doctor
-./target/debug/agent-viz ingest --source claude
-./target/debug/agent-viz list sessions
+./target/debug/agent-v doctor
+./target/debug/agent-v ingest --source claude
+./target/debug/agent-v list sessions
 ```
 
 ### M9 — Log Browser Core

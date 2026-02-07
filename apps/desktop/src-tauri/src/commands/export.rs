@@ -2,7 +2,7 @@ use serde::Serialize;
 
 /// Export a session to Markdown format
 pub async fn export_session_to_markdown(
-    session: &agent_viz_store::SessionRow, events: &[agent_viz_store::EventRow],
+    session: &agent_v_store::SessionRow, events: &[agent_v_store::EventRow],
 ) -> Result<String, String> {
     let mut md = String::new();
 
@@ -38,7 +38,7 @@ pub async fn export_session_to_markdown(
 
 /// Export a session to JSON format
 pub async fn export_session_to_json(
-    session: &agent_viz_store::SessionRow, events: &[agent_viz_store::EventRow],
+    session: &agent_v_store::SessionRow, events: &[agent_v_store::EventRow],
 ) -> Result<String, String> {
     #[derive(Serialize)]
     struct EventExport {
@@ -88,7 +88,7 @@ pub async fn export_session_to_json(
 
 /// Export a session to JSONL format
 pub async fn export_session_to_jsonl(
-    _session: &agent_viz_store::SessionRow, events: &[agent_viz_store::EventRow],
+    _session: &agent_v_store::SessionRow, events: &[agent_v_store::EventRow],
 ) -> Result<String, String> {
     let mut lines = Vec::new();
 
@@ -110,9 +110,7 @@ pub async fn export_session_to_jsonl(
 }
 
 /// Export search results to Markdown format
-pub async fn export_search_to_markdown(
-    query: &str, results: &[agent_viz_store::SearchResult],
-) -> Result<String, String> {
+pub async fn export_search_to_markdown(query: &str, results: &[agent_v_store::SearchResult]) -> Result<String, String> {
     let mut md = String::new();
 
     md.push_str(&format!("# Search Results: \"{}\"\n\n", query));
@@ -137,7 +135,7 @@ pub async fn export_search_to_markdown(
 }
 
 /// Export search results to JSON format
-pub async fn export_search_to_json(query: &str, results: &[agent_viz_store::SearchResult]) -> Result<String, String> {
+pub async fn export_search_to_json(query: &str, results: &[agent_v_store::SearchResult]) -> Result<String, String> {
     #[derive(Serialize)]
     struct SearchEventExport {
         event_id: String,
@@ -177,7 +175,7 @@ pub async fn export_search_to_json(query: &str, results: &[agent_viz_store::Sear
 }
 
 /// Export search results to JSONL format
-pub async fn export_search_to_jsonl(_query: &str, results: &[agent_viz_store::SearchResult]) -> Result<String, String> {
+pub async fn export_search_to_jsonl(_query: &str, results: &[agent_v_store::SearchResult]) -> Result<String, String> {
     let mut lines = Vec::new();
 
     for result in results {

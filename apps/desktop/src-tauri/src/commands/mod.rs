@@ -2,9 +2,9 @@ mod export;
 mod ingest;
 mod models;
 
-use agent_viz_core::Source;
-use agent_viz_store::SearchFacets as DbSearchFacets;
-use agent_viz_store::{check_sources_health, Database};
+use agent_v_core::Source;
+use agent_v_store::SearchFacets as DbSearchFacets;
+use agent_v_store::{check_sources_health, Database};
 use chrono::{Duration, Utc};
 use std::str::FromStr;
 
@@ -262,7 +262,7 @@ fn parse_duration(s: &str) -> Option<chrono::Duration> {
 
 /// Get health status for all data sources
 #[tauri::command]
-pub async fn get_source_health() -> Result<Vec<agent_viz_core::SourceHealth>, String> {
+pub async fn get_source_health() -> Result<Vec<agent_v_core::SourceHealth>, String> {
     let health_results = check_sources_health().await;
     Ok(health_results)
 }

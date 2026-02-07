@@ -1,4 +1,4 @@
-use agent_viz_store::{Database, SearchFacets};
+use agent_v_store::{Database, SearchFacets};
 use chrono::{DateTime, Duration, Utc};
 use owo_colors::OwoColorize;
 

@@ -1,8 +1,8 @@
-# Agent Viz
+# Agent V
 
 A local-first workspace for ingesting, normalizing, and visualizing session artifacts from multiple AI coding agents.
 
-Agent Viz provides a unified view of interactions with AI coding assistants like **Claude Code**, **Codex CLI**, and **OpenCode**, allowing you to search across sessions, analyze tool usage, and visualize agent timelines.
+Agent V provides a unified view of interactions with AI coding assistants like **Claude Code**, **Codex CLI**, and **OpenCode**, allowing you to search across sessions, analyze tool usage, and visualize agent timelines.
 
 ## Key Features
 
@@ -37,27 +37,27 @@ Agent Viz provides a unified view of interactions with AI coding assistants like
 Build the CLI:
 
 ```bash
-cargo build -p agent-viz-cli
+cargo build -p agent-v-cli
 ```
 
 Common commands:
 
 ```bash
 # System health check
-./target/debug/agent-viz doctor
+./target/debug/agent-v doctor
 
 # Ingest sessions from a source
-./target/debug/agent-viz ingest --source claude
-./target/debug/agent-viz ingest --source codex
-./target/debug/agent-viz ingest --source opencode
+./target/debug/agent-v ingest --source claude
+./target/debug/agent-v ingest --source codex
+./target/debug/agent-v ingest --source opencode
 
 # List and search sessions
-./target/debug/agent-viz list sessions
-./target/debug/agent-viz search "panic" --since 7d
-./target/debug/agent-viz show session <id>
+./target/debug/agent-v list sessions
+./target/debug/agent-v search "panic" --since 7d
+./target/debug/agent-v show session <id>
 
 # Analytics
-./target/debug/agent-viz stats --by day
+./target/debug/agent-v stats --by day
 ```
 
 ### Desktop Development

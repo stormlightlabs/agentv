@@ -1,4 +1,4 @@
-use agent_viz_core::{Event, EventKind, HealthStatus, Session, Source, SourceHealth};
+use agent_v_core::{Event, EventKind, HealthStatus, Session, Source, SourceHealth};
 use chrono::{DateTime, NaiveDate, Utc};
 use std::path::PathBuf;
 use tokio_rusqlite::Connection;

@@ -1,7 +1,7 @@
-use agent_viz_adapters::{claude::ClaudeAdapter, codex::CodexAdapter, crush::CrushAdapter, opencode::OpenCodeAdapter};
-use agent_viz_core::Source;
-use agent_viz_ingest::Watcher;
-use agent_viz_store::Database;
+use agent_v_adapters::{claude::ClaudeAdapter, codex::CodexAdapter, crush::CrushAdapter, opencode::OpenCodeAdapter};
+use agent_v_core::Source;
+use agent_v_ingest::Watcher;
+use agent_v_store::Database;
 use owo_colors::OwoColorize;
 use std::str::FromStr;
 

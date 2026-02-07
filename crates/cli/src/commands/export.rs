@@ -1,4 +1,4 @@
-use agent_viz_store::{Database, EventRow, SearchFacets, SessionRow};
+use agent_v_store::{Database, EventRow, SearchFacets, SessionRow};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::io::Write;
@@ -241,7 +241,7 @@ struct SearchEventExport {
 }
 
 async fn export_search_to_markdown(
-    query: &str, results: &[agent_viz_store::SearchResult],
+    query: &str, results: &[agent_v_store::SearchResult],
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut md = String::new();
 
@@ -267,7 +267,7 @@ async fn export_search_to_markdown(
 }
 
 async fn export_search_to_json(
-    query: &str, results: &[agent_viz_store::SearchResult],
+    query: &str, results: &[agent_v_store::SearchResult],
 ) -> Result<String, Box<dyn std::error::Error>> {
     let export = SearchResultExport {
         query: query.to_string(),
@@ -290,7 +290,7 @@ async fn export_search_to_json(
 }
 
 async fn export_search_to_jsonl(
-    _query: &str, results: &[agent_viz_store::SearchResult],
+    _query: &str, results: &[agent_v_store::SearchResult],
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut lines = Vec::new();
 

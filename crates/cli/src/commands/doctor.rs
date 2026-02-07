@@ -1,9 +1,9 @@
-use agent_viz_core::HealthStatus;
-use agent_viz_store::{Database, check_sources_health};
+use agent_v_core::HealthStatus;
+use agent_v_store::{Database, check_sources_health};
 use owo_colors::OwoColorize;
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    println!("{}", "Agent Viz Doctor".bold().underline());
+    println!("{}", "Agent V Doctor".bold().underline());
     println!();
 
     println!("{}", "Checking database...".dimmed());
@@ -50,7 +50,7 @@ async fn check_database() -> Result<String, Box<dyn std::error::Error>> {
 
 type IconStyler = Box<dyn Fn(&str) -> String>;
 
-fn print_source_health(health: &agent_viz_core::SourceHealth) {
+fn print_source_health(health: &agent_v_core::SourceHealth) {
     let (icon, icon_style): (&str, IconStyler) = match health.status {
         HealthStatus::Healthy => ("✓", Box::new(|s: &str| s.green().bold().to_string())),
         HealthStatus::Degraded => ("~", Box::new(|s: &str| s.yellow().bold().to_string())),

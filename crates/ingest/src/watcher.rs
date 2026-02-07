@@ -1,6 +1,6 @@
-use agent_viz_adapters::{ClaudeAdapter, CodexAdapter, CrushAdapter, OpenCodeAdapter};
-use agent_viz_core::Source;
-use agent_viz_store::Database;
+use agent_v_adapters::{ClaudeAdapter, CodexAdapter, CrushAdapter, OpenCodeAdapter};
+use agent_v_core::Source;
+use agent_v_store::Database;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};
 use std::collections::HashMap;
 use std::path::PathBuf;

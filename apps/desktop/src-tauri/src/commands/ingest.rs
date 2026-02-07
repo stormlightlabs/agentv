@@ -1,8 +1,8 @@
 use super::models::IngestResult;
 
-use agent_viz_adapters::{ClaudeAdapter, CodexAdapter, CrushAdapter, OpenCodeAdapter};
-use agent_viz_core::Source;
-use agent_viz_store::Database;
+use agent_v_adapters::{ClaudeAdapter, CodexAdapter, CrushAdapter, OpenCodeAdapter};
+use agent_v_core::Source;
+use agent_v_store::Database;
 
 /// Ingest sessions from a single source
 pub async fn ingest_single_source(db: &Database, source: Source) -> Result<IngestResult, String> {
