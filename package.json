@@ -1,19 +1,14 @@
 {
-  "name": "agent-viz",
-  "version": "0.1.0",
+  "name": "agent-v",
+  "version": "0.8.0",
   "description": "Agent session visualization and analysis tool",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter agent-v-gui dev",
+    "dev": "pnpm --filter agent-v-gui tauri dev",
     "build": "pnpm --filter agent-v-gui build",
-    "check": "pnpm --filter agent-v-gui check",
-    "tauri": "pnpm --filter agent-v-gui tauri",
-    "cli:build": "cargo build --bin agent-viz",
-    "cli:run": "cargo run --bin agent-viz",
-    "test": "cargo test",
-    "lint": "cargo clippy",
-    "format": "cargo fmt"
+    "check": "pnpm -r check",
+    "format": "pnpm -r format && cargo fmt --all"
   },
   "devDependencies": {
     "prettier": "^3.8.1",

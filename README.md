@@ -34,35 +34,40 @@ Agent V provides a unified view of interactions with AI coding assistants like *
 
 ### CLI
 
-Build the CLI:
+The CLI provides powerful command-line access to all Agent V functionality.
+
+**Build:**
 
 ```bash
 cargo build -p agent-v-cli
 ```
 
-Common commands:
+**Available Commands:**
 
-```bash
-# System health check
-./target/debug/agent-v doctor
-
-# Ingest sessions from a source
-./target/debug/agent-v ingest --source claude
-./target/debug/agent-v ingest --source codex
-./target/debug/agent-v ingest --source opencode
-
-# List and search sessions
-./target/debug/agent-v list sessions
-./target/debug/agent-v search "panic" --since 7d
-./target/debug/agent-v show session <id>
-
-# Analytics
-./target/debug/agent-v stats --by day
+```sh
+agent-v doctor                                # System health check
+agent-v ingest [--source <name>]              # Ingest sessions (all sources or specific)
+agent-v ingest --watch                        # Continuously watch for new sessions
+agent-v list sessions [--source <name>]       # List all sessions
+agent-v show session <id>                     # Show session details with events
+agent-v search <query>  [--source <name>]     # Search with FTS5
+                        [--since <duration>]
+                        [--kind <type>]
+agent-v stats [--by <dimension>]              # Analytics and statistics
+              [--since <duration>]
+agent-v export --session <id>                 # Export session
+              [--format md|json|jsonl]
 ```
 
 ### Desktop Development
 
 Start the desktop application in development mode:
+
+```bash
+just dev              # Run Tauri desktop app
+```
+
+Or using pnpm directly:
 
 ```bash
 pnpm tauri dev
@@ -79,7 +84,8 @@ crates/
 ├── api/          # Tauri command handlers (Rust <-> Frontend bridge)
 └── cli/          # Command-line interface implementation
 apps/
-└── desktop/      # Svelte + Tauri desktop wrapper
+├── desktop/      # Svelte + Tauri desktop wrapper
+└── worker/       # Cloudflare Worker for auto-updates
 ```
 
 ## References

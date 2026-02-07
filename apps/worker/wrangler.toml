@@ -1,0 +1,19 @@
+name = "agent-v-updater"
+main = "src/index.ts"
+compatibility_date = "2026-02-07"
+
+# R2 bucket for storing update artifacts
+[[r2_buckets]]
+binding = "UPDATES_BUCKET"
+bucket_name = "agent-v-updates"
+
+[[kv_namespaces]]
+binding = "UPDATE_METADATA"
+id = "your-kv-namespace-id"
+
+# Optional runtime overrides consumed by src/index.ts
+[vars]
+UPDATER_PATH_PREFIX = "/agentv"
+UPDATER_LATEST_VERSION_KEY = "latest_version"
+UPDATER_MANIFEST_KEY_PREFIX = "manifest:"
+UPDATER_R2_LATEST_OBJECT = "latest.json"
