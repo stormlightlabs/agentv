@@ -180,6 +180,14 @@ enum AuthProvider {
 }
 
 /// Adapter for OpenCode sessions
+///
+/// Unlike other adapters that read session files directly, OpenCode requires
+/// invoking the CLI subprocess (`opencode session list` and `opencode export`)
+/// to access session data. The adapter wraps blocking CLI calls in
+/// [`task::spawn_blocking`] to remain async-friendly while interfacing with
+/// the synchronous subprocess API.
+///
+/// TODO: Watch logs directory for new sessions, then invoke the export cmd
 #[derive(Debug, Clone)]
 pub struct OpenCodeAdapter {
     auth_path: PathBuf,

@@ -148,4 +148,11 @@ pub const MIGRATIONS: &[Migration] = &[
             CREATE INDEX IF NOT EXISTS idx_files_touched_path ON files_touched(file_path);
         "#,
     },
+    Migration {
+        name: "004_add_events_composite_index",
+        sql: r#"
+            -- Composite index for activity queries filtering by kind and timestamp
+            CREATE INDEX IF NOT EXISTS idx_events_kind_timestamp ON events(kind, timestamp);
+        "#,
+    },
 ];

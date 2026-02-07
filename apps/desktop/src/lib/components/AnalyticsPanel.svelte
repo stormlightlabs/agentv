@@ -15,7 +15,6 @@
   let error = $state<string | null>(null);
   let timeRange = $state<"7d" | "30d" | "90d">("30d");
 
-  // Stats data
   let activityStats = $state<ActivityStats[]>([]);
   let errorStats = $state<ErrorStats[]>([]);
   let toolFrequency = $state<ToolFrequencyStats[]>([]);
@@ -23,8 +22,8 @@
   let patchChurn = $state<PatchChurnStats[]>([]);
   let longRunningTools = $state<LongRunningToolCall[]>([]);
 
-  // Tab navigation
-  let activeSection = $state<"overview" | "tools" | "files" | "churn" | "latency">("overview");
+  type Tab = "overview" | "tools" | "files" | "churn" | "latency";
+  let activeSection = $state<Tab>("overview");
 
   async function loadAllStats() {
     loading = true;

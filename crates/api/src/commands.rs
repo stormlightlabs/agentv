@@ -1,5 +1,32 @@
 use agent_v_store::Database;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Errors that can occur in Tauri commands
+#[derive(Debug, Error)]
+pub enum CommandError {
+    #[error("Database error: {0}")]
+    Database(String),
+    #[error("Migration failed: {0}")]
+    Migration(String),
+    #[error("Failed to list sessions: {0}")]
+    ListSessions(String),
+    #[error("Failed to get session events: {0}")]
+    GetEvents(String),
+    #[error("Invalid source: {0}")]
+    InvalidSource(String),
+    #[error("Ingestion failed: {0}")]
+    Ingestion(String),
+}
+
+impl Serialize for CommandError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
 
 /// Session data for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,21 +52,36 @@ pub struct EventData {
     pub raw_payload: serde_json::Value,
 }
 
-/// List all sessions
+/// Pagination parameters for list queries
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationParams {
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+impl Default for PaginationParams {
+    fn default() -> Self {
+        Self { limit: Some(1000), offset: Some(0) }
+    }
+}
+
+/// List all sessions with pagination
 #[tauri::command]
-pub async fn list_sessions() -> Result<Vec<SessionData>, String> {
+pub async fn list_sessions(params: Option<PaginationParams>) -> Result<Vec<SessionData>, CommandError> {
     let db = Database::open_default()
         .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+        .map_err(|e| CommandError::Database(e.to_string()))?;
 
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+    db.migrate().await.map_err(|e| CommandError::Migration(e.to_string()))?;
+
+    let params = params.unwrap_or_default();
+    let limit = params.limit.unwrap_or(1000);
+    let offset = params.offset.unwrap_or(0);
 
     let rows = db
-        .list_sessions(1000, 0)
+        .list_sessions(limit as i64, offset as i64)
         .await
-        .map_err(|e| format!("Failed to list sessions: {}", e))?;
+        .map_err(|e| CommandError::ListSessions(e.to_string()))?;
 
     let sessions = rows
         .into_iter()
@@ -59,19 +101,17 @@ pub async fn list_sessions() -> Result<Vec<SessionData>, String> {
 
 /// Get events for a session
 #[tauri::command]
-pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, String> {
+pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, CommandError> {
     let db = Database::open_default()
         .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+        .map_err(|e| CommandError::Database(e.to_string()))?;
 
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+    db.migrate().await.map_err(|e| CommandError::Migration(e.to_string()))?;
 
     let rows = db
         .get_session_events(session_id)
         .await
-        .map_err(|e| format!("Failed to get session events: {}", e))?;
+        .map_err(|e| CommandError::GetEvents(e.to_string()))?;
 
     let events = rows
         .into_iter()
@@ -91,7 +131,7 @@ pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, St
 
 /// Trigger ingestion from a source
 #[tauri::command]
-pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
+pub async fn ingest_source(source: String) -> Result<IngestResult, CommandError> {
     use agent_v_adapters::{
         claude::ClaudeAdapter, codex::CodexAdapter, crush::CrushAdapter, opencode::OpenCodeAdapter,
     };
@@ -100,13 +140,11 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
 
     let db = Database::open_default()
         .await
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+        .map_err(|e| CommandError::Database(e.to_string()))?;
 
-    db.migrate()
-        .await
-        .map_err(|e| format!("Failed to migrate database: {}", e))?;
+    db.migrate().await.map_err(|e| CommandError::Migration(e.to_string()))?;
 
-    let source = Source::from_str(&source).map_err(|e| e.to_string())?;
+    let source = Source::from_str(&source).map_err(|e| CommandError::InvalidSource(e.to_string()))?;
 
     match source {
         Source::Claude => {

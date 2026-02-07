@@ -280,7 +280,11 @@ impl Watcher {
 
     /// Get paths to watch for OpenCode
     ///
-    /// TODO: watch logs and run export command periodically
+    /// Limitation: OpenCode does not expose session files directly. Sessions are
+    /// accessed via CLI export (`opencode export <session-id>`). File system
+    /// watching is not applicable - `--watch` mode cannot detect new OpenCode
+    /// sessions automatically. Manual ingestion or periodic polling via CLI
+    /// would be required for live updates.
     async fn get_opencode_watch_paths(&self) -> Vec<PathBuf> {
         vec![]
     }
