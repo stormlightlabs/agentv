@@ -92,7 +92,9 @@ pub async fn get_session_events(session_id: String) -> Result<Vec<EventData>, St
 /// Trigger ingestion from a source
 #[tauri::command]
 pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
-    use agent_v_adapters::{claude::ClaudeAdapter, crush::CrushAdapter};
+    use agent_v_adapters::{
+        claude::ClaudeAdapter, codex::CodexAdapter, crush::CrushAdapter, opencode::OpenCodeAdapter,
+    };
     use agent_v_core::Source;
     use std::str::FromStr;
 
@@ -109,6 +111,48 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
     match source {
         Source::Claude => {
             let adapter = ClaudeAdapter::new();
+            let sessions = adapter.discover_sessions().await;
+            let mut imported = 0;
+            let mut failed = 0;
+
+            for session_file in sessions {
+                match adapter.parse_session(&session_file).await {
+                    Ok((session, events)) => {
+                        if db.insert_session_with_events(&session, &events).await.is_ok() {
+                            imported += 1;
+                        } else {
+                            failed += 1;
+                        }
+                    }
+                    Err(_) => failed += 1,
+                }
+            }
+
+            Ok(IngestResult { imported, failed, total: imported + failed })
+        }
+        Source::Codex => {
+            let adapter = CodexAdapter::new();
+            let sessions = adapter.discover_sessions().await;
+            let mut imported = 0;
+            let mut failed = 0;
+
+            for session_file in sessions {
+                match adapter.parse_session(&session_file).await {
+                    Ok((session, events)) => {
+                        if db.insert_session_with_events(&session, &events).await.is_ok() {
+                            imported += 1;
+                        } else {
+                            failed += 1;
+                        }
+                    }
+                    Err(_) => failed += 1,
+                }
+            }
+
+            Ok(IngestResult { imported, failed, total: imported + failed })
+        }
+        Source::OpenCode => {
+            let adapter = OpenCodeAdapter::new();
             let sessions = adapter.discover_sessions().await;
             let mut imported = 0;
             let mut failed = 0;
@@ -149,7 +193,6 @@ pub async fn ingest_source(source: String) -> Result<IngestResult, String> {
 
             Ok(IngestResult { imported, failed, total: imported + failed })
         }
-        _ => Err(format!("Source '{}' not yet implemented", source)),
     }
 }
 

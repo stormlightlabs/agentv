@@ -464,8 +464,9 @@ mod tests {
 
     #[test]
     fn test_timestamp_conversion() {
-        let ts = 1704067200000i64;
-        let dt = DateTime::from_timestamp(ts, 0).unwrap();
+        let ts_millis = 1704067200000i64;
+        let ts_seconds = ts_millis / 1000;
+        let dt = DateTime::from_timestamp(ts_seconds, 0).unwrap();
         assert_eq!(dt.year(), 2024);
         assert_eq!(dt.month(), 1);
         assert_eq!(dt.day(), 1);
