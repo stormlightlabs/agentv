@@ -5,17 +5,15 @@
  *   /agentv/{target}-{arch}/{current_version}
  *
  * Data sources:
- * 1) KV (primary): latest_version + manifest:<version>
- * 2) R2 (fallback): latest.json object containing the manifest
+ *
+ *  KV: latest_version + manifest:<version>
  */
 
 export interface Env {
   UPDATE_METADATA?: KVNamespace;
-  UPDATES_BUCKET?: R2Bucket;
   UPDATER_PATH_PREFIX?: string;
   UPDATER_LATEST_VERSION_KEY?: string;
   UPDATER_MANIFEST_KEY_PREFIX?: string;
-  UPDATER_R2_LATEST_OBJECT?: string;
 }
 
 type UpdateManifest = { version: string; notes: string; pub_date: string; platforms: Record<string, PlatformInfo> };
@@ -29,7 +27,6 @@ type ParsedVersion = { major: number; minor: number; patch: number; prerelease: 
 const DEFAULT_PATH_PREFIX = "/agentv";
 const DEFAULT_LATEST_VERSION_KEY = "latest_version";
 const DEFAULT_MANIFEST_KEY_PREFIX = "manifest:";
-const DEFAULT_R2_LATEST_OBJECT = "latest.json";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -70,12 +67,7 @@ export default {
 };
 
 async function loadLatestManifest(env: Env): Promise<UpdateManifest | null> {
-  const fromKv = await loadManifestFromKv(env);
-  if (fromKv) {
-    return fromKv;
-  }
-
-  return loadManifestFromR2(env);
+  return loadManifestFromKv(env);
 }
 
 async function loadManifestFromKv(env: Env): Promise<UpdateManifest | null> {
@@ -99,30 +91,6 @@ async function loadManifestFromKv(env: Env): Promise<UpdateManifest | null> {
   }
 
   return manifestValue;
-}
-
-async function loadManifestFromR2(env: Env): Promise<UpdateManifest | null> {
-  if (!env.UPDATES_BUCKET) {
-    return null;
-  }
-
-  const latestObjectKey = env.UPDATER_R2_LATEST_OBJECT ?? DEFAULT_R2_LATEST_OBJECT;
-  const object = await env.UPDATES_BUCKET.get(latestObjectKey);
-  if (!object) {
-    return null;
-  }
-
-  try {
-    const manifestValue = await object.json();
-    if (!isUpdateManifest(manifestValue)) {
-      console.error(`Invalid manifest in R2 object "${latestObjectKey}"`);
-      return null;
-    }
-    return manifestValue;
-  } catch (error) {
-    console.error(`Failed to parse R2 object "${latestObjectKey}" as JSON`, error);
-    return null;
-  }
 }
 
 function parseRequestPath(pathname: string, configuredPrefix: string): ParsedRequestPath | null {

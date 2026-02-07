@@ -1,6 +1,6 @@
 # Agent V Updater Worker
 
-Cloudflare Worker that serves Tauri v2 updater manifests and artifacts.
+Cloudflare Worker that serves Tauri v2 updater manifests from KV metadata.
 
 ## Setup
 
@@ -12,7 +12,6 @@ Cloudflare Worker that serves Tauri v2 updater manifests and artifacts.
 
 2. Configure bindings in `apps/worker/wrangler.toml`:
    - Set `kv_namespaces.id` for `UPDATE_METADATA`
-   - Ensure R2 bucket `agent-v-updates` exists and is bound as `UPDATES_BUCKET`
 
 3. Create local env file:
 
@@ -56,11 +55,9 @@ GET https://apps.stormlightlabs.org/agentv/{target}-{arch}/{current_version}
 
 The worker resolves update metadata in this order:
 
-1. KV primary source:
+1. KV source:
    - `latest_version` (or `UPDATER_LATEST_VERSION_KEY`)
    - `manifest:<version>` (or `UPDATER_MANIFEST_KEY_PREFIX + version`)
-2. R2 fallback:
-   - `latest.json` (or `UPDATER_R2_LATEST_OBJECT`)
 
 **Example Response:**
 
@@ -70,7 +67,10 @@ The worker resolves update metadata in this order:
   "notes": "Release notes...",
   "pub_date": "2025-02-06T12:00:00Z",
   "platforms": {
-    "darwin-universal": { "url": "https://.../Agent-V_0.9.0_macos.dmg", "signature": "base64-signature..." }
+    "darwin-universal": {
+      "url": "https://.../Agent-V_0.9.0_macos.dmg",
+      "signature": "base64-signature..."
+    }
   }
 }
 ```
@@ -78,16 +78,10 @@ The worker resolves update metadata in this order:
 ## Publishing Updates
 
 1. Build and sign artifacts via GitHub Actions
-2. Upload artifacts to R2 bucket
+2. Upload signed artifacts to your public download host (for example GitHub Releases URLs in the manifest)
 3. Update KV metadata:
 
    ```bash
    wrangler kv:key put --binding=UPDATE_METADATA "latest_version" "v0.9.0"
    wrangler kv:key put --binding=UPDATE_METADATA "manifest:v0.9.0" '{"version":"v0.9.0",...}'
-   ```
-
-4. Optional: keep an R2 fallback manifest:
-
-   ```bash
-   wrangler r2 object put agent-v-updates/latest.json --file ./manifest.json
    ```
