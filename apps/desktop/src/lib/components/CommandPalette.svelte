@@ -105,9 +105,9 @@
   bind:open={keyboardStore.commandPaletteOpen}
   size="md"
   class="!items-start !pt-[20vh]"
-  contentClass="border border-bg-muted"
+  contentClass="border border-surface-muted"
   aria-label="Command palette">
-  <div class="flex items-center gap-3 px-4 py-3 border-b border-bg-muted">
+  <div class="flex items-center gap-3 px-4 py-3 border-b border-surface-muted">
     <span class="i-ri-command-line text-fg-muted"></span>
     <input
       bind:this={inputRef}
@@ -117,9 +117,9 @@
       bind:value={keyboardStore.commandPaletteSearch}
       onkeydown={handleKeydown} />
     <div class="flex gap-1">
-      <kbd class="px-2 py-1 bg-bg-muted rounded text-xs text-fg-dim">↑↓</kbd>
-      <kbd class="px-2 py-1 bg-bg-muted rounded text-xs text-fg-dim">↵</kbd>
-      <kbd class="px-2 py-1 bg-bg-muted rounded text-xs text-fg-dim">Esc</kbd>
+      <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">↑↓</kbd>
+      <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">↵</kbd>
+      <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">Esc</kbd>
     </div>
   </div>
 
@@ -148,9 +148,9 @@
         {#each items as item, index (item.id)}
           {@const globalIndex = keyboardStore.filteredCommands.indexOf(item)}
           <button
-            class="w-full px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-bg-soft {selectedIndex ===
+            class="w-full px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-surface-soft {selectedIndex ===
             globalIndex
-              ? 'bg-bg-soft'
+              ? 'bg-surface-soft'
               : ''}"
             onclick={() => handleSelect(item)}
             onmouseenter={() => (selectedIndex = globalIndex)}>
@@ -164,7 +164,7 @@
               {/if}
             </div>
             {#if item.shortcut}
-              <kbd class="px-2 py-1 bg-bg-muted rounded text-xs text-fg-dim">{item.shortcut}</kbd>
+              <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">{item.shortcut}</kbd>
             {/if}
           </button>
         {/each}
@@ -172,7 +172,7 @@
     {/if}
   </div>
 
-  <div class="px-4 py-2 border-t border-bg-muted text-xs text-fg-dim flex justify-between">
+  <div class="px-4 py-2 border-t border-surface-muted text-xs text-fg-dim flex justify-between">
     <span>{keyboardStore.filteredCommands.length} commands available</span>
     <span>Cmd+K to open</span>
   </div>

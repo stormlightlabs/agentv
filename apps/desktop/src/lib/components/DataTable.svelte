@@ -132,12 +132,12 @@
 
 <div class="flex flex-col h-full overflow-hidden">
   {#if columns.some((c) => c.filterable)}
-    <div class="p-2 border-b border-bg-muted bg-bg-soft flex flex-wrap gap-2">
+    <div class="p-2 border-b border-surface-muted bg-surface-soft flex flex-wrap gap-2">
       {#each columns.filter((c) => c.filterable) as column}
         <div class="flex items-center gap-1">
           <input
             type="text"
-            class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs text-fg placeholder-fg-dim focus:outline-none focus:border-blue"
+            class="px-2 py-1 bg-surface border border-surface-muted rounded text-xs text-fg placeholder-fg-dim focus:outline-none focus:border-blue"
             placeholder="Filter {column.header}..."
             value={filters[String(column.key)] || ""}
             oninput={(e) => {
@@ -157,7 +157,7 @@
     {#if loading}
       <div class="p-4 space-y-2">
         {#each Array(5) as _, i}
-          <div class="h-12 bg-bg-muted rounded animate-pulse" in:fade={{ delay: i * 50 }}></div>
+          <div class="h-12 bg-surface-muted rounded animate-pulse" in:fade={{ delay: i * 50 }}></div>
         {/each}
       </div>
     {:else if paginatedData.length === 0}
@@ -169,8 +169,8 @@
       </div>
     {:else}
       <table class="w-full text-sm">
-        <thead class="sticky top-0 bg-bg-soft z-10">
-          <tr class="border-b border-bg-muted">
+        <thead class="sticky top-0 bg-surface-soft z-10">
+          <tr class="border-b border-surface-muted">
             {#each columns as column}
               <th
                 class="px-4 py-2 text-left text-xs font-semibold text-fg-dim uppercase tracking-wide whitespace-nowrap {column.sortable
@@ -191,9 +191,9 @@
         <tbody>
           {#each paginatedData as row, index (keyExtractor(row))}
             <tr
-              class="border-b border-bg-muted last:border-b-0 transition-colors {selectable
-                ? 'cursor-pointer hover:bg-bg-muted'
-                : ''} {selectedId === keyExtractor(row) ? 'bg-bg-muted' : ''}"
+              class="border-b border-surface-muted last:border-b-0 transition-colors {selectable
+                ? 'cursor-pointer hover:bg-surface-muted'
+                : ''} {selectedId === keyExtractor(row) ? 'bg-surface-muted' : ''}"
               in:fly={{ y: 10, duration: 200, delay: index * 30 }}
               onclick={() => selectable && onSelect?.(row)}>
               {#each columns as column}
@@ -209,13 +209,13 @@
   </div>
 
   {#if totalPages > 1}
-    <div class="p-2 border-t border-bg-muted bg-bg-soft flex items-center justify-between text-xs">
+    <div class="p-2 border-t border-surface-muted bg-surface-soft flex items-center justify-between text-xs">
       <span class="text-fg-dim">
         Showing {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length}
       </span>
       <div class="flex items-center gap-1">
         <button
-          class="px-2 py-1 rounded border border-bg-muted bg-bg text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="px-2 py-1 rounded border border-surface-muted bg-surface text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           onclick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}
           aria-label="Previous page"
@@ -226,7 +226,7 @@
           {currentPage} / {totalPages}
         </span>
         <button
-          class="px-2 py-1 rounded border border-bg-muted bg-bg text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="px-2 py-1 rounded border border-surface-muted bg-surface text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           onclick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           aria-label="Next page"

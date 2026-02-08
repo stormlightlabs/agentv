@@ -30,12 +30,12 @@
   function getColors(): string {
     switch (notification.type) {
       case "success":
-        return "border-green bg-bg-soft";
+        return "border-green bg-surface-soft";
       case "error":
-        return "border-red bg-bg-soft";
+        return "border-red bg-surface-soft";
       case "info":
       default:
-        return "border-blue bg-bg-soft";
+        return "border-blue bg-surface-soft";
     }
   }
 

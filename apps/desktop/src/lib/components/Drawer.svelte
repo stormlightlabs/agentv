@@ -75,7 +75,7 @@
   <div
     class="absolute {directionClasses[
       direction
-    ]} bg-bg border-bg-muted shadow-2xl flex flex-col overflow-hidden {contentClass}"
+    ]} bg-surface border-surface-muted shadow-2xl flex flex-col overflow-hidden {contentClass}"
     transition:slide={transitionParams}>
     {@render children?.()}
   </div>

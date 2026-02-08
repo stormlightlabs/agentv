@@ -96,13 +96,13 @@
 
   function getKindClass(kind: string): string {
     const classes: Record<string, string> = {
-      message: "bg-blue text-bg",
-      tool_call: "bg-purple text-bg",
-      tool_result: "bg-green text-bg",
-      error: "bg-red text-bg",
-      system: "bg-bg-muted text-fg-dim",
+      message: "bg-blue text-surface",
+      tool_call: "bg-purple text-surface",
+      tool_result: "bg-green text-surface",
+      error: "bg-red text-surface",
+      system: "bg-surface-muted text-fg-dim",
     };
-    return classes[kind] || "bg-bg-muted text-fg";
+    return classes[kind] || "bg-surface-muted text-fg";
   }
 
   function truncateContent(content: string | null, maxLen: number = 120): string {
@@ -119,16 +119,16 @@
 </script>
 
 <div class="flex flex-col h-full overflow-hidden">
-  <div class="p-4 border-b border-bg-muted bg-bg-soft">
+  <div class="p-4 border-b border-surface-muted bg-surface-soft">
     <div class="flex gap-2 mb-3">
       <input
         type="text"
-        class="flex-1 px-3 py-2 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm focus:outline-none focus:border-blue"
+        class="flex-1 px-3 py-2 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm focus:outline-none focus:border-blue"
         placeholder="Search across sessions..."
         bind:value={query}
         onkeydown={handleKeydown} />
       <button
-        class="px-4 py-2 bg-blue text-bg border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-4 py-2 bg-blue text-surface border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
         onclick={performSearch}
         disabled={loading}>
         {loading ? "Searching..." : "Search"}
@@ -137,12 +137,12 @@
 
     <div class="flex gap-2">
       <button
-        class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
+        class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
         onclick={() => (showFilters = !showFilters)}>
         {showFilters ? "Hide Filters" : "Show Filters"}
       </button>
       <button
-        class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
+        class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
         onclick={() => (showAnalytics = !showAnalytics)}>
         {showAnalytics ? "Hide Analytics" : "Show Analytics"}
       </button>
@@ -150,12 +150,12 @@
   </div>
 
   {#if showFilters}
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 p-4 bg-bg border-b border-bg-muted">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 p-4 bg-surface border-b border-surface-muted">
       <div class="flex flex-col gap-1">
         <label for="since-filter" class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
         <select
           id="since-filter"
-          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.since || ""}
           onchange={(e) => {
             facets.since = e.currentTarget.value || undefined;
@@ -172,7 +172,7 @@
         <label for="project-filter" class="text-xs text-fg-dim uppercase tracking-wide">Project</label>
         <select
           id="project-filter"
-          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.project || ""}
           onchange={(e) => {
             facets.project = e.currentTarget.value || undefined;
@@ -189,7 +189,7 @@
         <label for="kind-filter" class="text-xs text-fg-dim uppercase tracking-wide">Event Kind</label>
         <select
           id="kind-filter"
-          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.kind || ""}
           onchange={(e) => {
             facets.kind = e.currentTarget.value || undefined;
@@ -206,7 +206,7 @@
         <label for="since-filter" class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
         <select
           id="since-filter"
-          class="px-2 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={facets.since || ""}
           onchange={(e) => {
             facets.since = e.currentTarget.value || undefined;
@@ -221,7 +221,7 @@
       </div>
 
       <button
-        class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer self-end transition-colors hover:border-red hover:text-red"
+        class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer self-end transition-colors hover:border-red hover:text-red"
         onclick={clearFilters}>
         Clear Filters
       </button>
@@ -229,7 +229,7 @@
   {/if}
 
   {#if showAnalytics && activityStats.length > 0}
-    <div class="p-4 bg-bg-soft border-b border-bg-muted">
+    <div class="p-4 bg-surface-soft border-b border-surface-muted">
       <h3 class="m-0 mb-3 text-sm font-semibold text-fg">Activity (Last 30 Days)</h3>
       <div class="flex items-end gap-1 h-25 pb-6 relative">
         {#each activityStats.slice(0, 14) as stat}
@@ -244,7 +244,7 @@
               {stat.day.slice(5)}
             </div>
             <div
-              class="absolute bottom-full left-1/2 -translate-x-1/2 px-2 py-1 bg-bg border border-bg-muted rounded text-xs text-fg whitespace-nowrap opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 z-10">
+              class="absolute bottom-full left-1/2 -translate-x-1/2 px-2 py-1 bg-surface border border-surface-muted rounded text-xs text-fg whitespace-nowrap opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 z-10">
               {stat.day}: {stat.event_count} events, {stat.session_count} sessions
             </div>
           </div>
@@ -254,19 +254,19 @@
   {/if}
 
   {#if error}
-    <div class="mx-4 my-2 p-2 bg-red text-bg rounded text-xs">{error}</div>
+    <div class="mx-4 my-2 p-2 bg-red text-surface rounded text-xs">{error}</div>
   {/if}
 
   <div class="flex-1 overflow-hidden flex flex-col">
     {#if results.length > 0}
-      <div class="px-4 py-2 border-b border-bg-muted bg-bg-soft">
+      <div class="px-4 py-2 border-b border-surface-muted bg-surface-soft">
         <span class="text-xs text-fg-dim">{results.length} results</span>
       </div>
 
       <div class="flex-1 overflow-y-auto p-2">
         {#each results as result (result.event.id)}
           <div
-            class="p-3 mb-2 bg-bg-soft border border-bg-muted rounded transition-colors hover:border-blue cursor-pointer"
+            class="p-3 mb-2 bg-surface-soft border border-surface-muted rounded transition-colors hover:border-blue cursor-pointer"
             onclick={() => onSelectEvent?.(result.event)}
             onkeydown={(e) => {
               if (e.key === "Enter" || e.key === " ") {

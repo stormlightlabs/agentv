@@ -197,7 +197,7 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden">
-  <header class="px-6 py-4 bg-bg-soft border-b border-bg-muted flex justify-between items-start gap-4">
+  <header class="px-6 py-4 bg-surface-soft border-b border-surface-muted flex justify-between items-start gap-4">
     <div class="flex-1 min-w-0">
       <h2 class="m-0 mb-2 text-xl font-semibold text-fg overflow-hidden text-ellipsis whitespace-nowrap">
         {session.title || "Untitled Session"}
@@ -235,7 +235,7 @@
       <div class="flex gap-1 justify-end">
         {#if onOpenDrawer}
           <button
-            class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue"
+            class="px-2 py-1 bg-surface border border-surface-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue"
             onclick={onOpenDrawer}
             title="View session details">
             <span class="i-ri-information-line"></span>
@@ -243,21 +243,21 @@
           </button>
         {/if}
         <button
-          class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
+          class="px-2 py-1 bg-surface border border-surface-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
           onclick={() => exportSession("md")}
           disabled={exporting}
           title="Export as Markdown">
           .md
         </button>
         <button
-          class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
+          class="px-2 py-1 bg-surface border border-surface-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
           onclick={() => exportSession("json")}
           disabled={exporting}
           title="Export as JSON">
           .json
         </button>
         <button
-          class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
+          class="px-2 py-1 bg-surface border border-surface-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
           onclick={() => exportSession("jsonl")}
           disabled={exporting}
           title="Export as JSONL">
@@ -275,7 +275,7 @@
     {:else}
       {#each groupedEvents.entries() as [date, dateEvents]}
         <div class="mb-6">
-          <div class="text-xs font-semibold uppercase text-fg-muted mb-3 pb-1 border-b border-bg-muted">
+          <div class="text-xs font-semibold uppercase text-fg-muted mb-3 pb-1 border-b border-surface-muted">
             {date}
           </div>
           <div class="flex flex-col gap-2">
@@ -287,7 +287,7 @@
               {@const isExpanded = expandedEvents.has(event.id)}
 
               <div
-                class="flex gap-3 p-3 bg-bg-soft rounded border border-transparent transition-colors hover:border-bg-muted cursor-pointer group"
+                class="flex gap-3 p-3 bg-surface-soft rounded border border-transparent transition-colors hover:border-surface-muted cursor-pointer group"
                 onclick={() => toggleEvent(event.id)}
                 ondblclick={() => onSelectEvent?.(event)}
                 onkeydown={(e) => {
@@ -341,7 +341,7 @@
                     <div class="mt-2 flex flex-wrap gap-1">
                       {#each toolCalls as tool}
                         <span
-                          class="inline-flex items-center gap-1 px-2 py-0.5 bg-bg-muted rounded text-xs text-fg-dim">
+                          class="inline-flex items-center gap-1 px-2 py-0.5 bg-surface-muted rounded text-xs text-fg-dim">
                           <span class="i-ri-tools-line"></span>
                           {tool.name}
                         </span>
@@ -350,7 +350,7 @@
                   {/if}
 
                   {#if thinking && isExpanded}
-                    <div class="mt-3 p-3 bg-bg-muted rounded border-l-2 border-blue-500">
+                    <div class="mt-3 p-3 bg-surface-muted rounded border-l-2 border-blue-500">
                       <div class="text-xs font-semibold text-fg-muted mb-2 flex items-center gap-1">
                         <span class="i-ri-brain-line"></span>
                         Thinking
@@ -362,7 +362,7 @@
                   {/if}
 
                   {#if isExpanded && event.raw_payload && Object.keys(event.raw_payload).length > 0}
-                    <div class="mt-3 p-2 bg-bg-muted rounded">
+                    <div class="mt-3 p-2 bg-surface-muted rounded">
                       <div class="flex items-center justify-between mb-1">
                         <div class="text-xs font-semibold text-fg-muted">Raw Data</div>
                         <button

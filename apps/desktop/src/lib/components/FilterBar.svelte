@@ -86,14 +86,14 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="flex flex-col gap-3 p-4 bg-bg-soft border-b border-bg-muted">
+<div class="flex flex-col gap-3 p-4 bg-surface-soft border-b border-surface-muted">
   <div class="flex gap-2">
     {#if showSearch}
       <div class="flex-1 relative">
         <input
           bind:this={searchInput}
           type="text"
-          class="w-full px-3 py-2 pl-9 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm focus:outline-none focus:border-blue"
+          class="w-full px-3 py-2 pl-9 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm focus:outline-none focus:border-blue"
           placeholder="Search across events... (Cmd+K)"
           bind:value={filterStore.state.query}
           onkeydown={handleKeydown} />
@@ -109,19 +109,19 @@
         {/if}
       </div>
       <button
-        class="px-4 py-2 bg-blue text-bg border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50"
+        class="px-4 py-2 bg-blue text-surface border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50"
         onclick={handleSearch}>
         Search
       </button>
     {/if}
 
     <button
-      class="px-3 py-2 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-2"
+      class="px-3 py-2 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-2"
       onclick={() => (showFilters = !showFilters)}>
       <span class="i-ri-filter-3-line"></span>
       Filters
       {#if filterStore.activeCount > 0}
-        <span class="bg-blue text-bg text-xs px-1.5 py-0.5 rounded">{filterStore.activeCount}</span>
+        <span class="bg-blue text-surface text-xs px-1.5 py-0.5 rounded">{filterStore.activeCount}</span>
       {/if}
     </button>
   </div>
@@ -185,13 +185,13 @@
 
   {#if showFilters}
     <div
-      class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4 pt-3 border-t border-bg-muted"
+      class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4 pt-3 border-t border-surface-muted"
       transition:fly={{ y: -10, duration: 200 }}>
       <div class="flex flex-col gap-1">
         <label for="filter-source" class="text-xs text-fg-dim uppercase tracking-wide">Source</label>
         <select
           id="filter-source"
-          class="px-2 py-1.5 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-2 py-1.5 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={filterStore.state.source || ""}
           onchange={(e) => handleFilterChange("source", e.currentTarget.value || null)}>
           <option value="">All sources</option>
@@ -205,7 +205,7 @@
         <label for="filter-project" class="text-xs text-fg-dim uppercase tracking-wide">Project</label>
         <select
           id="filter-project"
-          class="px-2 py-1.5 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-2 py-1.5 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={filterStore.state.project || ""}
           onchange={(e) => handleFilterChange("project", e.currentTarget.value || null)}>
           <option value="">All projects</option>
@@ -219,7 +219,7 @@
         <label for="filter-kind" class="text-xs text-fg-dim uppercase tracking-wide">Event Kind</label>
         <select
           id="filter-kind"
-          class="px-2 py-1.5 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-2 py-1.5 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={filterStore.state.kind || ""}
           onchange={(e) => handleFilterChange("kind", e.currentTarget.value || null)}>
           <option value="">All kinds</option>
@@ -234,7 +234,7 @@
           <label for="filter-role" class="text-xs text-fg-dim uppercase tracking-wide">Role</label>
           <select
             id="filter-role"
-            class="px-2 py-1.5 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+            class="px-2 py-1.5 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
             value={filterStore.state.role || ""}
             onchange={(e) => handleFilterChange("role", e.currentTarget.value || null)}>
             <option value="">All roles</option>
@@ -250,7 +250,7 @@
           <label for="filter-tool" class="text-xs text-fg-dim uppercase tracking-wide">Tool</label>
           <select
             id="filter-tool"
-            class="px-2 py-1.5 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+            class="px-2 py-1.5 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
             value={filterStore.state.tool || ""}
             onchange={(e) => handleFilterChange("tool", e.currentTarget.value || null)}>
             <option value="">All tools</option>
@@ -266,7 +266,7 @@
           <label for="filter-since" class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
           <select
             id="filter-since"
-            class="px-2 py-1.5 bg-bg border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+            class="px-2 py-1.5 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
             value={filterStore.state.since || ""}
             onchange={(e) => handleFilterChange("since", e.currentTarget.value || null)}>
             {#each dateOptions as option}

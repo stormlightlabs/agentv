@@ -21,7 +21,12 @@
     type Bookmark,
   } from "$lib/stores/bookmarks.svelte";
   import { filterStore, syncFiltersFromURL, updateURLFromFilters } from "$lib/stores/filters.svelte";
-  import { handleKeyboardEvent, keyboardStore, registerShortcut } from "$lib/stores/keyboard.svelte";
+  import {
+    CommandPaletteItem,
+    handleKeyboardEvent,
+    keyboardStore,
+    registerShortcut,
+  } from "$lib/stores/keyboard.svelte";
   import { logInfo } from "$lib/stores/logger.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
   import type { EventData, IngestResult, SessionData } from "$lib/types";
@@ -29,6 +34,7 @@
   import { onDestroy, onMount } from "svelte";
   import { fade, slide } from "svelte/transition";
 
+  type Tab = "sessions" | "search" | "analytics" | "status";
   const toast = useToast();
 
   let bookmarksOpen = $state(false);
@@ -46,7 +52,7 @@
   let events = $state<EventData[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let activeTab = $state<"sessions" | "search" | "analytics" | "status">("sessions");
+  let activeTab = $state<Tab>("sessions");
   let ingestLoading = $state(false);
   let lastIngestTime = $state<Date | null>(null);
   let newSessionsAvailable = $state(false);
@@ -373,7 +379,7 @@
   }
 
   function updateCommandPalette() {
-    const commands: typeof keyboardStore.commandPaletteItems = [
+    const commands: CommandPaletteItem[] = [
       {
         id: "sessions",
         title: "Go to Sessions",
@@ -461,7 +467,7 @@
 
     const tab = page.url.searchParams.get("tab");
     if (tab && ["sessions", "search", "analytics", "status"].includes(tab)) {
-      activeTab = tab as typeof activeTab;
+      activeTab = tab as Tab;
     }
   }
 
@@ -530,7 +536,7 @@
 
 <Sheet bind:open={bookmarksOpen} side="right" width="md" aria-label="Bookmarks">
   <div class="flex flex-col h-full">
-    <div class="flex items-center justify-between p-4 border-b border-bg-muted">
+    <div class="flex items-center justify-between p-4 border-b border-surface-muted">
       <h2 class="text-lg font-semibold text-fg m-0">Bookmarks</h2>
       <button
         class="p-2 text-fg-dim hover:text-fg transition-colors"
@@ -550,7 +556,7 @@
       {:else}
         {#each bookmarkStore.bookmarks as bookmark (bookmark.id)}
           <div
-            class="group flex items-start gap-3 p-3 bg-bg-soft rounded border border-bg-muted hover:border-blue transition-colors"
+            class="group flex items-start gap-3 p-3 bg-surface-soft rounded border border-surface-muted hover:border-blue transition-colors"
             onclick={() => applyBookmark(bookmark)}
             role="button"
             tabindex="0"
@@ -602,18 +608,18 @@
 
 {#if showSessionDrawer && selectedSession}
   <Modal bind:open={showSessionDrawer} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-bg-muted bg-bg-soft">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-surface-muted bg-surface-soft">
       <div class="flex items-center gap-3">
         <h2 class="text-xl font-semibold text-fg m-0">
           {selectedSession.title || "Untitled Session"}
         </h2>
-        <span class="px-2 py-0.5 bg-bg-muted rounded text-2xs text-fg-dim uppercase">
+        <span class="px-2 py-0.5 bg-surface-muted rounded text-2xs text-fg-dim uppercase">
           {selectedSession.source}
         </span>
       </div>
       <div class="flex items-center gap-2">
         <button
-          class="px-3 py-1.5 bg-bg border border-bg-muted rounded text-sm text-fg hover:border-blue hover:text-blue transition-colors flex items-center gap-1"
+          class="px-3 py-1.5 bg-surface border border-surface-muted rounded text-sm text-fg hover:border-blue hover:text-blue transition-colors flex items-center gap-1"
           onclick={() => copyToClipboard(JSON.stringify(selectedSession, null, 2))}
           type="button">
           <span class="i-ri-file-copy-line"></span>
@@ -630,33 +636,33 @@
     </div>
     <div class="flex-1 overflow-auto p-6">
       <div class="mb-6 grid grid-cols-3 gap-4 text-sm">
-        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
           <div class="text-xs text-fg-muted mb-1">Session ID</div>
           <div class="text-fg font-mono text-xs">{selectedSession.id}</div>
         </div>
-        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
           <div class="text-xs text-fg-muted mb-1">External ID</div>
           <div class="text-fg font-mono text-xs">{selectedSession.external_id}</div>
         </div>
-        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
           <div class="text-xs text-fg-muted mb-1">Project</div>
           <div class="text-fg">{selectedSession.project || "No project"}</div>
         </div>
-        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
           <div class="text-xs text-fg-muted mb-1">Created</div>
           <div class="text-fg">{new Date(selectedSession.created_at).toLocaleString()}</div>
         </div>
-        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
           <div class="text-xs text-fg-muted mb-1">Updated</div>
           <div class="text-fg">{new Date(selectedSession.updated_at).toLocaleString()}</div>
         </div>
-        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
           <div class="text-xs text-fg-muted mb-1">Events</div>
           <div class="text-fg">{events.length} events</div>
         </div>
       </div>
-      <div class="bg-bg-soft rounded border border-bg-muted overflow-hidden">
-        <div class="px-4 py-2 border-b border-bg-muted bg-bg-muted/50 flex items-center justify-between">
+      <div class="bg-surface-soft rounded border border-surface-muted overflow-hidden">
+        <div class="px-4 py-2 border-b border-surface-muted bg-surface-muted/50 flex items-center justify-between">
           <span class="text-sm font-semibold text-fg">Full Session Data</span>
           <span class="text-2xs text-fg-dim">JSON</span>
         </div>
@@ -669,7 +675,7 @@
 
 <div class="flex h-screen overflow-hidden">
   <aside
-    class="bg-bg-soft border-r border-bg-muted flex flex-col overflow-hidden relative"
+    class="bg-surface-soft border-r border-surface-muted flex flex-col overflow-hidden relative"
     style="width: {sidebarWidth}px; min-width: {minSidebarWidth}px;">
     <div
       class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue/50 transition-colors z-10"
@@ -682,7 +688,7 @@
       aria-valuemax={maxSidebarWidth}
       tabindex="0">
     </div>
-    <div class="p-4 border-b border-bg-muted flex flex-col gap-3">
+    <div class="p-4 border-b border-surface-muted flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <h1 class="m-0 text-xl font-semibold text-fg">Agent V</h1>
         <button
@@ -713,7 +719,7 @@
       {/if}
 
       <button
-        class="px-4 py-2 bg-blue text-bg border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-4 py-2 bg-blue text-surface border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
         onclick={ingestAllSources}
         disabled={ingestLoading}>
         {#if ingestLoading}
@@ -728,7 +734,7 @@
       <div class="flex flex-wrap gap-1">
         {#each sources as source}
           <button
-            class="px-2 py-1 bg-bg border border-bg-muted rounded text-2xs text-fg cursor-pointer transition-all hover:border-{source.color} hover:text-{source.color} disabled:opacity-50"
+            class="px-2 py-1 bg-surface border border-surface-muted rounded text-2xs text-fg cursor-pointer transition-all hover:border-{source.color} hover:text-{source.color} disabled:opacity-50"
             onclick={() => ingestSource(source.id)}
             disabled={ingestLoading}
             title="Refresh {source.name}">
@@ -758,47 +764,47 @@
       </div>
     </div>
 
-    <div class="flex border-b border-bg-muted bg-bg">
+    <div class="flex border-b border-surface-muted bg-surface">
       <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
         class:active={activeTab === "sessions"}
         class:text-blue={activeTab === "sessions"}
         class:border-b-blue={activeTab === "sessions"}
-        class:bg-bg-soft={activeTab === "sessions"}
+        class:bg-surface-soft={activeTab === "sessions"}
         onclick={() => (activeTab = "sessions")}>
         Sessions
       </button>
       <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
         class:active={activeTab === "search"}
         class:text-blue={activeTab === "search"}
         class:border-b-blue={activeTab === "search"}
-        class:bg-bg-soft={activeTab === "search"}
+        class:bg-surface-soft={activeTab === "search"}
         onclick={() => (activeTab = "search")}>
         Search
       </button>
       <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
         class:active={activeTab === "analytics"}
         class:text-blue={activeTab === "analytics"}
         class:border-b-blue={activeTab === "analytics"}
-        class:bg-bg-soft={activeTab === "analytics"}
+        class:bg-surface-soft={activeTab === "analytics"}
         onclick={() => (activeTab = "analytics")}>
         Analytics
       </button>
       <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-bg-soft"
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
         class:active={activeTab === "status"}
         class:text-blue={activeTab === "status"}
         class:border-b-blue={activeTab === "status"}
-        class:bg-bg-soft={activeTab === "status"}
+        class:bg-surface-soft={activeTab === "status"}
         onclick={() => (activeTab = "status")}>
         Status
       </button>
     </div>
 
     {#if error}
-      <div class="mx-4 my-2 p-2 bg-red text-bg rounded text-xs" transition:fade>
+      <div class="mx-4 my-2 p-2 bg-red text-surface rounded text-xs" transition:fade>
         {error}
       </div>
     {/if}
@@ -815,7 +821,7 @@
       {/if}
     </div>
 
-    <div class="p-2 border-t border-bg-muted bg-bg text-xs text-fg-dim">
+    <div class="p-2 border-t border-surface-muted bg-surface text-xs text-fg-dim">
       <div class="flex justify-between items-center">
         <span>{sessions.length} sessions</span>
         {#if lastIngestTime}

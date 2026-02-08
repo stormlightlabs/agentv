@@ -92,17 +92,17 @@
   }
 </script>
 
-<div class="flex flex-col h-full bg-bg">
-  <div class="flex items-center justify-between px-4 py-3 border-b border-bg-muted">
+<div class="flex flex-col h-full bg-surface">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-surface-muted">
     <div class="flex items-center gap-2">
       <span
         class="px-2 py-1 text-2xs font-semibold uppercase rounded {event.kind === 'error'
-          ? 'bg-red text-bg'
+          ? 'bg-red text-surface'
           : event.kind === 'tool_call'
-            ? 'bg-purple text-bg'
+            ? 'bg-purple text-surface'
             : event.kind === 'tool_result'
-              ? 'bg-green text-bg'
-              : 'bg-bg-muted text-fg'}">
+              ? 'bg-green text-surface'
+              : 'bg-surface-muted text-fg'}">
         {event.kind}
       </span>
       {#if event.role}
@@ -131,7 +131,7 @@
     </div>
   </div>
 
-  <div class="flex border-b border-bg-muted">
+  <div class="flex border-b border-surface-muted">
     <button
       class="px-4 py-2 text-sm transition-colors {activeTab === 'normalized'
         ? 'text-fg border-b-2 border-blue'
@@ -181,16 +181,17 @@
                 </button>
               {/if}
             </div>
-            <div class="text-sm text-fg font-mono bg-bg-soft p-2 rounded {field.type === 'path' ? 'break-all' : ''}">
+            <div
+              class="text-sm text-fg font-mono bg-surface-soft p-2 rounded {field.type === 'path' ? 'break-all' : ''}">
               {field.value}
             </div>
           </div>
         {/each}
 
         {#if event.content}
-          <div class="flex flex-col gap-1 pt-2 border-t border-bg-muted">
+          <div class="flex flex-col gap-1 pt-2 border-t border-surface-muted">
             <span class="text-xs text-fg-dim uppercase tracking-wide">Content</span>
-            <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-bg-soft p-3 rounded">
+            <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-surface-soft p-3 rounded">
               {event.content}
             </div>
           </div>
@@ -200,29 +201,29 @@
       <div class="space-y-4">
         <div class="flex flex-col gap-1">
           <span class="text-xs text-fg-dim uppercase tracking-wide">Thinking Content</span>
-          <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-bg-soft p-4 rounded">
+          <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-surface-soft p-4 rounded">
             {thinkingContent}
           </div>
         </div>
         {#if signature}
           <div class="flex flex-col gap-1">
             <span class="text-xs text-fg-dim uppercase tracking-wide">Signature</span>
-            <div class="text-xs text-fg-dim font-mono bg-bg-muted p-2 rounded break-all">{signature}</div>
+            <div class="text-xs text-fg-dim font-mono bg-surface-muted p-2 rounded break-all">{signature}</div>
           </div>
         {/if}
       </div>
     {:else if activeTab === "tools" && toolCalls.length > 0}
       <div class="space-y-4">
         {#each toolCalls as tool (tool.id)}
-          <div class="border border-bg-muted rounded-lg overflow-hidden">
-            <div class="bg-bg-soft px-3 py-2 flex items-center gap-2">
+          <div class="border border-surface-muted rounded-lg overflow-hidden">
+            <div class="bg-surface-soft px-3 py-2 flex items-center gap-2">
               <span class="i-ri-tools-line text-fg-dim"></span>
               <span class="text-sm font-medium text-fg">{tool.name}</span>
               <span class="text-xs text-fg-dim font-mono">{tool.id}</span>
             </div>
             <div class="p-3">
               <div class="text-xs text-fg-dim uppercase tracking-wide mb-1">Input</div>
-              <pre class="text-xs text-fg-dim bg-bg-muted p-2 rounded overflow-x-auto"><code
+              <pre class="text-xs text-fg-dim bg-surface-muted p-2 rounded overflow-x-auto"><code
                   >{formatJson(tool.input)}</code></pre>
             </div>
           </div>

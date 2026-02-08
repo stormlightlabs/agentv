@@ -28,12 +28,12 @@
 
   function getSourceBadgeClass(source: string): string {
     const classes: Record<string, string> = {
-      claude: "bg-blue text-bg",
-      codex: "bg-green text-bg",
-      opencode: "bg-purple text-bg",
-      crush: "bg-yellow text-bg",
+      claude: "bg-blue text-surface",
+      codex: "bg-green text-surface",
+      opencode: "bg-purple text-surface",
+      crush: "bg-yellow text-surface",
     };
-    return classes[source.toLowerCase()] || "bg-bg-muted text-fg";
+    return classes[source.toLowerCase()] || "bg-surface-muted text-fg";
   }
 
   const columns: DataTableColumn<SessionData>[] = [
@@ -61,7 +61,7 @@
 </script>
 
 <div class="flex flex-col h-full overflow-hidden" in:fly={{ y: 10, duration: 200 }}>
-  <div class="px-4 py-2 border-b border-bg-muted flex justify-between items-center bg-bg-soft">
+  <div class="px-4 py-2 border-b border-surface-muted flex justify-between items-center bg-surface-soft">
     <span class="text-xs text-fg-muted">{sessions.length} sessions</span>
   </div>
 

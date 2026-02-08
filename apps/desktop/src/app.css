@@ -4,10 +4,10 @@
 
 @theme {
   /* Gruvbox Dark Colors */
-  --color-bg: #282828;
-  --color-bg-soft: #32302f;
-  --color-bg-muted: #3c3836;
-  --color-bg-hard: #1d2021;
+  --color-surface: #282828;
+  --color-surface-soft: #32302f;
+  --color-surface-muted: #3c3836;
+  --color-surface-hard: #1d2021;
 
   --color-fg: #ebdbb2;
   --color-fg-dim: #a89984;
@@ -36,7 +36,7 @@
 
 html {
   font-family: var(--font-mono);
-  background-color: var(--color-bg);
+  background-color: var(--color-surface);
   color: var(--color-fg);
 }
 
@@ -44,7 +44,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: var(--color-bg);
+  background-color: var(--color-surface);
   color: var(--color-fg);
   font-size: 14px;
   line-height: 1.6;
@@ -56,11 +56,11 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-hard);
+  background: var(--color-surface-hard);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-bg-muted);
+  background: var(--color-surface-muted);
   border-radius: 4px;
 }
 
@@ -70,7 +70,7 @@ body {
 
 ::selection {
   background-color: var(--color-blue);
-  color: var(--color-bg);
+  color: var(--color-surface);
 }
 
 .text-muted {
@@ -82,19 +82,19 @@ body {
 }
 
 .bg-soft {
-  background-color: var(--color-bg-soft);
+  background-color: var(--color-surface-soft);
 }
 
 .bg-muted {
-  background-color: var(--color-bg-muted);
+  background-color: var(--color-surface-muted);
 }
 
 .bg-hard {
-  background-color: var(--color-bg-hard);
+  background-color: var(--color-surface-hard);
 }
 
 .border-subtle {
-  border-color: var(--color-bg-muted);
+  border-color: var(--color-surface-muted);
 }
 
 .accent-red {

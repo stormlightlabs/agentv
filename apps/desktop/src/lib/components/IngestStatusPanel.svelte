@@ -176,7 +176,7 @@
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-lg font-semibold text-fg m-0">Ingest Status</h2>
     <button
-      class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-1"
+      class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-1"
       onclick={loadHealth}
       disabled={loading}>
       <span class={loading ? "i-ri-loader-4-line animate-spin" : "i-ri-refresh-line"}></span>
@@ -192,12 +192,12 @@
     {#each healthData as source, index (source.source)}
       {@const history = ingestHistory[source.source]}
       <div
-        class="p-4 bg-bg-soft border border-bg-muted rounded-lg transition-all hover:border-blue"
+        class="p-4 bg-surface-soft border border-surface-muted rounded-lg transition-all hover:border-blue"
         transition:fly={{ y: 10, duration: 200, delay: index * 50 }}>
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-fg capitalize">{source.source}</span>
-            <span class="text-2xs uppercase px-1.5 py-0.5 rounded text-bg {getStatusColor(source.status)}">
+            <span class="text-2xs uppercase px-1.5 py-0.5 rounded text-surface {getStatusColor(source.status)}">
               {source.status}
             </span>
           </div>
@@ -219,7 +219,7 @@
         {/if}
 
         {#if history}
-          <div class="border-t border-bg-muted pt-3 mt-3">
+          <div class="border-t border-surface-muted pt-3 mt-3">
             <div class="grid grid-cols-2 gap-3 mb-3">
               <div class="flex items-center gap-2">
                 <span class="{getIngestStatusIcon(history.status)} {getIngestStatusColor(history.status)}"></span>
@@ -237,22 +237,22 @@
             </div>
 
             <div class="grid grid-cols-3 gap-2 text-center">
-              <div class="bg-bg p-2 rounded">
+              <div class="bg-surface p-2 rounded">
                 <div class="text-sm font-semibold text-green">{history.successCount}</div>
                 <div class="text-2xs text-fg-dim">Successes</div>
               </div>
-              <div class="bg-bg p-2 rounded">
+              <div class="bg-surface p-2 rounded">
                 <div class="text-sm font-semibold text-red">{history.failureCount}</div>
                 <div class="text-2xs text-fg-dim">Failures</div>
               </div>
-              <div class="bg-bg p-2 rounded">
+              <div class="bg-surface p-2 rounded">
                 <div class="text-sm font-semibold text-blue">{history.lastImported}</div>
                 <div class="text-2xs text-fg-dim">Last Import</div>
               </div>
             </div>
           </div>
         {:else}
-          <div class="border-t border-bg-muted pt-3 mt-3">
+          <div class="border-t border-surface-muted pt-3 mt-3">
             <div class="text-xs text-fg-dim italic">No ingest history available</div>
           </div>
         {/if}
@@ -267,7 +267,7 @@
     {/each}
   </div>
 
-  <div class="mt-4 p-3 bg-bg-soft border border-bg-muted rounded text-xs">
+  <div class="mt-4 p-3 bg-surface-soft border border-surface-muted rounded text-xs">
     <div class="flex flex-wrap gap-4">
       <div class="flex items-center gap-1">
         <span class="w-2 h-2 rounded-full bg-green"></span>

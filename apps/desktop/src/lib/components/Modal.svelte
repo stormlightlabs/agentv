@@ -53,7 +53,7 @@
   aria-labelledby={ariaLabelledBy}
   aria-describedby={ariaDescribedBy}>
   <div
-    class="w-full {sizeClasses[size]} bg-bg rounded-lg shadow-2xl overflow-hidden {contentClass}"
+    class="w-full {sizeClasses[size]} bg-surface rounded-lg shadow-2xl overflow-hidden {contentClass}"
     transition:scale={{ start: 0.95, duration: 150 }}>
     {@render children?.()}
   </div>

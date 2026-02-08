@@ -55,7 +55,7 @@
   <div
     class="absolute top-0 {sideClasses[side]} h-full {widthClasses[
       width
-    ]} bg-bg border-bg-muted shadow-xl flex flex-col {contentClass}"
+    ]} bg-surface border-surface-muted shadow-xl flex flex-col {contentClass}"
     transition:slide={{ axis: slideAxis[side], duration: 200 }}>
     {@render children?.()}
   </div>

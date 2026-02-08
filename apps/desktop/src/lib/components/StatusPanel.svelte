@@ -72,7 +72,7 @@
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-lg font-semibold text-fg m-0">Data Source Status</h2>
     <button
-      class="px-3 py-1.5 bg-transparent border border-bg-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-1"
+      class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-1"
       onclick={loadHealth}
       disabled={loading}>
       <span class={loading ? "i-ri-loader-4-line animate-spin" : "i-ri-refresh-line"}></span>
@@ -87,14 +87,14 @@
   <div class="space-y-3">
     {#each healthData as source, index (source.source)}
       <div
-        class="p-3 bg-bg-soft border border-bg-muted rounded transition-all hover:border-blue"
+        class="p-3 bg-surface-soft border border-surface-muted rounded transition-all hover:border-blue"
         in:fly={{ y: 10, duration: 200, delay: index * 50 }}>
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-fg capitalize">
               {source.source}
             </span>
-            <span class="text-2xs uppercase px-1.5 py-0.5 rounded text-bg {getStatusColor(source.status)}">
+            <span class="text-2xs uppercase px-1.5 py-0.5 rounded text-surface {getStatusColor(source.status)}">
               {source.status}
             </span>
           </div>
@@ -125,7 +125,7 @@
     {/each}
   </div>
 
-  <div class="mt-4 p-3 bg-bg-soft border border-bg-muted rounded">
+  <div class="mt-4 p-3 bg-surface-soft border border-surface-muted rounded">
     <h3 class="text-xs font-semibold text-fg-dim uppercase tracking-wide mb-2">Legend</h3>
     <div class="space-y-1 text-xs">
       <div class="flex items-center gap-2">

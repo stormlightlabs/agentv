@@ -11,9 +11,10 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
 
+  type TimeRange = "7d" | "30d" | "90d";
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let timeRange = $state<"7d" | "30d" | "90d">("30d");
+  let timeRange = $state<TimeRange>("30d");
 
   let activityStats = $state<ActivityStats[]>([]);
   let errorStats = $state<ErrorStats[]>([]);
@@ -93,17 +94,17 @@
 </script>
 
 <!-- TODO: consider componentizing Tools, Files, Churn, and Latency sections -->
-<div class="flex flex-col h-full overflow-hidden bg-bg-soft">
+<div class="flex flex-col h-full overflow-hidden bg-surface-soft">
   <!-- Header -->
-  <div class="p-4 border-b border-bg-muted bg-bg">
+  <div class="p-4 border-b border-surface-muted bg-surface">
     <div class="flex justify-between items-center mb-4">
       <h2 class="m-0 text-lg font-semibold text-fg">Analytics Dashboard</h2>
       <div class="flex gap-2">
         <select
-          class="px-3 py-1.5 bg-bg-soft border border-bg-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="px-3 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
           value={timeRange}
           onchange={(e) => {
-            timeRange = e.currentTarget.value as typeof timeRange;
+            timeRange = e.currentTarget.value as TimeRange;
             loadAllStats();
           }}>
           <option value="7d">Last 7 days</option>
@@ -111,7 +112,7 @@
           <option value="90d">Last 90 days</option>
         </select>
         <button
-          class="px-3 py-1.5 bg-blue text-bg border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:bg-blue-bright disabled:opacity-50"
+          class="px-3 py-1.5 bg-blue text-surface border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:bg-blue-bright disabled:opacity-50"
           onclick={loadAllStats}
           disabled={loading}>
           {loading ? "Loading..." : "Refresh"}
@@ -123,11 +124,11 @@
     <div class="flex gap-1">
       {#each ["overview", "tools", "files", "churn", "latency"] as section}
         <button
-          class="px-4 py-2 bg-transparent border-none text-fg-dim font-inherit text-sm cursor-pointer transition-all rounded hover:bg-bg-soft"
+          class="px-4 py-2 bg-transparent border-none text-fg-dim font-inherit text-sm cursor-pointer transition-all rounded hover:bg-surface-soft"
           class:bg-blue={activeSection === section}
-          class:text-bg={activeSection === section}
+          class:text-surface={activeSection === section}
           class:hover:bg-blue-bright={activeSection === section}
-          onclick={() => (activeSection = section as typeof activeSection)}>
+          onclick={() => (activeSection = section as Tab)}>
           {section.charAt(0).toUpperCase() + section.slice(1)}
         </button>
       {/each}
@@ -135,7 +136,7 @@
   </div>
 
   {#if error}
-    <div class="mx-4 my-2 p-3 bg-red text-bg rounded text-sm" transition:fade>{error}</div>
+    <div class="mx-4 my-2 p-3 bg-red text-surface rounded text-sm" transition:fade>{error}</div>
   {/if}
 
   <!-- Content -->
@@ -150,19 +151,19 @@
     {:else if activeSection === "overview"}
       <!-- Overview Section -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="p-4 bg-bg border border-bg-muted rounded">
+        <div class="p-4 bg-surface border border-surface-muted rounded">
           <div class="text-xs text-fg-dim uppercase tracking-wide mb-1">Total Events</div>
           <div class="text-2xl font-semibold text-fg">{getTotalEvents().toLocaleString()}</div>
         </div>
-        <div class="p-4 bg-bg border border-bg-muted rounded">
+        <div class="p-4 bg-surface border border-surface-muted rounded">
           <div class="text-xs text-fg-dim uppercase tracking-wide mb-1">Sessions</div>
           <div class="text-2xl font-semibold text-fg">{getTotalSessions().toLocaleString()}</div>
         </div>
-        <div class="p-4 bg-bg border border-bg-muted rounded">
+        <div class="p-4 bg-surface border border-surface-muted rounded">
           <div class="text-xs text-fg-dim uppercase tracking-wide mb-1">Tool Calls</div>
           <div class="text-2xl font-semibold text-fg">{getTotalToolCalls().toLocaleString()}</div>
         </div>
-        <div class="p-4 bg-bg border border-bg-muted rounded">
+        <div class="p-4 bg-surface border border-surface-muted rounded">
           <div class="text-xs text-fg-dim uppercase tracking-wide mb-1">Errors</div>
           <div
             class="text-2xl font-semibold"
@@ -175,7 +176,7 @@
 
       <!-- Activity Chart -->
       {#if activityStats.length > 0}
-        <div class="p-4 bg-bg border border-bg-muted rounded mb-4">
+        <div class="p-4 bg-surface border border-surface-muted rounded mb-4">
           <h3 class="m-0 mb-4 text-sm font-semibold text-fg">Activity Over Time</h3>
           <div class="flex items-end gap-1 h-40 pb-8 relative">
             {#each activityStats as stat}
@@ -190,7 +191,7 @@
                   {stat.day.slice(5)}
                 </div>
                 <div
-                  class="absolute bottom-full left-1/2 -translate-x-1/2 px-2 py-1 bg-bg border border-bg-muted rounded text-xs text-fg whitespace-nowrap opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 z-10">
+                  class="absolute bottom-full left-1/2 -translate-x-1/2 px-2 py-1 bg-surface border border-surface-muted rounded text-xs text-fg whitespace-nowrap opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 z-10">
                   {stat.day}: {stat.event_count} events
                 </div>
               </div>
@@ -202,7 +203,7 @@
       <!-- Churn Summary -->
       {#if patchChurn.length > 0}
         {@const totals = getTotalLinesChanged()}
-        <div class="p-4 bg-bg border border-bg-muted rounded">
+        <div class="p-4 bg-surface border border-surface-muted rounded">
           <h3 class="m-0 mb-3 text-sm font-semibold text-fg">Code Churn Summary</h3>
           <div class="flex gap-8">
             <div>
@@ -228,14 +229,14 @@
     {:else if activeSection === "tools"}
       <!-- Tools Section -->
       {#if toolFrequency.length > 0}
-        <div class="bg-bg border border-bg-muted rounded overflow-hidden">
-          <div class="px-4 py-3 border-b border-bg-muted bg-bg-soft">
+        <div class="bg-surface border border-surface-muted rounded overflow-hidden">
+          <div class="px-4 py-3 border-b border-surface-muted bg-surface-soft">
             <h3 class="m-0 text-sm font-semibold text-fg">Tool Call Frequency</h3>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-bg-muted text-left text-xs text-fg-dim">
+                <tr class="border-b border-surface-muted text-left text-xs text-fg-dim">
                   <th class="px-4 py-2 font-medium">Tool</th>
                   <th class="px-4 py-2 font-medium text-right">Calls</th>
                   <th class="px-4 py-2 font-medium text-right">Sessions</th>
@@ -245,7 +246,7 @@
               </thead>
               <tbody>
                 {#each toolFrequency as tool}
-                  <tr class="border-b border-bg-muted last:border-b-0 hover:bg-bg-soft">
+                  <tr class="border-b border-surface-muted last:border-b-0 hover:bg-surface-soft">
                     <td class="px-4 py-3 font-medium text-fg">{tool.tool_name}</td>
                     <td class="px-4 py-3 text-right">{tool.call_count.toLocaleString()}</td>
                     <td class="px-4 py-3 text-right text-fg-dim">{tool.sessions}</td>
@@ -269,14 +270,14 @@
     {:else if activeSection === "files"}
       <!-- Files Section -->
       {#if filesLeaderboard.length > 0}
-        <div class="bg-bg border border-bg-muted rounded overflow-hidden">
-          <div class="px-4 py-3 border-b border-bg-muted bg-bg-soft">
+        <div class="bg-surface border border-surface-muted rounded overflow-hidden">
+          <div class="px-4 py-3 border-b border-surface-muted bg-surface-soft">
             <h3 class="m-0 text-sm font-semibold text-fg">Files Touched Leaderboard</h3>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-bg-muted text-left text-xs text-fg-dim">
+                <tr class="border-b border-surface-muted text-left text-xs text-fg-dim">
                   <th class="px-4 py-2 font-medium">File Path</th>
                   <th class="px-4 py-2 font-medium text-right">Touches</th>
                   <th class="px-4 py-2 font-medium text-right">Sessions</th>
@@ -286,7 +287,7 @@
               </thead>
               <tbody>
                 {#each filesLeaderboard as file}
-                  <tr class="border-b border-bg-muted last:border-b-0 hover:bg-bg-soft">
+                  <tr class="border-b border-surface-muted last:border-b-0 hover:bg-surface-soft">
                     <td class="px-4 py-3 font-mono text-xs text-fg truncate max-w-md" title={file.file_path}>
                       {file.file_path}
                     </td>
@@ -308,14 +309,14 @@
     {:else if activeSection === "churn"}
       <!-- Churn Section -->
       {#if patchChurn.length > 0}
-        <div class="bg-bg border border-bg-muted rounded overflow-hidden">
-          <div class="px-4 py-3 border-b border-bg-muted bg-bg-soft">
+        <div class="bg-surface border border-surface-muted rounded overflow-hidden">
+          <div class="px-4 py-3 border-b border-surface-muted bg-surface-soft">
             <h3 class="m-0 text-sm font-semibold text-fg">Patch Churn by Day</h3>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-bg-muted text-left text-xs text-fg-dim">
+                <tr class="border-b border-surface-muted text-left text-xs text-fg-dim">
                   <th class="px-4 py-2 font-medium">Date</th>
                   <th class="px-4 py-2 font-medium text-right">Files Changed</th>
                   <th class="px-4 py-2 font-medium text-right">Lines Added</th>
@@ -326,7 +327,7 @@
               </thead>
               <tbody>
                 {#each patchChurn as day}
-                  <tr class="border-b border-bg-muted last:border-b-0 hover:bg-bg-soft">
+                  <tr class="border-b border-surface-muted last:border-b-0 hover:bg-surface-soft">
                     <td class="px-4 py-3 text-fg">{day.day}</td>
                     <td class="px-4 py-3 text-right">{day.files_changed}</td>
                     <td class="px-4 py-3 text-right text-green">+{day.lines_added}</td>
@@ -352,14 +353,14 @@
     {:else if activeSection === "latency"}
       <!-- Latency Section -->
       {#if longRunningTools.length > 0}
-        <div class="bg-bg border border-bg-muted rounded overflow-hidden">
-          <div class="px-4 py-3 border-b border-bg-muted bg-bg-soft">
+        <div class="bg-surface border border-surface-muted rounded overflow-hidden">
+          <div class="px-4 py-3 border-b border-surface-muted bg-surface-soft">
             <h3 class="m-0 text-sm font-semibold text-fg">Long-Running Tool Calls (5s+)</h3>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-bg-muted text-left text-xs text-fg-dim">
+                <tr class="border-b border-surface-muted text-left text-xs text-fg-dim">
                   <th class="px-4 py-2 font-medium">Tool</th>
                   <th class="px-4 py-2 font-medium text-right">Duration</th>
                   <th class="px-4 py-2 font-medium">Started</th>
@@ -370,7 +371,7 @@
               </thead>
               <tbody>
                 {#each longRunningTools as tool}
-                  <tr class="border-b border-bg-muted last:border-b-0 hover:bg-bg-soft">
+                  <tr class="border-b border-surface-muted last:border-b-0 hover:bg-surface-soft">
                     <td class="px-4 py-3 font-medium text-fg">{tool.tool_name}</td>
                     <td class="px-4 py-3 text-right">{formatDuration(tool.duration_ms)}</td>
                     <td class="px-4 py-3 text-fg-dim text-xs">{tool.started_at}</td>
@@ -378,9 +379,9 @@
                     <td class="px-4 py-3 text-fg-dim text-xs">{tool.project || "-"}</td>
                     <td class="px-4 py-3">
                       {#if tool.error_message}
-                        <span class="text-xs px-2 py-0.5 bg-red text-bg rounded">ERROR</span>
+                        <span class="text-xs px-2 py-0.5 bg-red text-surface rounded">ERROR</span>
                       {:else}
-                        <span class="text-xs px-2 py-0.5 bg-green text-bg rounded">OK</span>
+                        <span class="text-xs px-2 py-0.5 bg-green text-surface rounded">OK</span>
                       {/if}
                     </td>
                   </tr>
