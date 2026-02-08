@@ -118,6 +118,12 @@ pub struct LongRunningToolCall {
     pub error_message: Option<String>,
 }
 
+/// Result of a recompute operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecomputeResult {
+    pub total: usize,
+}
+
 /// Export format enum
 #[derive(Debug, Clone, Copy)]
 pub enum ExportFormat {

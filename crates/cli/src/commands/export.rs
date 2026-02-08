@@ -1,4 +1,4 @@
-use agent_v_store::{Database, EventRow, SearchFacets, SessionRow};
+use agent_v_store::{Database, EventRow, SearchFacets, SessionMetricsRow, SessionRow};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::io::Write;
@@ -35,14 +35,15 @@ pub async fn export_session(
     };
 
     let events = db.get_session_events(session.id.clone()).await?;
+    let metrics = db.get_session_metrics(&session.id).await?;
 
     match format {
         ExportFormat::Markdown => {
-            let md = export_session_to_markdown(&session, &events).await?;
+            let md = export_session_to_markdown(&session, &events, metrics.as_ref()).await?;
             write_output(&md, output.as_deref())?;
         }
         ExportFormat::Json => {
-            let json = export_session_to_json(&session, &events).await?;
+            let json = export_session_to_json(&session, &events, metrics.as_ref()).await?;
             write_output(&json, output.as_deref())?;
         }
         ExportFormat::Jsonl => {
@@ -118,7 +119,7 @@ fn write_output(content: &str, output_path: Option<&str>) -> Result<(), Box<dyn 
 }
 
 async fn export_session_to_markdown(
-    session: &SessionRow, events: &[EventRow],
+    session: &SessionRow, events: &[EventRow], metrics: Option<&SessionMetricsRow>,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut md = String::new();
 
@@ -133,9 +134,38 @@ async fn export_session_to_markdown(
         session.project.as_deref().unwrap_or("N/A")
     ));
     md.push_str(&format!("- **Created**: {}\n", session.created_at));
-    md.push_str(&format!("- **Updated**: {}\n\n", session.updated_at));
+    md.push_str(&format!("- **Updated**: {}\n", session.updated_at));
 
-    md.push_str("## Events\n\n");
+    if let Some(m) = metrics {
+        md.push_str("\n## Cost & Efficiency\n\n");
+        if let Some(cost) = m.estimated_cost {
+            md.push_str(&format!("- **Estimated Cost**: ${:.4}\n", cost));
+        }
+        if let Some(model) = &m.model {
+            md.push_str(&format!("- **Model**: {}\n", model));
+        }
+        if let Some(provider) = &m.provider {
+            md.push_str(&format!("- **Provider**: {}\n", provider));
+        }
+        if let (Some(input), Some(output)) = (m.input_tokens, m.output_tokens) {
+            md.push_str(&format!("- **Tokens**: {} input / {} output\n", input, output));
+        }
+        if let Some(duration) = m.duration_seconds {
+            md.push_str(&format!("- **Duration**: {}s\n", duration));
+        }
+        if let (Some(p50), Some(p95)) = (m.p50_latency_ms, m.p95_latency_ms) {
+            md.push_str(&format!("- **Latency**: p50={}ms, p95={}ms\n", p50, p95));
+        }
+        md.push_str(&format!("- **Total Events**: {}\n", m.total_events));
+        md.push_str(&format!(
+            "- **Messages**: {} user / {} assistant\n",
+            m.user_messages, m.assistant_messages
+        ));
+        md.push_str(&format!("- **Tool Calls**: {}\n", m.tool_call_count));
+        md.push_str(&format!("- **Errors**: {}\n", m.error_count));
+    }
+
+    md.push_str("\n## Events\n\n");
 
     for event in events {
         md.push_str(&format!("### {} - {}\n\n", event.timestamp, event.kind));
@@ -162,6 +192,31 @@ struct SessionExport {
     created_at: String,
     updated_at: String,
     events: Vec<EventExport>,
+    metrics: Option<SessionMetricsExport>,
+}
+
+#[derive(Serialize)]
+struct SessionMetricsExport {
+    total_events: i64,
+    message_count: i64,
+    tool_call_count: i64,
+    tool_result_count: i64,
+    error_count: i64,
+    user_messages: i64,
+    assistant_messages: i64,
+    duration_seconds: Option<i64>,
+    files_touched: i64,
+    lines_added: i64,
+    lines_removed: i64,
+    model: Option<String>,
+    provider: Option<String>,
+    input_tokens: Option<i64>,
+    output_tokens: Option<i64>,
+    estimated_cost: Option<f64>,
+    total_latency_ms: Option<i64>,
+    avg_latency_ms: Option<f64>,
+    p50_latency_ms: Option<i64>,
+    p95_latency_ms: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -175,8 +230,31 @@ struct EventExport {
 }
 
 async fn export_session_to_json(
-    session: &SessionRow, events: &[EventRow],
+    session: &SessionRow, events: &[EventRow], metrics: Option<&SessionMetricsRow>,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    let metrics_export = metrics.map(|m| SessionMetricsExport {
+        total_events: m.total_events,
+        message_count: m.message_count,
+        tool_call_count: m.tool_call_count,
+        tool_result_count: m.tool_result_count,
+        error_count: m.error_count,
+        user_messages: m.user_messages,
+        assistant_messages: m.assistant_messages,
+        duration_seconds: m.duration_seconds,
+        files_touched: m.files_touched,
+        lines_added: m.lines_added,
+        lines_removed: m.lines_removed,
+        model: m.model.clone(),
+        provider: m.provider.clone(),
+        input_tokens: m.input_tokens,
+        output_tokens: m.output_tokens,
+        estimated_cost: m.estimated_cost,
+        total_latency_ms: m.total_latency_ms,
+        avg_latency_ms: m.avg_latency_ms,
+        p50_latency_ms: m.p50_latency_ms,
+        p95_latency_ms: m.p95_latency_ms,
+    });
+
     let export = SessionExport {
         id: session.id.clone(),
         source: session.source.clone(),
@@ -196,6 +274,7 @@ async fn export_session_to_json(
                 raw_payload: serde_json::from_str(&e.raw_payload).unwrap_or(serde_json::Value::Null),
             })
             .collect(),
+        metrics: metrics_export,
     };
 
     Ok(serde_json::to_string_pretty(&export)?)

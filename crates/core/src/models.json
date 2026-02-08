@@ -94,5 +94,45 @@
     "output_price_per_1m": 2.0,
     "extended_input_price_per_1m": null,
     "extended_output_price_per_1m": null
+  },
+  {
+    "model_id": "big-pickle",
+    "provider": "unknown",
+    "input_price_per_1m": 0.0,
+    "output_price_per_1m": 0.0,
+    "extended_input_price_per_1m": null,
+    "extended_output_price_per_1m": null
+  },
+  {
+    "model_id": "claude-haiku-4.5",
+    "provider": "anthropic",
+    "input_price_per_1m": 0.25,
+    "output_price_per_1m": 1.25,
+    "extended_input_price_per_1m": 0.5,
+    "extended_output_price_per_1m": 2.5
+  },
+  {
+    "model_id": "k2p5",
+    "provider": "moonshot",
+    "input_price_per_1m": 0.6,
+    "output_price_per_1m": 3.0,
+    "extended_input_price_per_1m": null,
+    "extended_output_price_per_1m": null
+  },
+  {
+    "model_id": "gpt-5-codex",
+    "provider": "openai",
+    "input_price_per_1m": 2.0,
+    "output_price_per_1m": 10.0,
+    "extended_input_price_per_1m": null,
+    "extended_output_price_per_1m": null
+  },
+  {
+    "model_id": "minimax-m2.1",
+    "provider": "minimax",
+    "input_price_per_1m": 0.0,
+    "output_price_per_1m": 0.0,
+    "extended_input_price_per_1m": null,
+    "extended_output_price_per_1m": null
   }
 ]

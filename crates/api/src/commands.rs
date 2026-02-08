@@ -241,3 +241,43 @@ pub struct IngestResult {
     pub failed: usize,
     pub total: usize,
 }
+
+/// Recompute metrics for all sessions
+#[tauri::command]
+pub async fn recompute_all_metrics() -> Result<RecomputeResult, CommandError> {
+    let db = Database::open_default()
+        .await
+        .map_err(|e| CommandError::Database(e.to_string()))?;
+
+    db.migrate().await.map_err(|e| CommandError::Migration(e.to_string()))?;
+
+    let mut total = 0;
+    let mut offset = 0;
+    let batch_size = 100;
+
+    loop {
+        let sessions = db
+            .list_sessions(batch_size, offset)
+            .await
+            .map_err(|e| CommandError::ListSessions(e.to_string()))?;
+
+        if sessions.is_empty() {
+            break;
+        }
+
+        for session in &sessions {
+            let _ = db.compute_session_metrics(&session.id).await;
+            total += 1;
+        }
+
+        offset += batch_size;
+    }
+
+    Ok(RecomputeResult { total })
+}
+
+/// Result of a recompute operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecomputeResult {
+    pub total: usize,
+}

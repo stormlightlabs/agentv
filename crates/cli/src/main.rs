@@ -3,7 +3,7 @@ use tracing_subscriber::FmtSubscriber;
 
 mod commands;
 
-use commands::{doctor, export, ingest, list, search, show, stats, support};
+use commands::{doctor, export, ingest, list, recompute, search, show, stats, support};
 
 #[derive(Parser)]
 #[command(name = "agent-viz")]
@@ -87,6 +87,8 @@ enum Commands {
     },
     /// Show support information and funding links
     Support,
+    /// Recompute session metrics (useful after schema updates)
+    Recompute,
 }
 
 #[derive(Subcommand)]
@@ -153,6 +155,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Support => {
             tracing::info!("Running support command");
             support::run().await?;
+        }
+        Commands::Recompute => {
+            tracing::info!("Running recompute command");
+            recompute::run().await?;
         }
     }
 

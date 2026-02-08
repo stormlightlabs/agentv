@@ -394,3 +394,31 @@ pub async fn export_search(
         ExportFormat::Jsonl => export::export_search_to_jsonl(&query, &results).await,
     }
 }
+
+/// Recompute metrics for all sessions
+#[tauri::command]
+pub async fn recompute_all_metrics(db: State<'_, Database>) -> Result<models::RecomputeResult, String> {
+    let mut total = 0;
+    let mut offset = 0;
+    let batch_size = 100;
+
+    loop {
+        let sessions = db
+            .list_sessions(batch_size, offset)
+            .await
+            .map_err(|e| format!("Failed to list sessions: {}", e))?;
+
+        if sessions.is_empty() {
+            break;
+        }
+
+        for session in &sessions {
+            let _ = db.compute_session_metrics(&session.id).await;
+            total += 1;
+        }
+
+        offset += batch_size;
+    }
+
+    Ok(models::RecomputeResult { total })
+}

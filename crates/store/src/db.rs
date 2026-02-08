@@ -837,10 +837,31 @@ impl Database {
             }
 
             if let Ok(payload) = serde_json::from_str::<serde_json::Value>(&event.raw_payload) {
-                if model_name.is_none()
-                    && let Some(m) = payload.get("model").and_then(|v| v.as_str())
-                {
-                    model_name = Some(m.to_string());
+                if model_name.is_none() {
+                    if let Some(m) = payload.get("model").and_then(|v| v.as_str()) {
+                        model_name = Some(m.to_string());
+                    } else if let Some(m) = payload
+                        .get("message")
+                        .and_then(|msg| msg.get("model"))
+                        .and_then(|v| v.as_str())
+                    {
+                        model_name = Some(m.to_string());
+                    } else if let Some(model_obj) = payload.get("model") {
+                        if let Some(m) = model_obj.get("modelID").and_then(|v| v.as_str()) {
+                            model_name = Some(m.to_string());
+                        } else if let Some(m) = model_obj.get("model_id").and_then(|v| v.as_str()) {
+                            model_name = Some(m.to_string());
+                        }
+                    }
+                }
+
+                if let Some(usage) = payload.get("message").and_then(|msg| msg.get("usage")) {
+                    if let Some(it) = usage.get("input_tokens").and_then(|v| v.as_i64()) {
+                        input_tokens = it as usize;
+                    }
+                    if let Some(ot) = usage.get("output_tokens").and_then(|v| v.as_i64()) {
+                        output_tokens = ot as usize;
+                    }
                 }
 
                 if let Some(usage) = payload.get("usage") {
@@ -848,6 +869,17 @@ impl Database {
                         input_tokens = it as usize;
                     }
                     if let Some(ot) = usage.get("completion_tokens").and_then(|v| v.as_i64()) {
+                        output_tokens = ot as usize;
+                    }
+                }
+
+                if let Some(info) = payload.get("info")
+                    && let Some(token_usage) = info.get("total_token_usage")
+                {
+                    if let Some(it) = token_usage.get("input_tokens").and_then(|v| v.as_i64()) {
+                        input_tokens = it as usize;
+                    }
+                    if let Some(ot) = token_usage.get("output_tokens").and_then(|v| v.as_i64()) {
                         output_tokens = ot as usize;
                     }
                 }

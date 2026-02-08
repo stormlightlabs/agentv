@@ -229,6 +229,7 @@ impl CodexAdapter {
         let mut last_timestamp: Option<DateTime<Utc>> = None;
         let mut project: Option<String> = None;
         let session_title: Option<String> = None;
+        let mut model_name: Option<String> = None;
 
         for (idx, line) in lines.iter().enumerate() {
             if line.trim().is_empty() {
@@ -280,7 +281,14 @@ impl CodexAdapter {
                         events.push(event);
                     }
                 }
-                "turn_context" => {}
+                "turn_context" => {
+                    if let Ok(ctx) = serde_json::from_value::<TurnContext>(codex_event.payload.clone())
+                        && model_name.is_none()
+                        && ctx.model.is_some()
+                    {
+                        model_name = ctx.model.clone();
+                    }
+                }
                 _ => {
                     tracing::trace!("Unknown Codex event type: {}", codex_event.event_type);
                 }
@@ -299,6 +307,7 @@ impl CodexAdapter {
             "file_path": session_file.path.to_string_lossy().to_string(),
             "line_count": lines.len(),
             "meta": session_meta,
+            "model": model_name,
         });
 
         let session = Session {

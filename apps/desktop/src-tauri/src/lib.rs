@@ -5,7 +5,7 @@ use commands::{
     check_for_new_sessions, export_search, export_session, get_activity_stats, get_error_stats, get_event_kinds,
     get_files_leaderboard, get_long_running_tools, get_patch_churn, get_projects, get_session_events,
     get_source_health, get_sources, get_tool_call_frequency, ingest_all_sources, ingest_source, list_sessions,
-    search_events,
+    recompute_all_metrics, search_events,
 };
 use tauri::Manager;
 
@@ -41,7 +41,8 @@ pub fn run() {
             get_patch_churn,
             get_long_running_tools,
             export_session,
-            export_search
+            export_search,
+            recompute_all_metrics
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

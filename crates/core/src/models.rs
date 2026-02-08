@@ -167,13 +167,66 @@ impl ModelMetadata {
         let name_lower = model_name.to_lowercase();
 
         if let Some(meta) = registry.iter().find(|m| m.model_id == name_lower) {
-            Some(meta.clone())
-        } else {
-            registry
-                .iter()
-                .find(|m| name_lower.contains(&m.model_id) || m.model_id.contains(&name_lower))
-                .cloned()
+            return Some(meta.clone());
         }
+
+        let normalized = Self::normalize_model_name(&name_lower);
+
+        registry
+            .iter()
+            .max_by_key(|m| {
+                let registry_normalized = Self::normalize_model_name(&m.model_id);
+
+                Self::calculate_match_score(&normalized, &registry_normalized)
+            })
+            .filter(|m| {
+                let registry_normalized = Self::normalize_model_name(&m.model_id);
+                Self::calculate_match_score(&normalized, &registry_normalized) > 0
+            })
+            .cloned()
+    }
+
+    /// Normalize model name for fuzzy matching
+    /// - Remove dates (8 consecutive digits like 20251001)
+    /// - Normalize dashes to dots for version numbers
+    /// - Sort components for consistent comparison
+    fn normalize_model_name(name: &str) -> String {
+        let without_dates = name.replace(|c: char| c.is_ascii_digit(), "");
+
+        without_dates
+            .replace(['-', '_', ' '], ".")
+            .split('.')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
+    /// Calculate match score between two normalized model names
+    /// Higher score = better match
+    fn calculate_match_score(query: &str, candidate: &str) -> usize {
+        let query_parts: Vec<&str> = query.split('.').collect();
+        let candidate_parts: Vec<&str> = candidate.split('.').collect();
+
+        let mut score = 0;
+
+        for (i, q_part) in query_parts.iter().enumerate() {
+            for (j, c_part) in candidate_parts.iter().enumerate() {
+                if q_part == c_part {
+                    let position_penalty = i.max(j);
+                    score += 10 * (query_parts.len().saturating_sub(position_penalty));
+                } else if q_part.contains(c_part) || c_part.contains(q_part) {
+                    let position_penalty = i.max(j);
+                    score += 5 * (query_parts.len().saturating_sub(position_penalty));
+                }
+            }
+        }
+
+        let len_diff = query.len().abs_diff(candidate.len());
+        if len_diff < 5 {
+            score += 5;
+        }
+
+        score
     }
 
     /// Estimate token count from text using characters-per-token heuristic
