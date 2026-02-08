@@ -3,8 +3,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::Command;
-use tokio::task;
 use uuid::Uuid;
 
 /// A discovered OpenCode session
@@ -18,16 +16,11 @@ pub struct OpenCodeSession {
     pub updated: DateTime<Utc>,
 }
 
-/// OpenCode session export format (from `opencode export`)
+/// OpenCode session storage format (from `~/.local/share/opencode/storage/session/`)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct OpenCodeExport {
-    info: OpenCodeSessionInfo,
-    messages: Vec<OpenCodeMessage>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct OpenCodeSessionInfo {
+struct OpenCodeSessionStorage {
     id: String,
+    #[serde(default)]
     slug: String,
     #[serde(default)]
     version: String,
@@ -38,6 +31,81 @@ struct OpenCodeSessionInfo {
     time: OpenCodeTime,
     #[serde(default)]
     summary: OpenCodeSummary,
+}
+
+/// OpenCode message storage format (from `~/.local/share/opencode/storage/message/<session_id>/`)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenCodeMessageStorage {
+    id: String,
+    #[serde(rename = "sessionID")]
+    session_id: String,
+    role: String,
+    time: OpenCodeMessageTime,
+    #[serde(default)]
+    summary: Option<OpenCodeMessageSummary>,
+    #[serde(default)]
+    model: Option<OpenCodeModel>,
+    #[serde(rename = "providerID")]
+    #[serde(default)]
+    provider_id: Option<String>,
+    #[serde(default)]
+    agent: Option<String>,
+    #[serde(default)]
+    parent_id: Option<String>,
+}
+
+/// OpenCode part storage format (from `~/.local/share/opencode/storage/part/<message_id>/`)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenCodePartStorage {
+    id: String,
+    #[serde(rename = "sessionID")]
+    session_id: String,
+    #[serde(rename = "messageID")]
+    message_id: String,
+    #[serde(rename = "type")]
+    part_type: String,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    filename: Option<String>,
+    #[serde(default)]
+    tool: Option<String>,
+    #[serde(default)]
+    state: Option<OpenCodePartState>,
+    #[serde(default)]
+    url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenCodePartState {
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    input: Option<serde_json::Value>,
+    #[serde(default)]
+    output: Option<String>,
+    #[serde(default)]
+    metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenCodeMessageSummary {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    diffs: Vec<OpenCodeDiff>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenCodeDiff {
+    file: String,
+    #[serde(default)]
+    before: String,
+    #[serde(default)]
+    after: String,
+    additions: u32,
+    deletions: u32,
+    status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,31 +125,6 @@ struct OpenCodeSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct OpenCodeMessage {
-    info: OpenCodeMessageInfo,
-    #[serde(default)]
-    parts: Vec<OpenCodePart>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct OpenCodeMessageInfo {
-    id: String,
-    #[serde(rename = "sessionID")]
-    session_id: String,
-    role: String,
-    time: OpenCodeMessageTime,
-    #[serde(default)]
-    model: Option<OpenCodeModel>,
-    #[serde(rename = "providerID")]
-    #[serde(default)]
-    provider_id: Option<String>,
-    #[serde(default)]
-    agent: Option<String>,
-    #[serde(default)]
-    parent_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 struct OpenCodeMessageTime {
     created: i64,
     #[serde(default)]
@@ -94,68 +137,6 @@ struct OpenCodeModel {
     provider_id: String,
     #[serde(rename = "modelID")]
     model_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-enum OpenCodePart {
-    #[serde(rename = "text")]
-    Text {
-        id: String,
-        text: String,
-        #[serde(default)]
-        synthetic: bool,
-    },
-    #[serde(rename = "file")]
-    File {
-        id: String,
-        filename: String,
-        #[serde(default)]
-        url: Option<String>,
-        #[serde(default)]
-        mime: Option<String>,
-    },
-    #[serde(rename = "tool")]
-    Tool {
-        id: String,
-        #[serde(rename = "callID")]
-        call_id: String,
-        tool: String,
-        #[serde(default)]
-        state: Option<ToolState>,
-    },
-    #[serde(rename = "step-start")]
-    StepStart { id: String },
-    #[serde(rename = "step-end")]
-    StepEnd { id: String },
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ToolState {
-    #[serde(default)]
-    status: String,
-    #[serde(default)]
-    input: Option<serde_json::Value>,
-    #[serde(default)]
-    output: Option<String>,
-    #[serde(default)]
-    metadata: Option<serde_json::Value>,
-}
-
-/// OpenCode session list format (from `opencode session list --format json`)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct OpenCodeSessionListItem {
-    id: String,
-    title: String,
-    created: i64,
-    updated: i64,
-    #[serde(rename = "projectId")]
-    #[serde(default)]
-    project_id: Option<String>,
-    #[serde(default)]
-    directory: Option<String>,
 }
 
 /// OpenCode auth.json format
@@ -181,170 +162,145 @@ enum AuthProvider {
 
 /// Adapter for OpenCode sessions
 ///
-/// Unlike other adapters that read session files directly, OpenCode requires
-/// invoking the CLI subprocess (`opencode session list` and `opencode export`)
-/// to access session data. The adapter wraps blocking CLI calls in
-/// [`task::spawn_blocking`] to remain async-friendly while interfacing with
-/// the synchronous subprocess API.
+/// Discovers and parses sessions directly from OpenCode's storage directory
+/// structure without requiring the CLI export command.
 ///
-/// TODO: Watch logs directory for new sessions, then invoke the export cmd
+/// Storage structure:
+/// - `~/.local/share/opencode/storage/session/<project_hash>/<session_id>.json`
+/// - `~/.local/share/opencode/storage/message/<session_id>/<message_id>.json`
+/// - `~/.local/share/opencode/storage/part/<message_id>/<part_id>.json`
 #[derive(Debug, Clone)]
 pub struct OpenCodeAdapter {
+    storage_path: PathBuf,
     auth_path: PathBuf,
 }
 
 impl OpenCodeAdapter {
     /// Create a new OpenCode adapter with default paths
     pub fn new() -> Self {
+        let storage_path = dirs::home_dir()
+            .map(|h| h.join(".local/share/opencode/storage"))
+            .unwrap_or_else(|| PathBuf::from("~/.local/share/opencode/storage"));
+
         let auth_path = dirs::home_dir()
             .map(|h| h.join(".local/share/opencode/auth.json"))
             .unwrap_or_else(|| PathBuf::from("~/.local/share/opencode/auth.json"));
 
-        Self { auth_path }
+        Self { storage_path, auth_path }
     }
 
-    /// Create a new OpenCode adapter with custom auth path
-    pub fn with_auth_path(auth_path: PathBuf) -> Self {
-        Self { auth_path }
+    /// Create a new OpenCode adapter with custom paths
+    pub fn with_paths(storage_path: PathBuf, auth_path: PathBuf) -> Self {
+        Self { storage_path, auth_path }
     }
 
-    /// Check if OpenCode CLI is available
+    /// Get the storage path
+    pub fn storage_path(&self) -> &PathBuf {
+        &self.storage_path
+    }
+
+    /// Check if storage directory exists (OpenCode data available)
     pub fn is_available(&self) -> bool {
-        Command::new("opencode")
-            .arg("--version")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
+        self.storage_path.exists()
     }
 
-    /// Discover all OpenCode sessions via CLI
+    /// Discover all OpenCode sessions from storage
     pub async fn discover_sessions(&self) -> Vec<OpenCodeSession> {
         if !self.is_available() {
-            tracing::warn!("OpenCode CLI not available");
+            tracing::debug!("OpenCode storage not found at {:?}", self.storage_path);
             return Vec::new();
         }
 
-        let sessions = task::spawn_blocking(|| {
-            Command::new("opencode")
-                .args(["session", "list", "--format", "json"])
-                .output()
-        })
-        .await;
-
-        let Ok(Ok(output)) = sessions else {
-            tracing::error!("Failed to execute opencode session list");
-            return Vec::new();
-        };
-
-        if !output.status.success() {
-            tracing::warn!(
-                "opencode session list failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+        let session_dir = self.storage_path.join("session");
+        if !session_dir.exists() {
             return Vec::new();
         }
 
-        let json_str = match String::from_utf8(output.stdout) {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!("Failed to parse session list output: {}", e);
-                return Vec::new();
-            }
+        let mut sessions = Vec::new();
+
+        let Ok(project_dirs) = tokio::fs::read_dir(&session_dir).await else {
+            return Vec::new();
         };
 
-        let items: Vec<OpenCodeSessionListItem> = match serde_json::from_str(&json_str) {
-            Ok(items) => items,
-            Err(e) => {
-                tracing::error!("Failed to parse session list JSON: {}", e);
-                return Vec::new();
+        let mut project_dirs = project_dirs;
+        while let Ok(Some(project_entry)) = project_dirs.next_entry().await {
+            if !project_entry.file_type().await.map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
             }
-        };
 
-        let sessions: Vec<OpenCodeSession> = items
-            .into_iter()
-            .map(|item| {
-                let created = DateTime::from_timestamp(item.created, 0).unwrap_or_else(Utc::now);
-                let updated = DateTime::from_timestamp(item.updated, 0).unwrap_or(created);
+            let Ok(session_files) = tokio::fs::read_dir(project_entry.path()).await else {
+                continue;
+            };
 
-                OpenCodeSession {
-                    id: item.id,
-                    title: item.title,
-                    directory: item.directory,
-                    project_id: item.project_id,
-                    created,
-                    updated,
+            let mut session_files = session_files;
+            while let Ok(Some(session_entry)) = session_files.next_entry().await {
+                let path = session_entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                    continue;
                 }
-            })
-            .collect();
+
+                match self.parse_session_file(&path).await {
+                    Ok(session) => sessions.push(session),
+                    Err(e) => tracing::warn!("Failed to parse session file {:?}: {}", path, e),
+                }
+            }
+        }
 
         tracing::info!("Discovered {} OpenCode sessions", sessions.len());
         sessions
     }
 
-    /// Parse a session by exporting it via OpenCode CLI
+    /// Parse a session file from storage
+    async fn parse_session_file(
+        &self, path: &PathBuf,
+    ) -> Result<OpenCodeSession, Box<dyn std::error::Error + Send + Sync>> {
+        let content = tokio::fs::read_to_string(path).await?;
+        let data: OpenCodeSessionStorage = serde_json::from_str(&content)?;
+
+        let created = DateTime::from_timestamp(data.time.created / 1000, 0).unwrap_or_else(Utc::now);
+        let updated = DateTime::from_timestamp(data.time.updated / 1000, 0).unwrap_or(created);
+
+        Ok(OpenCodeSession {
+            id: data.id,
+            title: data.title,
+            directory: data.directory,
+            project_id: data.project_id,
+            created,
+            updated,
+        })
+    }
+
+    /// Parse a session from storage files
     pub async fn parse_session(
         &self, session: &OpenCodeSession,
     ) -> Result<(Session, Vec<Event>), Box<dyn std::error::Error + Send + Sync>> {
         tracing::debug!("Parsing OpenCode session: {}", session.id);
 
-        let session_id_for_path = session.id.clone();
-        let session_id = session.id.clone();
-        let temp_file = std::env::temp_dir()
-            .join(format!("opencode_export_{}.json", session_id_for_path))
-            .clone();
-        let temp_file_clone = temp_file.clone();
+        let session_path = self.find_session_file(&session.id).await?;
+        let session_content = tokio::fs::read_to_string(&session_path).await?;
+        let session_data: OpenCodeSessionStorage = serde_json::from_str(&session_content)?;
 
-        let export_result = task::spawn_blocking(move || {
-            Command::new("opencode")
-                .args(["export", &session_id])
-                .stdout(std::fs::File::create(&temp_file)?)
-                .output()
-        })
-        .await??;
-
-        if !export_result.status.success() {
-            return Err(format!(
-                "opencode export failed: {}",
-                String::from_utf8_lossy(&export_result.stderr)
-            )
-            .into());
-        }
-
-        let temp_file = temp_file_clone.clone();
-        let json_str = task::spawn_blocking(move || std::fs::read_to_string(temp_file)).await??;
-
-        let _ = std::fs::remove_file(&temp_file_clone);
-
-        let export_data: OpenCodeExport = serde_json::from_str(&json_str).map_err(|e| {
-            tracing::error!("Failed to parse export JSON: {}", e);
-            tracing::error!("JSON length: {} bytes", json_str.len());
-            e
-        })?;
-
-        let created_at = DateTime::from_timestamp(export_data.info.time.created, 0).unwrap_or_else(Utc::now);
-        let updated_at = DateTime::from_timestamp(export_data.info.time.updated, 0).unwrap_or(created_at);
-
-        let external_id = export_data.info.id.clone();
-
-        let raw_payload = serde_json::to_value(&export_data.info)?;
+        let created_at = DateTime::from_timestamp(session_data.time.created / 1000, 0).unwrap_or_else(Utc::now);
+        let updated_at = DateTime::from_timestamp(session_data.time.updated / 1000, 0).unwrap_or(created_at);
 
         let session_obj = Session {
             id: Uuid::new_v4(),
             source: Source::OpenCode,
-            external_id,
-            project: export_data.info.directory.clone(),
-            title: Some(export_data.info.title.clone()),
+            external_id: session_data.id.clone(),
+            project: session_data.directory.clone(),
+            title: Some(session_data.title.clone()),
             created_at,
             updated_at,
-            raw_payload,
+            raw_payload: serde_json::to_value(&session_data)?,
         };
 
+        let messages = self.load_session_messages(&session.id).await?;
         let mut events = Vec::new();
 
-        for message in &export_data.messages {
-            let timestamp = DateTime::from_timestamp(message.info.time.created, 0).unwrap_or_else(Utc::now);
+        for message in messages {
+            let timestamp = DateTime::from_timestamp(message.time.created / 1000, 0).unwrap_or_else(Utc::now);
 
-            let role = match message.info.role.as_str() {
+            let role = match message.role.as_str() {
                 "user" => Some(Role::User),
                 "assistant" => Some(Role::Assistant),
                 "system" => Some(Role::System),
@@ -353,7 +309,8 @@ impl OpenCodeAdapter {
 
             let event_kind = if role.is_some() { EventKind::Message } else { EventKind::System };
 
-            let content = self.format_message_content(message);
+            let parts = self.load_message_parts(&message.id).await.unwrap_or_default();
+            let content = self.format_message_content(&parts, &message);
 
             let event = Event {
                 id: Uuid::new_v4(),
@@ -362,32 +319,30 @@ impl OpenCodeAdapter {
                 role,
                 content: Some(content),
                 timestamp,
-                raw_payload: serde_json::to_value(message)?,
+                raw_payload: serde_json::to_value(&message)?,
             };
 
             events.push(event);
 
-            for part in &message.parts {
-                if let OpenCodePart::Tool { tool, state, .. } = part {
-                    let tool_content = if let Some(state) = state {
+            for part in &parts {
+                if part.part_type == "tool" {
+                    let tool_content = part.state.as_ref().map(|state| {
                         serde_json::to_string(&serde_json::json!({
-                            "tool": tool,
+                            "tool": part.tool,
                             "status": state.status,
                             "input": state.input,
                             "output": state.output,
                             "metadata": state.metadata,
                         }))
-                        .ok()
-                    } else {
-                        Some(tool.clone())
-                    };
+                        .unwrap_or_default()
+                    });
 
                     let tool_event = Event {
                         id: Uuid::new_v4(),
                         session_id: session_obj.id,
                         kind: EventKind::ToolCall,
                         role: Some(Role::Assistant),
-                        content: tool_content,
+                        content: tool_content.or_else(|| part.tool.clone()),
                         timestamp,
                         raw_payload: serde_json::to_value(part)?,
                     };
@@ -406,27 +361,139 @@ impl OpenCodeAdapter {
         Ok((session_obj, events))
     }
 
+    /// Find a session file by session ID
+    async fn find_session_file(&self, session_id: &str) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+        let session_dir = self.storage_path.join("session");
+
+        let Ok(project_dirs) = tokio::fs::read_dir(&session_dir).await else {
+            return Err("Session directory not found".into());
+        };
+
+        let mut project_dirs = project_dirs;
+        while let Ok(Some(project_entry)) = project_dirs.next_entry().await {
+            if !project_entry.file_type().await.map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+
+            let session_path = project_entry.path().join(format!("{}.json", session_id));
+            if session_path.exists() {
+                return Ok(session_path);
+            }
+        }
+
+        Err(format!("Session file not found for {}", session_id).into())
+    }
+
+    /// Load all messages for a session
+    async fn load_session_messages(
+        &self, session_id: &str,
+    ) -> Result<Vec<OpenCodeMessageStorage>, Box<dyn std::error::Error + Send + Sync>> {
+        let message_dir = self.storage_path.join("message").join(session_id);
+
+        if !message_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut messages = Vec::new();
+
+        let Ok(entries) = tokio::fs::read_dir(&message_dir).await else {
+            return Ok(Vec::new());
+        };
+
+        let mut entries = entries;
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+
+            match tokio::fs::read_to_string(&path).await {
+                Ok(content) => {
+                    if let Ok(message) = serde_json::from_str::<OpenCodeMessageStorage>(&content) {
+                        messages.push(message);
+                    }
+                }
+                Err(e) => tracing::warn!("Failed to read message file {:?}: {}", path, e),
+            }
+        }
+
+        messages.sort_by(|a, b| a.time.created.cmp(&b.time.created));
+
+        Ok(messages)
+    }
+
+    /// Load all parts for a message
+    async fn load_message_parts(
+        &self, message_id: &str,
+    ) -> Result<Vec<OpenCodePartStorage>, Box<dyn std::error::Error + Send + Sync>> {
+        let part_dir = self.storage_path.join("part").join(message_id);
+
+        if !part_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut parts = Vec::new();
+
+        let Ok(entries) = tokio::fs::read_dir(&part_dir).await else {
+            return Ok(Vec::new());
+        };
+
+        let mut entries = entries;
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+
+            match tokio::fs::read_to_string(&path).await {
+                Ok(content) => {
+                    if let Ok(part) = serde_json::from_str::<OpenCodePartStorage>(&content) {
+                        parts.push(part);
+                    }
+                }
+                Err(e) => tracing::warn!("Failed to read part file {:?}: {}", path, e),
+            }
+        }
+
+        parts.sort_by(|a, b| a.id.cmp(&b.id));
+
+        Ok(parts)
+    }
+
     /// Format message content from parts
-    fn format_message_content(&self, message: &OpenCodeMessage) -> String {
+    fn format_message_content(&self, parts: &[OpenCodePartStorage], message: &OpenCodeMessageStorage) -> String {
         let mut content_parts = Vec::new();
 
-        for part in &message.parts {
-            match part {
-                OpenCodePart::Text { text, .. } => {
-                    content_parts.push(text.clone());
+        for part in parts {
+            match part.part_type.as_str() {
+                "text" => {
+                    if let Some(text) = &part.text {
+                        content_parts.push(text.clone());
+                    }
                 }
-                OpenCodePart::File { filename, .. } => {
-                    content_parts.push(format!("[📎 {}]", filename));
+                "file" => {
+                    if let Some(filename) = &part.filename {
+                        content_parts.push(format!("[📎 {}]", filename));
+                    }
                 }
-                OpenCodePart::Tool { tool, state, .. } => {
-                    if let Some(state) = state {
-                        content_parts.push(format!("🔧 {} (status: {})", tool, state.status));
-                    } else {
-                        content_parts.push(format!("🔧 {}", tool));
+                "tool" => {
+                    if let Some(tool) = &part.tool {
+                        if let Some(state) = &part.state {
+                            content_parts.push(format!("🔧 {} (status: {})", tool, state.status));
+                        } else {
+                            content_parts.push(format!("🔧 {}", tool));
+                        }
                     }
                 }
                 _ => {}
             }
+        }
+
+        if content_parts.is_empty()
+            && let Some(summary) = &message.summary
+            && !summary.title.is_empty()
+        {
+            content_parts.push(summary.title.clone());
         }
 
         content_parts.join("\n\n")
@@ -467,6 +534,12 @@ mod tests {
     #[test]
     fn test_opencode_adapter_new() {
         let adapter = OpenCodeAdapter::new();
+        assert!(
+            adapter
+                .storage_path
+                .to_string_lossy()
+                .contains(".local/share/opencode/storage")
+        );
         assert!(adapter.auth_path.to_string_lossy().contains(".local/share/opencode"));
     }
 

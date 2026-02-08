@@ -8,7 +8,6 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{Mutex, mpsc};
 use tokio::time::interval;
-use tracing::{error, info, warn};
 
 /// Watcher configuration
 #[derive(Debug, Clone)]
@@ -72,27 +71,27 @@ impl Watcher {
 
         for path in &claude_paths {
             if path.exists() {
-                info!("Watching claude path: {:?}", path);
+                tracing::info!("Watching claude path: {:?}", path);
                 if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
-                    warn!("Failed to watch claude path {:?}: {}", path, e);
+                    tracing::warn!("Failed to watch claude path {:?}: {}", path, e);
                 }
             }
         }
 
         for path in &codex_paths {
             if path.exists() {
-                info!("Watching codex path: {:?}", path);
+                tracing::info!("Watching codex path: {:?}", path);
                 if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
-                    warn!("Failed to watch codex path {:?}: {}", path, e);
+                    tracing::warn!("Failed to watch codex path {:?}: {}", path, e);
                 }
             }
         }
 
         for path in &opencode_paths {
             if path.exists() {
-                info!("Watching opencode path: {:?}", path);
+                tracing::info!("Watching opencode path: {:?}", path);
                 if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
-                    warn!("Failed to watch opencode path {:?}: {}", path, e);
+                    tracing::warn!("Failed to watch opencode path {:?}: {}", path, e);
                 }
             }
         }
@@ -121,7 +120,7 @@ impl Watcher {
 
                         for source_str in ready {
                             pending_events.remove(&source_str);
-                            info!("Ingesting from {} due to file change", source_str);
+                            tracing::info!("Ingesting from {} due to file change", source_str);
 
                             let source = match source_str.as_str() {
                                 "claude" => Some(Source::Claude),
@@ -133,7 +132,7 @@ impl Watcher {
 
                             if let Some(src) = source {
                                 if let Err(e) = Self::ingest_source(src).await {
-                                    error!("Failed to ingest from {:?}: {}", src, e);
+                                    tracing::error!("Failed to ingest from {:?}: {}", src, e);
                                 } else {
                                     let mut s = stats.lock().await;
                                     s.push(IngestStats {
@@ -194,10 +193,10 @@ impl Watcher {
                     tokio::time::sleep(debounce_duration).await;
 
                     while rx.try_recv().is_ok() {
-                        // TODO: Drain pending events
+                        tracing::debug!("Draining pending events");
                     }
 
-                    info!("Ingesting from {:?} due to file change", source);
+                    tracing::info!("Ingesting from {:?} due to file change", source);
                     match Self::ingest_source(source).await {
                         Ok(_) => {
                             let mut s = stats.lock().await;
@@ -209,7 +208,7 @@ impl Watcher {
                             });
                         }
                         Err(e) => {
-                            error!("Failed to ingest from {:?}: {}", source, e);
+                            tracing::error!("Failed to ingest from {:?}: {}", source, e);
                         }
                     }
                 }
@@ -245,7 +244,7 @@ impl Watcher {
             }
 
             if needs_ingest {
-                info!("Crush database modified, re-ingesting");
+                tracing::info!("Crush database modified, re-ingesting");
                 match Self::ingest_crush().await {
                     Ok(_) => {
                         let mut s = stats.lock().await;
@@ -256,9 +255,7 @@ impl Watcher {
                             timestamp: SystemTime::now(),
                         });
                     }
-                    Err(e) => {
-                        error!("Failed to ingest Crush: {}", e);
-                    }
+                    Err(e) => tracing::error!("Failed to ingest Crush: {}", e),
                 }
             }
 
@@ -280,13 +277,10 @@ impl Watcher {
 
     /// Get paths to watch for OpenCode
     ///
-    /// Limitation: OpenCode does not expose session files directly. Sessions are
-    /// accessed via CLI export (`opencode export <session-id>`). File system
-    /// watching is not applicable - `--watch` mode cannot detect new OpenCode
-    /// sessions automatically. Manual ingestion or periodic polling via CLI
-    /// would be required for live updates.
+    /// Watches the storage directory for new session files.
     async fn get_opencode_watch_paths(&self) -> Vec<PathBuf> {
-        vec![]
+        let adapter = OpenCodeAdapter::new();
+        vec![adapter.storage_path().clone()]
     }
 
     /// Ingest from a specific source

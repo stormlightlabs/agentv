@@ -1,3 +1,5 @@
+import { logError } from "./logger.svelte";
+
 type BookmarkKind = "session" | "search" | "filter" | "chart";
 
 type BookmarkData = {
@@ -31,8 +33,7 @@ function createBookmarkStore() {
         return JSON.parse(stored);
       }
     } catch {
-      // TODO: use tauri logger
-      console.error("Failed to load bookmarks from storage");
+      logError("Failed to load bookmarks from storage");
     }
     return [];
   }
@@ -42,8 +43,7 @@ function createBookmarkStore() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
-      // TODO: use tauri logger
-      console.error("Failed to save bookmarks to storage");
+      logError("Failed to save bookmarks to storage");
     }
   }
 
@@ -85,8 +85,7 @@ function createBookmarkStore() {
         return true;
       }
     } catch {
-      // TODO: use tauri logger
-      console.error("Failed to import bookmarks");
+      logError("Failed to import bookmarks");
     }
     return false;
   }
