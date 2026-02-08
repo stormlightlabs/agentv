@@ -244,8 +244,10 @@ pub const UPSERT_SESSION_METRICS: &str = r#"
     INSERT INTO session_metrics (
         session_id, total_events, message_count, tool_call_count, tool_result_count,
         error_count, user_messages, assistant_messages, duration_seconds,
-        files_touched, lines_added, lines_removed, computed_at
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+        files_touched, lines_added, lines_removed, computed_at,
+        model, provider, input_tokens, output_tokens, estimated_cost,
+        total_latency_ms, avg_latency_ms, p50_latency_ms, p95_latency_ms
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)
     ON CONFLICT(session_id) DO UPDATE SET
         total_events = excluded.total_events,
         message_count = excluded.message_count,
@@ -258,7 +260,16 @@ pub const UPSERT_SESSION_METRICS: &str = r#"
         files_touched = excluded.files_touched,
         lines_added = excluded.lines_added,
         lines_removed = excluded.lines_removed,
-        computed_at = excluded.computed_at
+        computed_at = excluded.computed_at,
+        model = excluded.model,
+        provider = excluded.provider,
+        input_tokens = excluded.input_tokens,
+        output_tokens = excluded.output_tokens,
+        estimated_cost = excluded.estimated_cost,
+        total_latency_ms = excluded.total_latency_ms,
+        avg_latency_ms = excluded.avg_latency_ms,
+        p50_latency_ms = excluded.p50_latency_ms,
+        p95_latency_ms = excluded.p95_latency_ms
 "#;
 
 /// Insert a tool call record
@@ -353,7 +364,9 @@ pub const GET_SESSION_METRICS: &str = r#"
     SELECT
         session_id, total_events, message_count, tool_call_count, tool_result_count,
         error_count, user_messages, assistant_messages, duration_seconds,
-        files_touched, lines_added, lines_removed, computed_at
+        files_touched, lines_added, lines_removed, computed_at,
+        model, provider, input_tokens, output_tokens, estimated_cost,
+        total_latency_ms, avg_latency_ms, p50_latency_ms, p95_latency_ms
     FROM session_metrics
     WHERE session_id = ?1
 "#;
@@ -388,9 +401,112 @@ pub const GET_SESSIONS_WITH_METRICS: &str = r#"
         s.id, s.source, s.external_id, s.project, s.title, s.created_at, s.updated_at, s.raw_payload,
         m.total_events, m.message_count, m.tool_call_count, m.tool_result_count,
         m.error_count, m.user_messages, m.assistant_messages, m.duration_seconds,
-        m.files_touched, m.lines_added, m.lines_removed, m.computed_at
+        m.files_touched, m.lines_added, m.lines_removed, m.computed_at,
+        m.model, m.provider, m.input_tokens, m.output_tokens, m.estimated_cost,
+        m.total_latency_ms, m.avg_latency_ms, m.p50_latency_ms, m.p95_latency_ms
     FROM sessions s
     LEFT JOIN session_metrics m ON s.id = m.session_id
     ORDER BY s.updated_at DESC
     LIMIT ?1 OFFSET ?2
+"#;
+
+/// Get cost stats by source
+pub const COST_STATS_BY_SOURCE: &str = r#"
+    SELECT
+        s.source,
+        COUNT(DISTINCT m.session_id) as session_count,
+        SUM(m.estimated_cost) as total_cost,
+        AVG(m.estimated_cost) as avg_cost_per_session,
+        SUM(m.input_tokens) as total_input_tokens,
+        SUM(m.output_tokens) as total_output_tokens,
+        AVG(m.avg_latency_ms) as avg_latency_ms,
+        AVG(m.p50_latency_ms) as p50_latency_ms,
+        AVG(m.p95_latency_ms) as p95_latency_ms
+    FROM session_metrics m
+    JOIN sessions s ON m.session_id = s.id
+    WHERE (?1 = '' OR s.source = ?1)
+        AND (?2 = '' OR m.computed_at >= ?2)
+        AND (?3 = '' OR m.computed_at < ?3)
+    GROUP BY s.source
+    ORDER BY total_cost DESC
+"#;
+
+/// Get cost stats by project
+pub const COST_STATS_BY_PROJECT: &str = r#"
+    SELECT
+        COALESCE(s.project, 'Unknown') as project,
+        COUNT(DISTINCT m.session_id) as session_count,
+        SUM(m.estimated_cost) as total_cost,
+        AVG(m.estimated_cost) as avg_cost_per_session,
+        SUM(m.input_tokens) as total_input_tokens,
+        SUM(m.output_tokens) as total_output_tokens,
+        AVG(m.avg_latency_ms) as avg_latency_ms,
+        AVG(m.p50_latency_ms) as p50_latency_ms,
+        AVG(m.p95_latency_ms) as p95_latency_ms
+    FROM session_metrics m
+    JOIN sessions s ON m.session_id = s.id
+    WHERE (?1 = '' OR s.source = ?1)
+        AND (?2 = '' OR m.computed_at >= ?2)
+        AND (?3 = '' OR m.computed_at < ?3)
+    GROUP BY s.project
+    ORDER BY total_cost DESC
+"#;
+
+/// Get cost stats by session
+pub const COST_STATS_BY_SESSION: &str = r#"
+    SELECT
+        s.id,
+        s.external_id,
+        s.project,
+        s.source,
+        m.estimated_cost,
+        m.input_tokens,
+        m.output_tokens,
+        m.avg_latency_ms,
+        m.p50_latency_ms,
+        m.p95_latency_ms,
+        m.duration_seconds,
+        m.computed_at
+    FROM session_metrics m
+    JOIN sessions s ON m.session_id = s.id
+    WHERE (?1 = '' OR s.source = ?1)
+        AND (?2 = '' OR m.computed_at >= ?2)
+        AND (?3 = '' OR m.computed_at < ?3)
+    ORDER BY m.estimated_cost DESC NULLS LAST
+    LIMIT ?4 OFFSET ?5
+"#;
+
+/// Get latency distribution stats (p50, p95, p99)
+pub const LATENCY_DISTRIBUTION: &str = r#"
+    SELECT
+        AVG(m.avg_latency_ms) as avg_latency,
+        AVG(m.p50_latency_ms) as p50_latency,
+        AVG(m.p95_latency_ms) as p95_latency,
+        MAX(m.p95_latency_ms) as max_p95,
+        COUNT(*) as session_count
+    FROM session_metrics m
+    JOIN sessions s ON m.session_id = s.id
+    WHERE (?1 = '' OR s.source = ?1)
+        AND (?2 = '' OR m.computed_at >= ?2)
+        AND (?3 = '' OR m.computed_at < ?3)
+        AND m.p95_latency_ms IS NOT NULL
+"#;
+
+/// Get model/provider usage stats
+pub const MODEL_USAGE_STATS: &str = r#"
+    SELECT
+        COALESCE(m.model, 'unknown') as model,
+        COALESCE(m.provider, 'unknown') as provider,
+        COUNT(DISTINCT m.session_id) as session_count,
+        SUM(m.input_tokens) as total_input_tokens,
+        SUM(m.output_tokens) as total_output_tokens,
+        SUM(m.estimated_cost) as total_cost,
+        AVG(m.avg_latency_ms) as avg_latency_ms
+    FROM session_metrics m
+    JOIN sessions s ON m.session_id = s.id
+    WHERE (?1 = '' OR s.source = ?1)
+        AND (?2 = '' OR m.computed_at >= ?2)
+        AND (?3 = '' OR m.computed_at < ?3)
+    GROUP BY m.model, m.provider
+    ORDER BY total_cost DESC NULLS LAST
 "#;

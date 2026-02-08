@@ -4,7 +4,8 @@ pub mod models;
 pub mod queries;
 
 pub use db::{
-    ActivityStats, Database, ErrorStats, FileLeaderboardEntry, GroupedStats, LongRunningToolCall, PatchChurnStats,
-    SearchFacets, SearchResult, ToolFrequencyStats, check_sources_health,
+    ActivityStats, CostStats, Database, ErrorStats, FileLeaderboardEntry, GroupedStats, LatencyDistribution,
+    LongRunningToolCall, ModelUsageStats, PatchChurnStats, SearchFacets, SearchResult, SessionCostStats,
+    ToolFrequencyStats, check_sources_health,
 };
 pub use models::*;

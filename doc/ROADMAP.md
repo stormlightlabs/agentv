@@ -292,11 +292,22 @@ just list
 
 **Tasks:**
 
-- [ ] Store: extend metrics table to include model/provider metadata + token estimates (when available) + "unknown" fallback
-- [ ] CLI: `stats --by cost` (per session/project/source) with totals + p50/p95 for latency
+- [x] Store: extend metrics table to include model/provider metadata + token estimates (when available) + "unknown" fallback
+- [x] CLI: `stats --by cost` (per session/project/source) with totals + p50/p95 for latency
 - [ ] Desktop: "Cost & Latency" panel per session (timeline overlay + rollups)
 - [ ] Desktop: project-level "Efficiency" dashboard (cost/session, tool-error rate, retry loops)
 - [ ] Export: include cost/latency rollups in `export --session` and export bundles
+
+**CLI Testing:**
+
+```bash
+# Check migration applied via doctor
+./target/debug/agent-viz doctor
+
+# View cost and latency statistics
+./target/debug/agent-viz stats --by cost
+./target/debug/agent-viz stats --by cost --since 7d
+```
 
 ### M10 — Log Browser Core
 

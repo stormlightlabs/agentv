@@ -20,6 +20,7 @@ pub async fn run(by: Option<String>, since: Option<String>) -> Result<(), Box<dy
         Some("files") => show_files_leaderboard(&db, since_dt, until_dt).await?,
         Some("churn") => show_patch_churn(&db, since_dt, until_dt).await?,
         Some("latency") | Some("slow") => show_long_running_tools(&db, since_dt, until_dt).await?,
+        Some("cost") => show_cost_stats(&db, since_dt, until_dt).await?,
         _ => show_summary(&db).await?,
     }
 
@@ -412,6 +413,150 @@ async fn show_long_running_tools(
             stat.project.as_deref().unwrap_or("no project"),
             error_indicator
         );
+    }
+
+    Ok(())
+}
+
+async fn show_cost_stats(
+    db: &Database, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("{}", "Cost & Latency Statistics".bold().underline());
+    println!();
+
+    let by_source = db.get_cost_stats_by_source(None, since, until).await?;
+    println!("{}", "By Source:".bold());
+    if by_source.is_empty() || by_source.iter().all(|s| s.total_cost.is_none()) {
+        println!(
+            "  {}",
+            "No cost data available. Cost tracking requires model metadata and token estimates.".yellow()
+        );
+    } else {
+        for stat in by_source {
+            let cost_str = stat
+                .total_cost
+                .map(|c| format!("${:.4}", c))
+                .unwrap_or_else(|| "unknown".to_string());
+            let avg_cost = stat
+                .avg_cost_per_session
+                .map(|c| format!("${:.4}", c))
+                .unwrap_or_else(|| "unknown".to_string());
+            let p50 = stat
+                .p50_latency_ms
+                .map(|l| format!("{:.0}ms", l))
+                .unwrap_or_else(|| "-".to_string());
+            let p95 = stat
+                .p95_latency_ms
+                .map(|l| format!("{:.0}ms", l))
+                .unwrap_or_else(|| "-".to_string());
+            println!(
+                "  {:12} {:4} sessions  total: {:10}  avg/session: {:10}  latency p50: {}  p95: {}",
+                stat.dimension.cyan(),
+                stat.session_count,
+                cost_str.yellow(),
+                avg_cost.dimmed(),
+                p50,
+                p95
+            );
+        }
+    }
+    println!();
+
+    let by_project = db.get_cost_stats_by_project(None, since, until).await?;
+    println!("{}", "By Project:".bold());
+    if by_project.is_empty() || by_project.iter().all(|s| s.total_cost.is_none()) {
+        println!("  {}", "No cost data available.".yellow());
+    } else {
+        for stat in by_project.iter().take(10) {
+            let cost_str = stat
+                .total_cost
+                .map(|c| format!("${:.4}", c))
+                .unwrap_or_else(|| "unknown".to_string());
+            let avg_cost = stat
+                .avg_cost_per_session
+                .map(|c| format!("${:.4}", c))
+                .unwrap_or_else(|| "unknown".to_string());
+            let p50 = stat
+                .p50_latency_ms
+                .map(|l| format!("{:.0}ms", l))
+                .unwrap_or_else(|| "-".to_string());
+            let p95 = stat
+                .p95_latency_ms
+                .map(|l| format!("{:.0}ms", l))
+                .unwrap_or_else(|| "-".to_string());
+            println!(
+                "  {:20} {:4} sessions  total: {:10}  avg/session: {:10}  latency p50: {}  p95: {}",
+                stat.dimension.cyan(),
+                stat.session_count,
+                cost_str.yellow(),
+                avg_cost.dimmed(),
+                p50,
+                p95
+            );
+        }
+        if by_project.len() > 10 {
+            println!("  ... and {} more", by_project.len() - 10);
+        }
+    }
+    println!();
+
+    let latency_dist = db.get_latency_distribution(None, since, until).await?;
+    println!("{}", "Latency Distribution:".bold());
+    if latency_dist.session_count > 0 {
+        let avg = latency_dist
+            .avg_latency
+            .map(|l| format!("{:.0}ms", l))
+            .unwrap_or_else(|| "-".to_string());
+        let p50 = latency_dist
+            .p50_latency
+            .map(|l| format!("{:.0}ms", l))
+            .unwrap_or_else(|| "-".to_string());
+        let p95 = latency_dist
+            .p95_latency
+            .map(|l| format!("{:.0}ms", l))
+            .unwrap_or_else(|| "-".to_string());
+        let max = latency_dist
+            .max_p95
+            .map(|l| format!("{}ms", l))
+            .unwrap_or_else(|| "-".to_string());
+        println!(
+            "  avg: {}  p50: {}  p95: {}  max p95: {}  ({} sessions)",
+            avg, p50, p95, max, latency_dist.session_count
+        );
+    } else {
+        println!("  {}", "No latency data available.".yellow());
+    }
+    println!();
+
+    let model_stats = db.get_model_usage_stats(None, since, until).await?;
+    println!("{}", "By Model/Provider:".bold());
+    if model_stats.is_empty() || model_stats.iter().all(|s| s.total_cost.is_none()) {
+        println!("  {}", "No model usage data available.".yellow());
+    } else {
+        for stat in model_stats {
+            let cost = stat
+                .total_cost
+                .map(|c| format!("${:.4}", c))
+                .unwrap_or_else(|| "unknown".to_string());
+            let tokens = match (stat.total_input_tokens, stat.total_output_tokens) {
+                (Some(input), Some(output)) => format!("{}k in / {}k out", input / 1000, output / 1000),
+                (Some(input), None) => format!("{}k in", input / 1000),
+                (None, Some(output)) => format!("{}k out", output / 1000),
+                (None, None) => "unknown tokens".to_string(),
+            };
+            let latency = stat
+                .avg_latency_ms
+                .map(|l| format!("{:.0}ms", l))
+                .unwrap_or_else(|| "-".to_string());
+            println!(
+                "  {:20} {:10} {:4} sessions  {}  avg latency: {}",
+                format!("{}/{}", stat.provider, stat.model).cyan(),
+                cost.yellow(),
+                stat.session_count,
+                tokens.dimmed(),
+                latency
+            );
+        }
     }
 
     Ok(())

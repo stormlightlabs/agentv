@@ -41,6 +41,15 @@ pub struct SessionMetricsRow {
     pub lines_added: i64,
     pub lines_removed: i64,
     pub computed_at: String,
+    pub model: Option<String>,
+    pub provider: Option<String>,
+    pub input_tokens: Option<i64>,
+    pub output_tokens: Option<i64>,
+    pub estimated_cost: Option<f64>,
+    pub total_latency_ms: Option<i64>,
+    pub avg_latency_ms: Option<f64>,
+    pub p50_latency_ms: Option<i64>,
+    pub p95_latency_ms: Option<i64>,
 }
 
 /// Database row for a tool call with latency tracking

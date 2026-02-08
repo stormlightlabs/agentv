@@ -1,5 +1,6 @@
-use agent_v_core::{Event, EventKind, HealthStatus, Session, Source, SourceHealth};
+use agent_v_core::{Event, EventKind, HealthStatus, ModelMetadata, Session, Source, SourceHealth};
 use chrono::{DateTime, NaiveDate, Utc};
+use rusqlite::OptionalExtension;
 use std::path::PathBuf;
 use tokio_rusqlite::Connection;
 use tracing::{error, info};
@@ -176,6 +177,38 @@ impl Database {
                     })?
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(rows)
+            })
+            .await
+    }
+
+    /// Get a session by ID
+    pub async fn get_session(&self, id: String) -> Result<Option<SessionRow>, tokio_rusqlite::Error> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare("SELECT id, source, external_id, project, title, created_at, updated_at, raw_payload FROM sessions WHERE id = ?1")?;
+                let row = stmt.query_row([id], |row| {
+                    Ok(SessionRow {
+                        id: row.get(0)?,
+                        source: row.get(1)?,
+                        external_id: row.get(2)?,
+                        project: row.get(3)?,
+                        title: row.get(4)?,
+                        created_at: row.get(5)?,
+                        updated_at: row.get(6)?,
+                        raw_payload: row.get(7)?,
+                    })
+                });
+
+                match row {
+                    Ok(r) => Ok(Some(r)),
+                    Err(e) => {
+                        if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
+                            Ok(None)
+                        } else {
+                            Err(e.into())
+                        }
+                    }
+                }
             })
             .await
     }
@@ -647,30 +680,194 @@ impl Database {
         let lines_added = metrics.lines_added;
         let lines_removed = metrics.lines_removed;
         let computed_at = metrics.computed_at.clone();
+        let model = metrics.model.clone();
+        let provider = metrics.provider.clone();
+        let input_tokens = metrics.input_tokens;
+        let output_tokens = metrics.output_tokens;
+        let estimated_cost = metrics.estimated_cost;
+        let total_latency_ms = metrics.total_latency_ms;
+        let avg_latency_ms = metrics.avg_latency_ms;
+        let p50_latency_ms = metrics.p50_latency_ms;
+        let p95_latency_ms = metrics.p95_latency_ms;
 
         self.conn
             .call(move |conn| {
                 conn.execute(
                     queries::UPSERT_SESSION_METRICS,
-                    [
+                    rusqlite::params![
                         session_id,
-                        total_events.to_string(),
-                        message_count.to_string(),
-                        tool_call_count.to_string(),
-                        tool_result_count.to_string(),
-                        error_count.to_string(),
-                        user_messages.to_string(),
-                        assistant_messages.to_string(),
-                        duration_seconds.map(|d| d.to_string()).unwrap_or_default(),
-                        files_touched.to_string(),
-                        lines_added.to_string(),
-                        lines_removed.to_string(),
+                        total_events,
+                        message_count,
+                        tool_call_count,
+                        tool_result_count,
+                        error_count,
+                        user_messages,
+                        assistant_messages,
+                        duration_seconds,
+                        files_touched,
+                        lines_added,
+                        lines_removed,
                         computed_at,
+                        model,
+                        provider,
+                        input_tokens,
+                        output_tokens,
+                        estimated_cost,
+                        total_latency_ms,
+                        avg_latency_ms,
+                        p50_latency_ms,
+                        p95_latency_ms,
                     ],
                 )?;
                 Ok(())
             })
             .await
+    }
+
+    /// Compute and store metrics for a session
+    pub async fn compute_session_metrics(&self, session_id: &str) -> Result<(), tokio_rusqlite::Error> {
+        let session_id_str = session_id.to_string();
+        let session = self.get_session(session_id_str.clone()).await?;
+        let events = self.get_session_events(session_id_str.clone()).await?;
+
+        if session.is_none() {
+            return Ok(());
+        }
+        let session = session.unwrap();
+
+        let file_stats: (i64, i64, i64) = self
+            .conn
+            .call({
+                let sid = session_id_str.clone();
+                move |conn| {
+                    let mut stmt = conn.prepare(
+                        "SELECT COUNT(DISTINCT file_path), SUM(lines_added), SUM(lines_removed)
+                     FROM files_touched WHERE session_id = ?1",
+                    )?;
+                    stmt.query_row([sid], |row| {
+                        Ok((
+                            row.get::<_, i64>(0).unwrap_or(0),
+                            row.get::<_, i64>(1).unwrap_or(0),
+                            row.get::<_, i64>(2).unwrap_or(0),
+                        ))
+                    })
+                    .map_err(|e| e.into())
+                }
+            })
+            .await
+            .unwrap_or((0, 0, 0));
+
+        let latency_stats: (Option<i64>, Option<f64>) = self
+            .conn
+            .call({
+                let sid = session_id_str.clone();
+                move |conn| {
+                    let mut stmt = conn.prepare(
+                        "SELECT SUM(duration_ms), AVG(duration_ms)
+                     FROM tool_calls WHERE session_id = ?1 AND duration_ms IS NOT NULL",
+                    )?;
+                    stmt.query_row([sid], |row| Ok((row.get(0).ok(), row.get(1).ok())))
+                        .map_err(|e| e.into())
+                }
+            })
+            .await
+            .unwrap_or((None, None));
+
+        let mut metrics = SessionMetricsRow {
+            session_id: session_id_str,
+            total_events: events.len() as i64,
+            message_count: 0,
+            tool_call_count: 0,
+            tool_result_count: 0,
+            error_count: 0,
+            user_messages: 0,
+            assistant_messages: 0,
+            duration_seconds: None,
+            files_touched: file_stats.0,
+            lines_added: file_stats.1,
+            lines_removed: file_stats.2,
+            computed_at: Utc::now().to_rfc3339(),
+            model: None,
+            provider: None,
+            input_tokens: None,
+            output_tokens: None,
+            estimated_cost: None,
+            total_latency_ms: latency_stats.0,
+            avg_latency_ms: latency_stats.1,
+            p50_latency_ms: None,
+            p95_latency_ms: None,
+        };
+
+        let mut input_tokens = 0;
+        let mut output_tokens = 0;
+        let mut model_name: Option<String> = None;
+
+        if let Ok(payload) = serde_json::from_str::<serde_json::Value>(&session.raw_payload) {
+            if let Some(m) = payload.get("model").and_then(|v| v.as_str()) {
+                model_name = Some(m.to_string());
+            } else if let Some(m) = payload
+                .get("metadata")
+                .and_then(|meta| meta.get("model"))
+                .and_then(|v| v.as_str())
+            {
+                model_name = Some(m.to_string());
+            }
+        }
+
+        for event in events {
+            match event.kind.as_str() {
+                "message" => {
+                    metrics.message_count += 1;
+                    if event.role.as_deref() == Some("user") {
+                        metrics.user_messages += 1;
+                        if let Some(content) = &event.content {
+                            input_tokens += ModelMetadata::estimate_tokens(content);
+                        }
+                    } else if event.role.as_deref() == Some("assistant") {
+                        metrics.assistant_messages += 1;
+                        if let Some(content) = &event.content {
+                            output_tokens += ModelMetadata::estimate_tokens(content);
+                        }
+                    }
+                }
+                "tool_call" => metrics.tool_call_count += 1,
+                "tool_result" => metrics.tool_result_count += 1,
+                "error" => metrics.error_count += 1,
+                _ => {}
+            }
+
+            if let Ok(payload) = serde_json::from_str::<serde_json::Value>(&event.raw_payload) {
+                if model_name.is_none()
+                    && let Some(m) = payload.get("model").and_then(|v| v.as_str())
+                {
+                    model_name = Some(m.to_string());
+                }
+
+                if let Some(usage) = payload.get("usage") {
+                    if let Some(it) = usage.get("prompt_tokens").and_then(|v| v.as_i64()) {
+                        input_tokens = it as usize;
+                    }
+                    if let Some(ot) = usage.get("completion_tokens").and_then(|v| v.as_i64()) {
+                        output_tokens = ot as usize;
+                    }
+                }
+            }
+        }
+
+        metrics.model = model_name.clone();
+        metrics.input_tokens = Some(input_tokens as i64);
+        metrics.output_tokens = Some(output_tokens as i64);
+
+        if let Some(m) = model_name
+            && let Some(meta) = ModelMetadata::lookup(&m)
+        {
+            metrics.provider = Some(meta.provider.clone());
+            metrics.estimated_cost = Some(meta.calculate_cost(input_tokens, output_tokens));
+        }
+
+        self.upsert_session_metrics(&metrics).await?;
+
+        Ok(())
     }
 
     /// Get tool call frequency stats
@@ -821,9 +1018,18 @@ impl Database {
                             lines_added: row.get(10)?,
                             lines_removed: row.get(11)?,
                             computed_at: row.get(12)?,
+                            model: row.get(13)?,
+                            provider: row.get(14)?,
+                            input_tokens: row.get(15)?,
+                            output_tokens: row.get(16)?,
+                            estimated_cost: row.get(17)?,
+                            total_latency_ms: row.get(18)?,
+                            avg_latency_ms: row.get(19)?,
+                            p50_latency_ms: row.get(20)?,
+                            p95_latency_ms: row.get(21)?,
                         })
                     })
-                    .ok();
+                    .optional()?;
                 Ok(row)
             })
             .await
@@ -863,11 +1069,174 @@ impl Database {
                                 lines_added: row.get(17)?,
                                 lines_removed: row.get(18)?,
                                 computed_at: row.get(19)?,
+                                model: row.get(20)?,
+                                provider: row.get(21)?,
+                                input_tokens: row.get(22)?,
+                                output_tokens: row.get(23)?,
+                                estimated_cost: row.get(24)?,
+                                total_latency_ms: row.get(25)?,
+                                avg_latency_ms: row.get(26)?,
+                                p50_latency_ms: row.get(27)?,
+                                p95_latency_ms: row.get(28)?,
                             })
                         } else {
                             None
                         };
                         Ok((session, metrics))
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get cost stats by source
+    pub async fn get_cost_stats_by_source(
+        &self, source_filter: Option<String>, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<Vec<CostStats>, tokio_rusqlite::Error> {
+        let source = source_filter.unwrap_or_default();
+        let since_str = since.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+        let until_str = until.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::COST_STATS_BY_SOURCE)?;
+                let rows = stmt
+                    .query_map([source, since_str, until_str], |row| {
+                        Ok(CostStats {
+                            dimension: row.get(0)?,
+                            session_count: row.get(1)?,
+                            total_cost: row.get(2)?,
+                            avg_cost_per_session: row.get(3)?,
+                            total_input_tokens: row.get(4)?,
+                            total_output_tokens: row.get(5)?,
+                            avg_latency_ms: row.get(6)?,
+                            p50_latency_ms: row.get(7)?,
+                            p95_latency_ms: row.get(8)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get cost stats by project
+    pub async fn get_cost_stats_by_project(
+        &self, source_filter: Option<String>, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<Vec<CostStats>, tokio_rusqlite::Error> {
+        let source = source_filter.unwrap_or_default();
+        let since_str = since.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+        let until_str = until.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::COST_STATS_BY_PROJECT)?;
+                let rows = stmt
+                    .query_map([source, since_str, until_str], |row| {
+                        Ok(CostStats {
+                            dimension: row.get(0)?,
+                            session_count: row.get(1)?,
+                            total_cost: row.get(2)?,
+                            avg_cost_per_session: row.get(3)?,
+                            total_input_tokens: row.get(4)?,
+                            total_output_tokens: row.get(5)?,
+                            avg_latency_ms: row.get(6)?,
+                            p50_latency_ms: row.get(7)?,
+                            p95_latency_ms: row.get(8)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get cost stats by session
+    pub async fn get_cost_stats_by_session(
+        &self, source_filter: Option<String>, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>, limit: i64,
+        offset: i64,
+    ) -> Result<Vec<SessionCostStats>, tokio_rusqlite::Error> {
+        let source = source_filter.unwrap_or_default();
+        let since_str = since.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+        let until_str = until.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::COST_STATS_BY_SESSION)?;
+                let rows = stmt
+                    .query_map(
+                        [source, since_str, until_str, limit.to_string(), offset.to_string()],
+                        |row| {
+                            Ok(SessionCostStats {
+                                session_id: row.get(0)?,
+                                external_id: row.get(1)?,
+                                project: row.get(2)?,
+                                source: row.get(3)?,
+                                estimated_cost: row.get(4)?,
+                                input_tokens: row.get(5)?,
+                                output_tokens: row.get(6)?,
+                                avg_latency_ms: row.get(7)?,
+                                p50_latency_ms: row.get(8)?,
+                                p95_latency_ms: row.get(9)?,
+                                duration_seconds: row.get(10)?,
+                                computed_at: row.get(11)?,
+                            })
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .await
+    }
+
+    /// Get latency distribution stats
+    pub async fn get_latency_distribution(
+        &self, source_filter: Option<String>, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<LatencyDistribution, tokio_rusqlite::Error> {
+        let source = source_filter.unwrap_or_default();
+        let since_str = since.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+        let until_str = until.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::LATENCY_DISTRIBUTION)?;
+                let row = stmt.query_row([source, since_str, until_str], |row| {
+                    Ok(LatencyDistribution {
+                        avg_latency: row.get(0)?,
+                        p50_latency: row.get(1)?,
+                        p95_latency: row.get(2)?,
+                        max_p95: row.get(3)?,
+                        session_count: row.get(4)?,
+                    })
+                })?;
+                Ok(row)
+            })
+            .await
+    }
+
+    /// Get model usage stats
+    pub async fn get_model_usage_stats(
+        &self, source_filter: Option<String>, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<Vec<ModelUsageStats>, tokio_rusqlite::Error> {
+        let source = source_filter.unwrap_or_default();
+        let since_str = since.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+        let until_str = until.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::MODEL_USAGE_STATS)?;
+                let rows = stmt
+                    .query_map([source, since_str, until_str], |row| {
+                        Ok(ModelUsageStats {
+                            model: row.get(0)?,
+                            provider: row.get(1)?,
+                            session_count: row.get(2)?,
+                            total_input_tokens: row.get(3)?,
+                            total_output_tokens: row.get(4)?,
+                            total_cost: row.get(5)?,
+                            avg_latency_ms: row.get(6)?,
+                        })
                     })?
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(rows)
@@ -915,6 +1284,59 @@ pub struct LongRunningToolCall {
     pub session_external_id: String,
     pub project: Option<String>,
     pub error_message: Option<String>,
+}
+
+/// Cost and latency stats by source or project
+#[derive(Debug, Clone)]
+pub struct CostStats {
+    pub dimension: String,
+    pub session_count: i64,
+    pub total_cost: Option<f64>,
+    pub avg_cost_per_session: Option<f64>,
+    pub total_input_tokens: Option<i64>,
+    pub total_output_tokens: Option<i64>,
+    pub avg_latency_ms: Option<f64>,
+    pub p50_latency_ms: Option<f64>,
+    pub p95_latency_ms: Option<f64>,
+}
+
+/// Cost stats for a single session
+#[derive(Debug, Clone)]
+pub struct SessionCostStats {
+    pub session_id: String,
+    pub external_id: String,
+    pub project: Option<String>,
+    pub source: String,
+    pub estimated_cost: Option<f64>,
+    pub input_tokens: Option<i64>,
+    pub output_tokens: Option<i64>,
+    pub avg_latency_ms: Option<f64>,
+    pub p50_latency_ms: Option<i64>,
+    pub p95_latency_ms: Option<i64>,
+    pub duration_seconds: Option<i64>,
+    pub computed_at: String,
+}
+
+/// Latency distribution summary
+#[derive(Debug, Clone)]
+pub struct LatencyDistribution {
+    pub avg_latency: Option<f64>,
+    pub p50_latency: Option<f64>,
+    pub p95_latency: Option<f64>,
+    pub max_p95: Option<i64>,
+    pub session_count: i64,
+}
+
+/// Model/provider usage stats
+#[derive(Debug, Clone)]
+pub struct ModelUsageStats {
+    pub model: String,
+    pub provider: String,
+    pub session_count: i64,
+    pub total_input_tokens: Option<i64>,
+    pub total_output_tokens: Option<i64>,
+    pub total_cost: Option<f64>,
+    pub avg_latency_ms: Option<f64>,
 }
 
 /// Check health of all configured data sources
@@ -1040,5 +1462,96 @@ async fn count_projects(path: &std::path::Path) -> usize {
             count
         }
         Err(_) => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_v_core::{Event, EventKind, Role, Session, Source};
+    use uuid::Uuid;
+
+    async fn setup_test_db() -> Database {
+        let db = Database::open(":memory:").await.unwrap();
+        db.migrate().await.unwrap();
+        db
+    }
+
+    #[tokio::test]
+    async fn test_compute_session_metrics() {
+        let db = setup_test_db().await;
+        let session_id = Uuid::new_v4();
+
+        let session = Session {
+            id: session_id,
+            source: Source::Claude,
+            external_id: "ext-1".to_string(),
+            project: Some("test-project".to_string()),
+            title: Some("Test Session".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            raw_payload: serde_json::json!({"model": "claude-4.5-sonnet"}),
+        };
+
+        let events = vec![
+            Event {
+                id: Uuid::new_v4(),
+                session_id,
+                kind: EventKind::Message,
+                role: Some(Role::User),
+                content: Some("Hello".to_string()),
+                timestamp: Utc::now(),
+                raw_payload: serde_json::json!({}),
+            },
+            Event {
+                id: Uuid::new_v4(),
+                session_id,
+                kind: EventKind::Message,
+                role: Some(Role::Assistant),
+                content: Some("Hi there! I am a 2026 model.".to_string()),
+                timestamp: Utc::now(),
+                raw_payload: serde_json::json!({"usage": {"prompt_tokens": 10, "completion_tokens": 20}}),
+            },
+        ];
+
+        db.insert_session_with_events(&session, &events).await.unwrap();
+
+        let s = db.get_session(session_id.to_string()).await.unwrap();
+        assert!(s.is_some(), "Session should be in DB");
+
+        let evs = db.get_session_events(session_id.to_string()).await.unwrap();
+        assert_eq!(evs.len(), 2, "Should have 2 events in DB");
+
+        db.compute_session_metrics(&session_id.to_string()).await.unwrap();
+
+        let metrics_opt = db.get_session_metrics(&session_id.to_string()).await.unwrap();
+        if metrics_opt.is_none() {
+            let exists: bool = db
+                .conn
+                .call({
+                    let sid = session_id.to_string();
+                    move |conn| {
+                        let mut stmt = conn.prepare("SELECT COUNT(*) FROM session_metrics WHERE session_id = ?1")?;
+                        let count: i64 = stmt.query_row([sid], |row| row.get(0))?;
+                        Ok(count > 0)
+                    }
+                })
+                .await
+                .unwrap();
+            panic!("Metrics not found for {}. Row exists: {}", session_id, exists);
+        }
+        let metrics = metrics_opt.unwrap();
+
+        assert_eq!(metrics.total_events, 2);
+        assert_eq!(metrics.message_count, 2);
+        assert_eq!(metrics.user_messages, 1);
+        assert_eq!(metrics.assistant_messages, 1);
+        assert_eq!(metrics.model, Some("claude-4.5-sonnet".to_string()));
+        assert_eq!(metrics.provider, Some("anthropic".to_string()));
+
+        assert_eq!(metrics.input_tokens, Some(10));
+        assert_eq!(metrics.output_tokens, Some(20));
+
+        assert!(metrics.estimated_cost.unwrap() > 0.0);
     }
 }

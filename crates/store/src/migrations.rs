@@ -155,4 +155,24 @@ pub const MIGRATIONS: &[Migration] = &[
             CREATE INDEX IF NOT EXISTS idx_events_kind_timestamp ON events(kind, timestamp);
         "#,
     },
+    Migration {
+        name: "005_add_cost_and_latency_metrics",
+        sql: r#"
+            -- Add cost and latency metrics to session_metrics table
+            ALTER TABLE session_metrics ADD COLUMN model TEXT;
+            ALTER TABLE session_metrics ADD COLUMN provider TEXT;
+            ALTER TABLE session_metrics ADD COLUMN input_tokens INTEGER;
+            ALTER TABLE session_metrics ADD COLUMN output_tokens INTEGER;
+            ALTER TABLE session_metrics ADD COLUMN estimated_cost REAL;
+            ALTER TABLE session_metrics ADD COLUMN total_latency_ms INTEGER;
+            ALTER TABLE session_metrics ADD COLUMN avg_latency_ms REAL;
+            ALTER TABLE session_metrics ADD COLUMN p50_latency_ms INTEGER;
+            ALTER TABLE session_metrics ADD COLUMN p95_latency_ms INTEGER;
+
+            -- Index for cost queries
+            CREATE INDEX IF NOT EXISTS idx_session_metrics_cost ON session_metrics(estimated_cost);
+            CREATE INDEX IF NOT EXISTS idx_session_metrics_model ON session_metrics(model);
+            CREATE INDEX IF NOT EXISTS idx_session_metrics_provider ON session_metrics(provider);
+        "#,
+    },
 ];

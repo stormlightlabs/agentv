@@ -307,8 +307,10 @@ impl Watcher {
         let adapter = ClaudeAdapter::new();
 
         for session_file in adapter.discover_sessions().await {
-            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
-                let _ = db.insert_session_with_events(&session, &events).await;
+            if let Ok((session, events)) = adapter.parse_session(&session_file).await
+                && db.insert_session_with_events(&session, &events).await.is_ok()
+            {
+                let _ = db.compute_session_metrics(&session.id.to_string()).await;
             }
         }
 
@@ -321,8 +323,10 @@ impl Watcher {
         let adapter = CodexAdapter::new();
 
         for session_file in adapter.discover_sessions().await {
-            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
-                let _ = db.insert_session_with_events(&session, &events).await;
+            if let Ok((session, events)) = adapter.parse_session(&session_file).await
+                && db.insert_session_with_events(&session, &events).await.is_ok()
+            {
+                let _ = db.compute_session_metrics(&session.id.to_string()).await;
             }
         }
 
@@ -335,8 +339,10 @@ impl Watcher {
         let adapter = OpenCodeAdapter::new();
 
         for session in adapter.discover_sessions().await {
-            if let Ok((session_obj, events)) = adapter.parse_session(&session).await {
-                let _ = db.insert_session_with_events(&session_obj, &events).await;
+            if let Ok((session_obj, events)) = adapter.parse_session(&session).await
+                && db.insert_session_with_events(&session_obj, &events).await.is_ok()
+            {
+                let _ = db.compute_session_metrics(&session_obj.id.to_string()).await;
             }
         }
 
@@ -349,8 +355,10 @@ impl Watcher {
         let adapter = CrushAdapter::new();
 
         for session_file in adapter.discover_sessions().await {
-            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
-                let _ = db.insert_session_with_events(&session, &events).await;
+            if let Ok((session, events)) = adapter.parse_session(&session_file).await
+                && db.insert_session_with_events(&session, &events).await.is_ok()
+            {
+                let _ = db.compute_session_metrics(&session.id.to_string()).await;
             }
         }
 
