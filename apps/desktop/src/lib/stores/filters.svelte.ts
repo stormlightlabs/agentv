@@ -1,5 +1,4 @@
 import { goto } from "$app/navigation";
-import { page } from "$app/state";
 
 type Nullable<T> = T | null;
 
@@ -89,9 +88,7 @@ function createFilterStore() {
 
 export const filterStore = createFilterStore();
 
-export function syncFiltersFromURL(): void {
-  const searchParams = new URLSearchParams(page.url.searchParams);
-
+export function syncFiltersFromURL(searchParams: URLSearchParams): void {
   filterStore.state = {
     query: searchParams.get("q") || "",
     source: searchParams.get("source"),

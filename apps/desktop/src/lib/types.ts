@@ -45,7 +45,7 @@ export type EventData = {
   role: string | null;
   content: string | null;
   timestamp: string;
-  raw_payload: EventPayload;
+  raw_payload: EventPayload | null;
 };
 
 export type SearchResult = { event: EventData; rank: number; snippet: string | null };
@@ -58,7 +58,6 @@ export type ErrorStats = { day: string; error_count: number; signature: string |
 
 export type GroupedStats = { dimension: string; count: number; sessions?: number; earliest?: string; latest?: string };
 
-// M7 Analytics Types
 export type ToolFrequencyStats = {
   tool_name: string;
   call_count: number;

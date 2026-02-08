@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { useToast } from "$lib/stores/toast";
+  import { useToast } from "$lib/stores/toast.svelte";
   import type { ContentBlock, EventData, EventPayload, SessionData } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
 
-  type Props = { session: SessionData; events: EventData[]; onSelectEvent?: (event: EventData) => void };
+  type Props = {
+    session: SessionData;
+    events: EventData[];
+    onSelectEvent?: (event: EventData) => void;
+    onOpenDrawer?: () => void;
+  };
 
-  let { session, events, onSelectEvent }: Props = $props();
+  let { session, events, onSelectEvent, onOpenDrawer }: Props = $props();
 
   const toast = useToast();
   let exporting = $state(false);
@@ -51,7 +56,8 @@
     }
   }
 
-  function extractToolCalls(rawPayload: EventPayload): Array<{ name: string; id: string }> {
+  function extractToolCalls(rawPayload: EventPayload | null | undefined): Array<{ name: string; id: string }> {
+    if (!rawPayload) return [];
     const message = rawPayload.message;
     if (!message) return [];
 
@@ -66,7 +72,8 @@
       .map((block) => ({ name: block.name, id: block.id }));
   }
 
-  function extractThinking(rawPayload: EventPayload): string | null {
+  function extractThinking(rawPayload: EventPayload | null | undefined): string | null {
+    if (!rawPayload) return null;
     const message = rawPayload.message;
     if (!message) return null;
 
@@ -80,12 +87,37 @@
     return thinkingBlock?.thinking ?? null;
   }
 
-  function extractGitBranch(rawPayload: EventPayload): string | null {
-    return rawPayload.gitBranch ?? null;
+  function extractGitBranch(rawPayload: EventPayload | null | undefined): string | null {
+    return rawPayload?.gitBranch ?? null;
   }
 
-  function extractCwd(rawPayload: EventPayload): string | null {
-    return rawPayload.cwd ?? null;
+  function extractCwd(rawPayload: EventPayload | null | undefined): string | null {
+    return rawPayload?.cwd ?? null;
+  }
+
+  function extractContentFromPayload(payload: EventPayload | null | undefined): string | null {
+    if (!payload) return null;
+
+    const messageContent = payload.message?.content;
+    if (messageContent) {
+      if (typeof messageContent === "string") {
+        return messageContent;
+      }
+      if (Array.isArray(messageContent)) {
+        return messageContent
+          .filter(
+            (block): block is ContentBlock & { type: "text"; text: string } => block.type === "text" && "text" in block,
+          )
+          .map((block) => block.text)
+          .join("\n");
+      }
+    }
+
+    if (payload.content && typeof payload.content === "string") {
+      return payload.content;
+    }
+
+    return null;
   }
 
   function getContentPreview(event: EventData): string {
@@ -93,9 +125,19 @@
       return event.content.slice(0, 150).replace(/\n/g, " ");
     }
 
+    const payloadContent = extractContentFromPayload(event.raw_payload);
+    if (payloadContent) {
+      return payloadContent.slice(0, 150).replace(/\n/g, " ");
+    }
+
     const toolCalls = extractToolCalls(event.raw_payload);
     if (toolCalls.length > 0) {
       return `Tool calls: ${toolCalls.map((t) => t.name).join(", ")}`;
+    }
+
+    const thinking = extractThinking(event.raw_payload);
+    if (thinking) {
+      return `Thinking: ${thinking.slice(0, 100)}...`;
     }
 
     return "";
@@ -191,6 +233,15 @@
         {formatDate(session.updated_at)}
       </div>
       <div class="flex gap-1 justify-end">
+        {#if onOpenDrawer}
+          <button
+            class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue"
+            onclick={onOpenDrawer}
+            title="View session details">
+            <span class="i-ri-information-line"></span>
+            Details
+          </button>
+        {/if}
         <button
           class="px-2 py-1 bg-bg border border-bg-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue disabled:opacity-50"
           onclick={() => exportSession("md")}

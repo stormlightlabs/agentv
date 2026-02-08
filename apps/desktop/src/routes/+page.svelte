@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import AnalyticsPanel from "$lib/components/AnalyticsPanel.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import EventInspector from "$lib/components/EventInspector.svelte";
@@ -21,7 +21,7 @@
   import { filterStore, syncFiltersFromURL, updateURLFromFilters } from "$lib/stores/filters.svelte";
   import { keyboardStore, handleKeyboardEvent, registerShortcut } from "$lib/stores/keyboard.svelte";
   import { logInfo } from "$lib/stores/logger.svelte";
-  import { useToast } from "$lib/stores/toast";
+  import { useToast } from "$lib/stores/toast.svelte";
   import type { EventData, IngestResult, SessionData } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
   import { onDestroy, onMount } from "svelte";
@@ -32,6 +32,12 @@
   let bookmarksOpen = $state(false);
   let selectedEvent = $state<EventData | null>(null);
   let showEventInspector = $state(false);
+  let showSessionDrawer = $state(false);
+
+  let sidebarWidth = $state(500);
+  let isResizing = $state(false);
+  let minSidebarWidth = 350;
+  let maxSidebarWidth = 800;
 
   let sessions = $state<SessionData[]>([]);
   let selectedSession = $state<SessionData | null>(null);
@@ -109,6 +115,7 @@
   async function selectSession(session: SessionData) {
     selectedSession = session;
     filterStore.setFilter("sessionId", session.id);
+    showSessionDrawer = false;
     try {
       events = await invoke<EventData[]>("get_session_events", { sessionId: session.id });
       logInfo("Session selected", { sessionId: session.id, eventCount: events.length });
@@ -116,6 +123,32 @@
       console.error("Failed to load events:", e);
       toast.error(`Failed to load events: ${e}`);
       events = [];
+    }
+  }
+
+  function startResizing(e: MouseEvent) {
+    isResizing = true;
+    e.preventDefault();
+  }
+
+  function handleResize(e: MouseEvent) {
+    if (!isResizing) return;
+    const newWidth = e.clientX;
+    if (newWidth >= minSidebarWidth && newWidth <= maxSidebarWidth) {
+      sidebarWidth = newWidth;
+    }
+  }
+
+  function stopResizing() {
+    isResizing = false;
+  }
+
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard");
+    } catch (e) {
+      toast.error("Failed to copy");
     }
   }
 
@@ -400,14 +433,14 @@
   function handleUrlParams() {
     if (!browser) return;
 
-    syncFiltersFromURL();
+    syncFiltersFromURL(page.url.searchParams);
 
-    const sessionId = $page.url.searchParams.get("session");
+    const sessionId = page.url.searchParams.get("session");
     if (sessionId) {
       selectSessionById(sessionId);
     }
 
-    const tab = $page.url.searchParams.get("tab");
+    const tab = page.url.searchParams.get("tab");
     if (tab && ["sessions", "search", "analytics", "status"].includes(tab)) {
       activeTab = tab as typeof activeTab;
     }
@@ -429,10 +462,14 @@
     handleUrlParams();
 
     window.addEventListener("keydown", handleKeydown);
+    window.addEventListener("mousemove", handleResize);
+    window.addEventListener("mouseup", stopResizing);
 
     return () => {
       stopAutoRefresh();
       window.removeEventListener("keydown", handleKeydown);
+      window.removeEventListener("mousemove", handleResize);
+      window.removeEventListener("mouseup", stopResizing);
     };
   });
 
@@ -570,8 +607,96 @@
   </div>
 {/if}
 
+{#if showSessionDrawer && selectedSession}
+  <div
+    class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+    onclick={() => (showSessionDrawer = false)}
+    onkeydown={(e) => {
+      if (e.key === "Escape") showSessionDrawer = false;
+    }}
+    role="dialog"
+    aria-label="Session details"
+    tabindex="-1"
+    transition:fade={{ duration: 150 }}>
+    <div
+      class="w-full max-w-5xl h-[85vh] bg-bg rounded-lg shadow-2xl overflow-hidden flex flex-col"
+      onclick={(e) => e.stopPropagation()}
+      transition:slide={{ duration: 150 }}>
+      <div class="flex items-center justify-between px-6 py-4 border-b border-bg-muted bg-bg-soft">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-semibold text-fg m-0">
+            {selectedSession.title || "Untitled Session"}
+          </h2>
+          <span class="px-2 py-0.5 bg-bg-muted rounded text-2xs text-fg-dim uppercase">
+            {selectedSession.source}
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            class="px-3 py-1.5 bg-bg border border-bg-muted rounded text-sm text-fg hover:border-blue hover:text-blue transition-colors flex items-center gap-1"
+            onclick={() => copyToClipboard(JSON.stringify(selectedSession, null, 2))}
+            type="button">
+            <span class="i-ri-file-copy-line"></span>
+            Copy Session JSON
+          </button>
+          <button
+            class="p-2 text-fg-dim hover:text-fg transition-colors"
+            onclick={() => (showSessionDrawer = false)}
+            type="button">
+            <span class="i-ri-close-line text-xl"></span>
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-6">
+        <div class="mb-6 grid grid-cols-3 gap-4 text-sm">
+          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+            <div class="text-xs text-fg-muted mb-1">Session ID</div>
+            <div class="text-fg font-mono text-xs">{selectedSession.id}</div>
+          </div>
+          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+            <div class="text-xs text-fg-muted mb-1">External ID</div>
+            <div class="text-fg font-mono text-xs">{selectedSession.external_id}</div>
+          </div>
+          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+            <div class="text-xs text-fg-muted mb-1">Project</div>
+            <div class="text-fg">{selectedSession.project || "No project"}</div>
+          </div>
+          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+            <div class="text-xs text-fg-muted mb-1">Created</div>
+            <div class="text-fg">{new Date(selectedSession.created_at).toLocaleString()}</div>
+          </div>
+          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+            <div class="text-xs text-fg-muted mb-1">Updated</div>
+            <div class="text-fg">{new Date(selectedSession.updated_at).toLocaleString()}</div>
+          </div>
+          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+            <div class="text-xs text-fg-muted mb-1">Events</div>
+            <div class="text-fg">{events.length} events</div>
+          </div>
+        </div>
+        <div class="bg-bg-soft rounded border border-bg-muted overflow-hidden">
+          <div class="px-4 py-2 border-b border-bg-muted bg-bg-muted/50 flex items-center justify-between">
+            <span class="text-sm font-semibold text-fg">Full Session Data</span>
+            <span class="text-2xs text-fg-dim">JSON</span>
+          </div>
+          <pre class="p-4 text-sm text-fg-dim overflow-x-auto max-h-[50vh]"><code
+              >{JSON.stringify(selectedSession, null, 2)}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <div class="flex h-screen overflow-hidden">
-  <aside class="w-80 min-w-80 bg-bg-soft border-r border-bg-muted flex flex-col overflow-hidden">
+  <aside
+    class="bg-bg-soft border-r border-bg-muted flex flex-col overflow-hidden relative"
+    style="width: {sidebarWidth}px; min-width: {minSidebarWidth}px;">
+    <div
+      class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue/50 transition-colors z-10"
+      onmousedown={startResizing}
+      role="separator"
+      aria-label="Resize sidebar">
+    </div>
     <div class="p-4 border-b border-bg-muted flex flex-col gap-3">
       <div class="flex items-center justify-between">
         <h1 class="m-0 text-xl font-semibold text-fg">Agent V</h1>
@@ -719,7 +844,11 @@
     {#if sessions.length === 0 && !loading}
       <WelcomeScreen onGetStarted={ingestAllSources} />
     {:else if selectedSession}
-      <SessionViewer session={selectedSession} {events} onSelectEvent={selectEvent} />
+      <SessionViewer
+        session={selectedSession}
+        {events}
+        onSelectEvent={selectEvent}
+        onOpenDrawer={() => (showSessionDrawer = true)} />
     {:else}
       <div class="flex-1 flex items-center justify-center text-fg-dim" in:fade>
         <div class="text-center">
