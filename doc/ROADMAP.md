@@ -259,8 +259,13 @@ For all adapters, verify with:
 - [ ] Add diagnostics flow (log file location, copy debug bundle, actionable error messages)
 - [ ] Tag & release v0.1.0
 - [ ] Publish alpha install docs (macOS/Windows/Linux), known limits, and rollback steps
-
-- [ ] Before v0.1.0, pull forward the following from later milestones:
+- [ ] Add "Support Agent V" surface area (donationware):
+    - [ ] README: funding links + explicit donationware statement (no paid tiers)
+    - [ ] Desktop: Support page (links + why donations matter)
+    - [ ] Desktop: optional post-onboarding nudge after "first successful ingest" (dismiss forever)
+    - [ ] CLI: `agent-v support` prints funding links + short pitch (no prompts by default)
+    - [ ] Release notes template: include "Support" section
+- [x] Before v0.1.0, pull forward the following from later milestones:
     - [x] (from M9): unified filter bar (source/project/kind/role/tool/date/full-text) in session and log views
     - [x] (from M9): deep-linkable URL state for active query + selected session/event
     - [x] (from M9): keyboard-first navigation and quick actions (copy id/payload/open session)
@@ -281,7 +286,19 @@ just ingest-source claude
 just list
 ```
 
-### M9 — Log Browser Core
+### M9 — Cost + Efficiency Accounting (Local)
+
+**Goal:** Attribute cost and latency to specific sessions, steps, and tools (local-only).
+
+**Tasks:**
+
+- [ ] Store: extend metrics table to include model/provider metadata + token estimates (when available) + "unknown" fallback
+- [ ] CLI: `stats --by cost` (per session/project/source) with totals + p50/p95 for latency
+- [ ] Desktop: "Cost & Latency" panel per session (timeline overlay + rollups)
+- [ ] Desktop: project-level "Efficiency" dashboard (cost/session, tool-error rate, retry loops)
+- [ ] Export: include cost/latency rollups in `export --session` and export bundles
+
+### M10 — Log Browser Core
 
 **Goal:** Make high-volume agent event logs fast to browse and filter.
 
@@ -293,7 +310,19 @@ just list
 - [ ] Add keyboard-first navigation and quick actions (copy id/payload/open session)
 - [ ] Add saved filter presets for recurring investigations
 
-### M10 — Event Inspector + Correlation
+### M11 — Tool-Call Forensics (Investigation Workflow)
+
+**Goal:** Make tool usage inspectable at scale: "show me every edit/run/write and what it changed."
+
+**Tasks:**
+
+- [ ] Add first-class "Tool Calls" index (tool kind, args, duration, exit status, error signature)
+- [ ] Add tool-call facets: tool name, exit code, cwd, file paths touched, bytes in/out
+- [ ] Add "tool call -> tool result" jump + parent/child chain traversal in the event browser
+- [ ] Add "files touched" and "commands run" derived views per session
+- [ ] Add saved investigation presets (e.g., "all failing commands", "all file writes", "all approvals")
+
+### M12 — Event Inspector + Correlation
 
 **Goal:** Make each event inspectable, explainable, and traceable.
 
@@ -305,19 +334,41 @@ just list
 - [ ] Adjacent-event diff mode for prompt/response and tool output changes
 - [ ] Sensitive-field redaction toggles for copy/export safety
 
-### M11 — Visual Analytics Workbench
+### M13 — Trace Timeline (Causality-First View)
+
+**Goal:** Render each session as a trace with causality: prompt -> tool -> output -> patch.
+
+**Tasks:**
+
+- [ ] Desktop: dedicated "Trace" view (expand/collapse spans; progressive disclosure)
+- [ ] Desktop: span grouping by "agent step" (message + tool subtree + patch subtree)
+- [ ] CLI: `show session <id> --trace` (tree + latency + status icons)
+- [ ] Store: persist correlation ids (span_id/parent_span_id) across normalized events
+
+### M14 — Visual Analytics Workbench
 
 **Goal:** Turn logs into interactive operational insights.
 
 **Tasks:**
 
-- [ ] Reusable chart primitives for timeseries, histogram, and leaderboard views
+- [ ] Reusable chart primitives for timeseries, histogram, and leaderboard views (chart.js powered)
 - [ ] Multi-series throughput charts (events/sessions by source/project/model)
 - [ ] Latency distributions (p50/p95/p99) with outlier drill-down
 - [ ] Error signature trends and top-regression views
 - [ ] Click-through from chart points into pre-filtered event browser results
 
-### M12 — Compare Modes + Regression Signals
+### M15 — Export Bundles (Bug Reports + PR Review)
+
+**Goal:** Make "share the evidence" a first-class workflow without cloud dependency.
+
+**Tasks:**
+
+- [ ] Add export bundle format: `.zip` containing (a) session jsonl, (b) normalized summary json, (c) rendered markdown report, (d) referenced patches, (e) selected screenshots (optional)
+- [ ] Desktop: "Create bundle" button from session + from search result set
+- [ ] CLI: `export bundle --session <id> --out <path>` and `export bundle --search "<q>"`
+- [ ] Add redaction rules to bundle pipeline (reuse M10 redaction toggles)
+
+### M16 — Compare Modes + Regression Signals
 
 **Goal:** Explain what changed between runs, projects, or date windows.
 
@@ -329,7 +380,22 @@ just list
 - [ ] Timeline annotations (release markers, ingest incidents, manual notes)
 - [ ] Export comparison reports (`md`/`json`) with reproducible query parameters
 
-### M13 — Ingestion Freshness + Reliability
+### M17 — Session Diff + Replay
+
+**Goal:** Reproduce and compare two sessions end-to-end (tools, outputs, patches) locally.
+
+**Tasks:**
+
+- [ ] Desktop: session-to-session diff (A/B) for:
+    - [ ] prompts/messages (with highlight)
+    - [ ] tool call sequences (added/removed/reordered)
+    - [ ] tool outputs (diff where text; fallback raw view)
+    - [ ] patch sets (git-style file diffs)
+- [ ] CLI: `diff sessions <a> <b>` with summary + optional `--format md`
+- [ ] Replay (offline): re-render a stored session as-if live (no model calls; use stored tool outputs)
+- [ ] Replay (optional live): re-run tools with safety gates (explicit allowlist + dry-run) and compare with stored outputs
+
+### M18 — Ingestion Freshness + Reliability
 
 **Goal:** Ensure near-real-time ingest is trustworthy at scale.
 
@@ -341,7 +407,7 @@ just list
 - [ ] Add stale-source alerts in desktop status panel
 - [ ] Add idempotency and duplicate-ingest verification checks
 
-### M14 — Daily Driver Polish for Analysts
+### M19 — Daily Driver Polish for Analysts
 
 **Goal:** Make the app a default workflow for log triage and performance analysis.
 
@@ -361,10 +427,10 @@ just list
 - **M6:** New sessions appear automatically without manual re-ingest
 - **M7:** Can export sessions and view comprehensive analytics
 - **M8:** Users can download an alpha build, install it, and receive updates via Cloudflare Worker-backed Tauri updater
-- **M9-M10:** Users can browse large log volumes and deeply inspect correlated event details
-- **M11-M12:** Users can visualize trends and compare windows/projects to detect regressions
-- **M13:** Continuous ingest is observable, resilient, and freshness-aware across all sources
-- **M14:** The tool is polished enough for daily investigation workflows
+- **M9-M13:** Users can browse large log volumes, deeply inspect correlated event details, and trace session causality
+- **M14-M17:** Users can visualize trends, export shareable bundles, and compare windows/projects to detect regressions
+- **M18:** Continuous ingest is observable, resilient, and freshness-aware across all sources
+- **M19:** The tool is polished enough for daily investigation workflows
 
 ## References
 

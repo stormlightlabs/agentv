@@ -93,7 +93,6 @@
   });
 </script>
 
-<!-- TODO: consider componentizing Tools, Files, Churn, and Latency sections -->
 <div class="flex flex-col h-full overflow-hidden bg-surface-soft">
   <!-- Header -->
   <div class="p-4 border-b border-surface-muted bg-surface">

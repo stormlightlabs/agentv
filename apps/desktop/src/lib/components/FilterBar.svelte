@@ -1,5 +1,6 @@
 <script lang="ts">
   import { filterStore, type FilterState } from "$lib/stores/filters.svelte";
+  import { untrack } from "svelte";
   import { fly } from "svelte/transition";
 
   type Props = {
@@ -28,6 +29,7 @@
 
   let showFilters = $state(false);
   let searchInput: HTMLInputElement | null = $state(null);
+  const activeCount = $derived(filterStore.activeCount);
 
   const roleOptions = ["user", "assistant", "system"];
   const dateOptions = [
@@ -77,10 +79,11 @@
   }
 
   $effect(() => {
-    const activeCount = filterStore.activeCount;
-    if (activeCount > 0 && !showFilters) {
-      // TODO: auto-show filters when active
-    }
+    untrack(() => {
+      if (activeCount > 0 && !showFilters) {
+        showFilters = true;
+      }
+    });
   });
 </script>
 
@@ -117,7 +120,8 @@
 
     <button
       class="px-3 py-2 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-2"
-      onclick={() => (showFilters = !showFilters)}>
+      onclick={() => (showFilters = !showFilters)}
+      disabled={activeCount > 0}>
       <span class="i-ri-filter-3-line"></span>
       Filters
       {#if filterStore.activeCount > 0}
