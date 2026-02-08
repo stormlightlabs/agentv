@@ -17,3 +17,4 @@ vite.config.ts.timestamp-*
 # will have schema files for capabilities auto-completion
 **/*/gen/schemas/*.json
 !claude.rs
+AGENTS.md

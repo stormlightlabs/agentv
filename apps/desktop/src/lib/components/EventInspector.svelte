@@ -12,6 +12,12 @@
 
   let activeTab = $state<"normalized" | "raw" | "thinking" | "tools">("normalized");
 
+  const payload = $derived(event.raw_payload);
+  const normalizedFields = $derived(getNormalizedFields(event));
+  const toolCalls = $derived(payload ? getToolCalls(payload) : []);
+  const thinkingContent = $derived(payload ? getThinkingContent(payload) : null);
+  const signature = $derived(payload ? getSignature(payload) : null);
+
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text).catch(() => {});
   }
@@ -29,20 +35,19 @@
       { label: "Timestamp", value: new Date(event.timestamp).toLocaleString() },
     ];
 
-    const payload = event.raw_payload;
-    if (payload.uuid) {
+    if (payload?.uuid) {
       fields.push({ label: "UUID", value: payload.uuid });
     }
-    if (payload.parentUuid) {
+    if (payload?.parentUuid) {
       fields.push({ label: "Parent UUID", value: payload.parentUuid, type: "parent" });
     }
-    if (payload.type) {
+    if (payload?.type) {
       fields.push({ label: "Type", value: payload.type });
     }
-    if (payload.gitBranch) {
+    if (payload?.gitBranch) {
       fields.push({ label: "Git Branch", value: payload.gitBranch, type: "git" });
     }
-    if (payload.cwd) {
+    if (payload?.cwd) {
       fields.push({ label: "Working Directory", value: payload.cwd, type: "path" });
     }
 
@@ -85,11 +90,6 @@
 
     return thinkingBlock?.signature ?? null;
   }
-
-  const normalizedFields = $derived(getNormalizedFields(event));
-  const toolCalls = $derived(getToolCalls(event.raw_payload));
-  const thinkingContent = $derived(getThinkingContent(event.raw_payload));
-  const signature = $derived(getSignature(event.raw_payload));
 </script>
 
 <div class="flex flex-col h-full bg-bg">
@@ -123,8 +123,8 @@
         class="p-1.5 text-fg-dim hover:text-fg transition-colors"
         title="Copy Payload"
         onclick={() => {
-          copyToClipboard(formatJson(event.raw_payload));
-          onCopyPayload?.(event.raw_payload);
+          copyToClipboard(formatJson(payload));
+          if (payload) onCopyPayload?.(payload);
         }}>
         <span class="i-ri-file-copy-line"></span>
       </button>
@@ -172,7 +172,7 @@
         {#each normalizedFields as field}
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
-              <label class="text-xs text-fg-dim uppercase tracking-wide">{field.label}</label>
+              <span class="text-xs text-fg-dim uppercase tracking-wide">{field.label}</span>
               {#if field.type === "parent"}
                 <button
                   class="text-xs text-blue hover:text-blue-bright"
@@ -189,7 +189,7 @@
 
         {#if event.content}
           <div class="flex flex-col gap-1 pt-2 border-t border-bg-muted">
-            <label class="text-xs text-fg-dim uppercase tracking-wide">Content</label>
+            <span class="text-xs text-fg-dim uppercase tracking-wide">Content</span>
             <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-bg-soft p-3 rounded">
               {event.content}
             </div>
@@ -199,14 +199,14 @@
     {:else if activeTab === "thinking" && thinkingContent}
       <div class="space-y-4">
         <div class="flex flex-col gap-1">
-          <label class="text-xs text-fg-dim uppercase tracking-wide">Thinking Content</label>
+          <span class="text-xs text-fg-dim uppercase tracking-wide">Thinking Content</span>
           <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-bg-soft p-4 rounded">
             {thinkingContent}
           </div>
         </div>
         {#if signature}
           <div class="flex flex-col gap-1">
-            <label class="text-xs text-fg-dim uppercase tracking-wide">Signature</label>
+            <span class="text-xs text-fg-dim uppercase tracking-wide">Signature</span>
             <div class="text-xs text-fg-dim font-mono bg-bg-muted p-2 rounded break-all">{signature}</div>
           </div>
         {/if}

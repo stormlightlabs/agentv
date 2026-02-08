@@ -6,9 +6,11 @@
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import EventInspector from "$lib/components/EventInspector.svelte";
   import IngestStatusPanel from "$lib/components/IngestStatusPanel.svelte";
+  import Modal from "$lib/components/Modal.svelte";
   import SearchPanel from "$lib/components/SearchPanel.svelte";
   import SessionList from "$lib/components/SessionList.svelte";
   import SessionViewer from "$lib/components/SessionViewer.svelte";
+  import Sheet from "$lib/components/Sheet.svelte";
   import Toast from "$lib/components/Toast.svelte";
   import WelcomeScreen from "$lib/components/WelcomeScreen.svelte";
   import {
@@ -19,7 +21,7 @@
     type Bookmark,
   } from "$lib/stores/bookmarks.svelte";
   import { filterStore, syncFiltersFromURL, updateURLFromFilters } from "$lib/stores/filters.svelte";
-  import { keyboardStore, handleKeyboardEvent, registerShortcut } from "$lib/stores/keyboard.svelte";
+  import { handleKeyboardEvent, keyboardStore, registerShortcut } from "$lib/stores/keyboard.svelte";
   import { logInfo } from "$lib/stores/logger.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
   import type { EventData, IngestResult, SessionData } from "$lib/types";
@@ -141,6 +143,23 @@
 
   function stopResizing() {
     isResizing = false;
+  }
+
+  function handleResizerKeydown(event: KeyboardEvent) {
+    const step = 20;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      sidebarWidth = Math.max(minSidebarWidth, sidebarWidth - step);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      sidebarWidth = Math.min(maxSidebarWidth, sidebarWidth + step);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      sidebarWidth = minSidebarWidth;
+    } else if (event.key === "End") {
+      event.preventDefault();
+      sidebarWidth = maxSidebarWidth;
+    }
   }
 
   async function copyToClipboard(text: string) {
@@ -509,91 +528,65 @@
 
 <CommandPalette />
 
-{#if bookmarksOpen}
-  <div
-    class="fixed inset-0 z-40 bg-black/50"
-    onclick={() => (bookmarksOpen = false)}
-    onkeydown={(e) => {
-      if (e.key === "Escape") bookmarksOpen = false;
-    }}
-    role="dialog"
-    aria-label="Bookmarks"
-    tabindex="-1"
-    transition:fade={{ duration: 200 }}>
-    <div
-      class="absolute right-0 top-0 h-full w-80 bg-bg border-l border-bg-muted shadow-xl"
-      onclick={(e) => e.stopPropagation()}
-      transition:slide={{ axis: "x", duration: 200 }}>
-      <div class="flex flex-col h-full">
-        <div class="flex items-center justify-between p-4 border-b border-bg-muted">
-          <h2 class="text-lg font-semibold text-fg m-0">Bookmarks</h2>
-          <button class="p-2 text-fg-dim hover:text-fg transition-colors" onclick={() => (bookmarksOpen = false)}>
-            <span class="i-ri-close-line"></span>
-          </button>
-        </div>
+<Sheet bind:open={bookmarksOpen} side="right" width="md" aria-label="Bookmarks">
+  <div class="flex flex-col h-full">
+    <div class="flex items-center justify-between p-4 border-b border-bg-muted">
+      <h2 class="text-lg font-semibold text-fg m-0">Bookmarks</h2>
+      <button
+        class="p-2 text-fg-dim hover:text-fg transition-colors"
+        onclick={() => (bookmarksOpen = false)}
+        aria-label="Close bookmarks">
+        <span class="i-ri-close-line"></span>
+      </button>
+    </div>
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-2">
-          {#if bookmarkStore.bookmarks.length === 0}
-            <div class="text-center text-fg-dim py-8">
-              <div class="i-ri-bookmark-line text-3xl mb-2 opacity-50"></div>
-              <p>No bookmarks yet</p>
-              <p class="text-sm">Use Cmd+D to bookmark sessions</p>
-            </div>
-          {:else}
-            {#each bookmarkStore.bookmarks as bookmark (bookmark.id)}
-              <div
-                class="group flex items-start gap-3 p-3 bg-bg-soft rounded border border-bg-muted hover:border-blue transition-colors"
-                onclick={() => applyBookmark(bookmark)}
-                role="button"
-                tabindex="0"
-                onkeydown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    applyBookmark(bookmark);
-                  }
-                }}>
-                <span class="{getBookmarkIcon(bookmark.type)} {getBookmarkColor(bookmark.type)} mt-0.5"></span>
-                <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium text-fg truncate">{bookmark.name}</div>
-                  {#if bookmark.description}
-                    <div class="text-xs text-fg-dim truncate">{bookmark.description}</div>
-                  {/if}
-                </div>
-                <button
-                  class="opacity-0 group-hover:opacity-100 p-1 text-fg-dim hover:text-red transition-all"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    deleteBookmark(bookmark.id);
-                  }}
-                  aria-label="Delete bookmark"
-                  type="button">
-                  <span class="i-ri-delete-bin-line"></span>
-                </button>
-              </div>
-            {/each}
-          {/if}
+    <div class="flex-1 overflow-y-auto p-4 space-y-2">
+      {#if bookmarkStore.bookmarks.length === 0}
+        <div class="text-center text-fg-dim py-8">
+          <div class="i-ri-bookmark-line text-3xl mb-2 opacity-50"></div>
+          <p>No bookmarks yet</p>
+          <p class="text-sm">Use Cmd+D to bookmark sessions</p>
         </div>
-      </div>
+      {:else}
+        {#each bookmarkStore.bookmarks as bookmark (bookmark.id)}
+          <div
+            class="group flex items-start gap-3 p-3 bg-bg-soft rounded border border-bg-muted hover:border-blue transition-colors"
+            onclick={() => applyBookmark(bookmark)}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                applyBookmark(bookmark);
+              }
+            }}>
+            <span class="{getBookmarkIcon(bookmark.type)} {getBookmarkColor(bookmark.type)} mt-0.5"></span>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-fg truncate">{bookmark.name}</div>
+              {#if bookmark.description}
+                <div class="text-xs text-fg-dim truncate">{bookmark.description}</div>
+              {/if}
+            </div>
+            <button
+              class="opacity-0 group-hover:opacity-100 p-1 text-fg-dim hover:text-red transition-all"
+              onclick={(e) => {
+                e.stopPropagation();
+                deleteBookmark(bookmark.id);
+              }}
+              aria-label="Delete bookmark"
+              type="button">
+              <span class="i-ri-delete-bin-line"></span>
+            </button>
+          </div>
+        {/each}
+      {/if}
     </div>
   </div>
-{/if}
+</Sheet>
 
-<!-- TODO: Modal component -->
 {#if showEventInspector && selectedEvent}
-  <div
-    class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-    onclick={() => (showEventInspector = false)}
-    onkeydown={(e) => {
-      if (e.key === "Escape") showEventInspector = false;
-    }}
-    role="dialog"
-    aria-label="Event inspector"
-    tabindex="-1"
-    transition:fade={{ duration: 150 }}>
-    <div
-      class="w-full max-w-4xl h-[80vh] bg-bg rounded-lg shadow-2xl overflow-hidden"
-      onclick={(e) => e.stopPropagation()}
-      transition:slide={{ duration: 150 }}>
+  <Modal bind:open={showEventInspector} size="lg" aria-label="Event inspector">
+    <div class="h-[80vh]">
       <EventInspector
         event={selectedEvent}
         onCopyId={() => toast.success("ID copied")}
@@ -604,87 +597,74 @@
           }
         }} />
     </div>
-  </div>
+  </Modal>
 {/if}
 
 {#if showSessionDrawer && selectedSession}
-  <div
-    class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-    onclick={() => (showSessionDrawer = false)}
-    onkeydown={(e) => {
-      if (e.key === "Escape") showSessionDrawer = false;
-    }}
-    role="dialog"
-    aria-label="Session details"
-    tabindex="-1"
-    transition:fade={{ duration: 150 }}>
-    <div
-      class="w-full max-w-5xl h-[85vh] bg-bg rounded-lg shadow-2xl overflow-hidden flex flex-col"
-      onclick={(e) => e.stopPropagation()}
-      transition:slide={{ duration: 150 }}>
-      <div class="flex items-center justify-between px-6 py-4 border-b border-bg-muted bg-bg-soft">
-        <div class="flex items-center gap-3">
-          <h2 class="text-xl font-semibold text-fg m-0">
-            {selectedSession.title || "Untitled Session"}
-          </h2>
-          <span class="px-2 py-0.5 bg-bg-muted rounded text-2xs text-fg-dim uppercase">
-            {selectedSession.source}
-          </span>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            class="px-3 py-1.5 bg-bg border border-bg-muted rounded text-sm text-fg hover:border-blue hover:text-blue transition-colors flex items-center gap-1"
-            onclick={() => copyToClipboard(JSON.stringify(selectedSession, null, 2))}
-            type="button">
-            <span class="i-ri-file-copy-line"></span>
-            Copy Session JSON
-          </button>
-          <button
-            class="p-2 text-fg-dim hover:text-fg transition-colors"
-            onclick={() => (showSessionDrawer = false)}
-            type="button">
-            <span class="i-ri-close-line text-xl"></span>
-          </button>
-        </div>
+  <Modal bind:open={showSessionDrawer} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-bg-muted bg-bg-soft">
+      <div class="flex items-center gap-3">
+        <h2 class="text-xl font-semibold text-fg m-0">
+          {selectedSession.title || "Untitled Session"}
+        </h2>
+        <span class="px-2 py-0.5 bg-bg-muted rounded text-2xs text-fg-dim uppercase">
+          {selectedSession.source}
+        </span>
       </div>
-      <div class="flex-1 overflow-auto p-6">
-        <div class="mb-6 grid grid-cols-3 gap-4 text-sm">
-          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
-            <div class="text-xs text-fg-muted mb-1">Session ID</div>
-            <div class="text-fg font-mono text-xs">{selectedSession.id}</div>
-          </div>
-          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
-            <div class="text-xs text-fg-muted mb-1">External ID</div>
-            <div class="text-fg font-mono text-xs">{selectedSession.external_id}</div>
-          </div>
-          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
-            <div class="text-xs text-fg-muted mb-1">Project</div>
-            <div class="text-fg">{selectedSession.project || "No project"}</div>
-          </div>
-          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
-            <div class="text-xs text-fg-muted mb-1">Created</div>
-            <div class="text-fg">{new Date(selectedSession.created_at).toLocaleString()}</div>
-          </div>
-          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
-            <div class="text-xs text-fg-muted mb-1">Updated</div>
-            <div class="text-fg">{new Date(selectedSession.updated_at).toLocaleString()}</div>
-          </div>
-          <div class="p-3 bg-bg-soft rounded border border-bg-muted">
-            <div class="text-xs text-fg-muted mb-1">Events</div>
-            <div class="text-fg">{events.length} events</div>
-          </div>
-        </div>
-        <div class="bg-bg-soft rounded border border-bg-muted overflow-hidden">
-          <div class="px-4 py-2 border-b border-bg-muted bg-bg-muted/50 flex items-center justify-between">
-            <span class="text-sm font-semibold text-fg">Full Session Data</span>
-            <span class="text-2xs text-fg-dim">JSON</span>
-          </div>
-          <pre class="p-4 text-sm text-fg-dim overflow-x-auto max-h-[50vh]"><code
-              >{JSON.stringify(selectedSession, null, 2)}</code></pre>
-        </div>
+      <div class="flex items-center gap-2">
+        <button
+          class="px-3 py-1.5 bg-bg border border-bg-muted rounded text-sm text-fg hover:border-blue hover:text-blue transition-colors flex items-center gap-1"
+          onclick={() => copyToClipboard(JSON.stringify(selectedSession, null, 2))}
+          type="button">
+          <span class="i-ri-file-copy-line"></span>
+          Copy Session JSON
+        </button>
+        <button
+          class="p-2 text-fg-dim hover:text-fg transition-colors"
+          onclick={() => (showSessionDrawer = false)}
+          type="button"
+          aria-label="Close session details">
+          <span class="i-ri-close-line text-xl"></span>
+        </button>
       </div>
     </div>
-  </div>
+    <div class="flex-1 overflow-auto p-6">
+      <div class="mb-6 grid grid-cols-3 gap-4 text-sm">
+        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+          <div class="text-xs text-fg-muted mb-1">Session ID</div>
+          <div class="text-fg font-mono text-xs">{selectedSession.id}</div>
+        </div>
+        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+          <div class="text-xs text-fg-muted mb-1">External ID</div>
+          <div class="text-fg font-mono text-xs">{selectedSession.external_id}</div>
+        </div>
+        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+          <div class="text-xs text-fg-muted mb-1">Project</div>
+          <div class="text-fg">{selectedSession.project || "No project"}</div>
+        </div>
+        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+          <div class="text-xs text-fg-muted mb-1">Created</div>
+          <div class="text-fg">{new Date(selectedSession.created_at).toLocaleString()}</div>
+        </div>
+        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+          <div class="text-xs text-fg-muted mb-1">Updated</div>
+          <div class="text-fg">{new Date(selectedSession.updated_at).toLocaleString()}</div>
+        </div>
+        <div class="p-3 bg-bg-soft rounded border border-bg-muted">
+          <div class="text-xs text-fg-muted mb-1">Events</div>
+          <div class="text-fg">{events.length} events</div>
+        </div>
+      </div>
+      <div class="bg-bg-soft rounded border border-bg-muted overflow-hidden">
+        <div class="px-4 py-2 border-b border-bg-muted bg-bg-muted/50 flex items-center justify-between">
+          <span class="text-sm font-semibold text-fg">Full Session Data</span>
+          <span class="text-2xs text-fg-dim">JSON</span>
+        </div>
+        <pre class="p-4 text-sm text-fg-dim overflow-x-auto max-h-[50vh]"><code
+            >{JSON.stringify(selectedSession, null, 2)}</code></pre>
+      </div>
+    </div>
+  </Modal>
 {/if}
 
 <div class="flex h-screen overflow-hidden">
@@ -694,8 +674,13 @@
     <div
       class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue/50 transition-colors z-10"
       onmousedown={startResizing}
+      onkeydown={handleResizerKeydown}
       role="separator"
-      aria-label="Resize sidebar">
+      aria-label="Resize sidebar"
+      aria-valuenow={sidebarWidth}
+      aria-valuemin={minSidebarWidth}
+      aria-valuemax={maxSidebarWidth}
+      tabindex="0">
     </div>
     <div class="p-4 border-b border-bg-muted flex flex-col gap-3">
       <div class="flex items-center justify-between">
