@@ -1,10 +1,9 @@
 use clap::{Parser, Subcommand};
-use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
 
 mod commands;
 
-use commands::{doctor, export, ingest, list, search, show, stats};
+use commands::{doctor, export, ingest, list, search, show, stats, support};
 
 #[derive(Parser)]
 #[command(name = "agent-viz")]
@@ -86,6 +85,8 @@ enum Commands {
         #[arg(short = 'k', long)]
         kind: Option<String>,
     },
+    /// Show support information and funding links
+    Support,
 }
 
 #[derive(Subcommand)]
@@ -101,7 +102,7 @@ enum ListWhat {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+        .with_max_level(tracing::Level::INFO)
         .with_target(false)
         .with_thread_ids(false)
         .with_file(false)
@@ -115,39 +116,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Commands::Doctor => {
-            info!("Running doctor command");
+            tracing::info!("Running doctor command");
             doctor::run().await?;
         }
         Commands::Ingest { source, watch } => {
-            info!("Running ingest command");
+            tracing::info!("Running ingest command");
             ingest::run(source, watch).await?;
         }
         Commands::List { what } => match what {
             ListWhat::Sessions { source } => {
-                info!("Running list sessions command");
+                tracing::info!("Running list sessions command");
                 list::sessions(source).await?;
             }
         },
         Commands::Show { session_id } => {
-            info!("Showing session: {}", session_id);
+            tracing::info!("Showing session: {}", session_id);
             show::session(session_id).await?;
         }
         Commands::Search { query, source, since, kind } => {
-            info!("Searching for: {}", query);
+            tracing::info!("Searching for: {}", query);
             search::run(query, source, since, kind).await?;
         }
         Commands::Stats { by, since } => {
-            info!("Running stats command");
+            tracing::info!("Running stats command");
             stats::run(by, since).await?;
         }
         Commands::Export { session, search, format, output, source, since, kind } => {
-            info!("Running export command");
+            tracing::info!("Running export command");
             let export_format = export::ExportFormat::from_str(&format)?;
             if let Some(session_id) = session {
                 export::export_session(session_id, export_format, output).await?;
             } else if let Some(query) = search {
                 export::export_search(query, source, since, kind, export_format, output).await?;
             }
+        }
+        Commands::Support => {
+            tracing::info!("Running support command");
+            support::run().await?;
         }
     }
 

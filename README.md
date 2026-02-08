@@ -92,3 +92,12 @@ apps/
 
 - Inspired by [claude-code-viewer](https://github.com/d-kimuson/claude-code-viewer).
 - Designed to work with [Claude Code](https://claude.ai/code), [Codex](https://github.com/openai/codex), and [OpenCode](https://opencode.ai).
+
+## Support
+
+Stormlight Labs is just me, [Owais](https://desertthunder.dev).
+Software like Agent V is free to use, funded by you.
+If Agent V saves you time or helps your workflow, consider supporting its continued development and my other open source work:
+
+- GitHub Sponsors: [github.com/sponsors/desertthunder](https://github.com/sponsors/desertthunder)
+- Ko-fi: [ko-fi.com/desertthunder](https://ko-fi.com/desertthunder)

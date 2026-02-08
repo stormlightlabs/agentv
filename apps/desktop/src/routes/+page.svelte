@@ -4,6 +4,7 @@
   import { page } from "$app/state";
   import AnalyticsPanel from "$lib/components/AnalyticsPanel.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
+  import Dialog from "$lib/components/Dialog.svelte";
   import EventInspector from "$lib/components/EventInspector.svelte";
   import IngestStatusPanel from "$lib/components/IngestStatusPanel.svelte";
   import Modal from "$lib/components/Modal.svelte";
@@ -11,6 +12,7 @@
   import SessionList from "$lib/components/SessionList.svelte";
   import SessionViewer from "$lib/components/SessionViewer.svelte";
   import Sheet from "$lib/components/Sheet.svelte";
+  import SupportPanel from "$lib/components/SupportPanel.svelte";
   import Toast from "$lib/components/Toast.svelte";
   import WelcomeScreen from "$lib/components/WelcomeScreen.svelte";
   import {
@@ -22,19 +24,20 @@
   } from "$lib/stores/bookmarks.svelte";
   import { filterStore, syncFiltersFromURL, updateURLFromFilters } from "$lib/stores/filters.svelte";
   import {
-    CommandPaletteItem,
     handleKeyboardEvent,
     keyboardStore,
     registerShortcut,
+    type CommandPaletteItem,
   } from "$lib/stores/keyboard.svelte";
   import { logInfo } from "$lib/stores/logger.svelte";
+  import { supportNudgeStore } from "$lib/stores/supportNudge.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
   import type { EventData, IngestResult, SessionData } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
   import { onDestroy, onMount } from "svelte";
   import { fade, slide } from "svelte/transition";
 
-  type Tab = "sessions" | "search" | "analytics" | "status";
+  type Tab = "sessions" | "search" | "analytics" | "status" | "support";
   const toast = useToast();
 
   let bookmarksOpen = $state(false);
@@ -58,6 +61,7 @@
   let newSessionsAvailable = $state(false);
   let autoRefreshEnabled = $state(true);
   let refreshInterval: number | null = null;
+  let showSupportNudge = $state(false);
 
   const sources = [
     { id: "claude", name: "Claude", color: "blue" },
@@ -202,6 +206,17 @@
 
       if (result.imported > 0) {
         toast.success(`Imported ${result.imported} sessions from ${sourceId} in ${result.duration_ms}ms`);
+        // Check if this is the first successful ingest
+        if (!supportNudgeStore.state.firstIngestCompleted) {
+          supportNudgeStore.markFirstIngestCompleted();
+          supportNudgeStore.markOnboardingComplete();
+          // Show nudge after a short delay
+          setTimeout(() => {
+            if (supportNudgeStore.shouldShowNudge()) {
+              showSupportNudge = true;
+            }
+          }, 1500);
+        }
       } else if (result.failed > 0) {
         toast.error(`Failed to import ${result.failed} sessions from ${sourceId}`);
       } else {
@@ -230,6 +245,17 @@
 
       if (totalImported > 0) {
         toast.success(`Imported ${totalImported} sessions from all sources`);
+        // Check if this is the first successful ingest
+        if (!supportNudgeStore.state.firstIngestCompleted) {
+          supportNudgeStore.markFirstIngestCompleted();
+          supportNudgeStore.markOnboardingComplete();
+          // Show nudge after a short delay
+          setTimeout(() => {
+            if (supportNudgeStore.shouldShowNudge()) {
+              showSupportNudge = true;
+            }
+          }, 1500);
+        }
       } else if (totalFailed > 0) {
         toast.error(`Failed to import ${totalFailed} sessions`);
       } else {
@@ -352,6 +378,14 @@
     });
 
     registerShortcut({
+      key: "5",
+      modifiers: { meta: true },
+      description: "Go to support",
+      scope: "global",
+      handler: () => (activeTab = "support"),
+    });
+
+    registerShortcut({
       key: "r",
       modifiers: { meta: true },
       description: "Refresh sessions",
@@ -417,6 +451,15 @@
         action: () => (activeTab = "status"),
       },
       {
+        id: "support",
+        title: "Go to Support",
+        subtitle: "Support Agent V development",
+        icon: "i-ri-heart-line",
+        category: "navigation",
+        shortcut: "Cmd+5",
+        action: () => (activeTab = "support"),
+      },
+      {
         id: "refresh",
         title: "Refresh Sessions",
         subtitle: "Reload all sessions",
@@ -466,7 +509,7 @@
     }
 
     const tab = page.url.searchParams.get("tab");
-    if (tab && ["sessions", "search", "analytics", "status"].includes(tab)) {
+    if (tab && ["sessions", "search", "analytics", "status", "support"].includes(tab)) {
       activeTab = tab as Tab;
     }
   }
@@ -801,6 +844,15 @@
         onclick={() => (activeTab = "status")}>
         Status
       </button>
+      <button
+        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
+        class:active={activeTab === "support"}
+        class:text-blue={activeTab === "support"}
+        class:border-b-blue={activeTab === "support"}
+        class:bg-surface-soft={activeTab === "support"}
+        onclick={() => (activeTab = "support")}>
+        Support
+      </button>
     </div>
 
     {#if error}
@@ -816,6 +868,8 @@
         <SearchPanel onSelectSession={selectSessionById} onSelectEvent={selectEvent} />
       {:else if activeTab === "analytics"}
         <AnalyticsPanel />
+      {:else if activeTab === "support"}
+        <SupportPanel />
       {:else}
         <IngestStatusPanel onRefresh={loadSessions} />
       {/if}
@@ -851,3 +905,73 @@
     {/if}
   </main>
 </div>
+
+<Dialog bind:open={showSupportNudge} closeOnOutsideClick={false} role="dialog" aria-label="Support Agent V">
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-surface-muted rounded-lg max-w-md w-full shadow-xl">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="i-ri-heart-line text-3xl text-red"></span>
+          <h2 class="m-0 text-xl font-semibold text-fg">Support Agent V</h2>
+        </div>
+
+        <p class="m-0 mb-4 text-fg-dim leading-relaxed">
+          Great! You've successfully imported your first sessions. Agent V is <strong>donationware</strong> - free to use
+          with no paid tiers.
+        </p>
+
+        <p class="m-0 mb-6 text-fg-dim leading-relaxed">
+          If Agent V helps your workflow, consider supporting its continued development. Your contribution keeps the
+          project independent and privacy-focused.
+        </p>
+
+        <div class="space-y-3 mb-6">
+          <a
+            href="https://github.com/sponsors/desertthunder"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-3 p-3 bg-surface-soft border border-surface-muted rounded-lg hover:border-blue transition-all no-underline">
+            <span class="i-ri-github-line text-xl text-fg-dim"></span>
+            <div class="flex-1">
+              <div class="font-medium text-fg">GitHub Sponsors</div>
+              <div class="text-sm text-fg-dim">Monthly or one-time support</div>
+            </div>
+            <span class="i-ri-external-link-line text-fg-dim"></span>
+          </a>
+
+          <a
+            href="https://ko-fi.com/desertthunder"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-3 p-3 bg-surface-soft border border-surface-muted rounded-lg hover:border-blue transition-all no-underline">
+            <span class="i-ri-cup-line text-xl text-fg-dim"></span>
+            <div class="flex-1">
+              <div class="font-medium text-fg">Ko-fi</div>
+              <div class="text-sm text-fg-dim">Quick one-time donations</div>
+            </div>
+            <span class="i-ri-external-link-line text-fg-dim"></span>
+          </a>
+        </div>
+
+        <div class="flex gap-3">
+          <button
+            class="flex-1 px-4 py-2 bg-blue text-surface border-none rounded font-medium cursor-pointer hover:bg-blue-bright transition-colors"
+            onclick={() => {
+              showSupportNudge = false;
+              activeTab = "support";
+            }}>
+            Learn More
+          </button>
+          <button
+            class="px-4 py-2 bg-transparent border border-surface-muted rounded text-fg cursor-pointer hover:border-fg transition-colors"
+            onclick={() => {
+              supportNudgeStore.dismissNudge();
+              showSupportNudge = false;
+            }}>
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</Dialog>

@@ -259,12 +259,12 @@ For all adapters, verify with:
 - [ ] Add diagnostics flow (log file location, copy debug bundle, actionable error messages)
 - [ ] Tag & release v0.1.0
 - [ ] Publish alpha install docs (macOS/Windows/Linux), known limits, and rollback steps
-- [ ] Add "Support Agent V" surface area (donationware):
-    - [ ] README: funding links + explicit donationware statement (no paid tiers)
-    - [ ] Desktop: Support page (links + why donations matter)
-    - [ ] Desktop: optional post-onboarding nudge after "first successful ingest" (dismiss forever)
-    - [ ] CLI: `agent-v support` prints funding links + short pitch (no prompts by default)
-    - [ ] Release notes template: include "Support" section
+- [x] Add "Support Agent V" surface area (donationware):
+    - [x] README: funding links + explicit donationware statement (no paid tiers)
+    - [x] Desktop: Support page (links + why donations matter)
+    - [x] Desktop: optional post-onboarding nudge after "first successful ingest" (dismiss forever)
+    - [x] CLI: `agent-v support` prints funding links + short pitch (no prompts by default)
+    - [x] Release notes template: include "Support" section
 - [x] Before v0.1.0, pull forward the following from later milestones:
     - [x] (from M9): unified filter bar (source/project/kind/role/tool/date/full-text) in session and log views
     - [x] (from M9): deep-linkable URL state for active query + selected session/event
