@@ -3,6 +3,7 @@ use serde::Serialize;
 /// Export a session to Markdown format
 pub async fn export_session_to_markdown(
     session: &agent_v_store::SessionRow, events: &[agent_v_store::EventRow],
+    metrics: Option<&agent_v_store::SessionMetricsRow>,
 ) -> Result<String, String> {
     let mut md = String::new();
 
@@ -18,6 +19,33 @@ pub async fn export_session_to_markdown(
     ));
     md.push_str(&format!("- **Created**: {}\n", session.created_at));
     md.push_str(&format!("- **Updated**: {}\n\n", session.updated_at));
+
+    if let Some(m) = metrics {
+        md.push_str("## Cost & Efficiency\n\n");
+        if let Some(cost) = m.estimated_cost {
+            md.push_str(&format!("- **Estimated Cost**: ${:.4}\n", cost));
+        }
+        if let (Some(provider), Some(model)) = (&m.provider, &m.model) {
+            md.push_str(&format!("- **Model**: {}/{}\n", provider, model));
+        }
+        if let (Some(input), Some(output)) = (m.input_tokens, m.output_tokens) {
+            md.push_str(&format!("- **Tokens**: {} input / {} output\n", input, output));
+        }
+        if let Some(duration) = m.duration_seconds {
+            md.push_str(&format!("- **Duration**: {}s\n", duration));
+        }
+        if let (Some(p50), Some(p95)) = (m.p50_latency_ms, m.p95_latency_ms) {
+            md.push_str(&format!("- **Latency**: p50={}ms, p95={}ms\n", p50, p95));
+        }
+        md.push_str(&format!("- **Total Events**: {}\n", m.total_events));
+        md.push_str(&format!(
+            "- **Messages**: {} user / {} assistant\n",
+            m.user_messages, m.assistant_messages
+        ));
+        md.push_str(&format!("- **Tool Calls**: {}\n", m.tool_call_count));
+        md.push_str(&format!("- **Errors**: {}\n", m.error_count));
+        md.push_str(&format!("- **Files Touched**: {}\n\n", m.files_touched));
+    }
 
     md.push_str("## Events\n\n");
 
@@ -39,6 +67,7 @@ pub async fn export_session_to_markdown(
 /// Export a session to JSON format
 pub async fn export_session_to_json(
     session: &agent_v_store::SessionRow, events: &[agent_v_store::EventRow],
+    metrics: Option<&agent_v_store::SessionMetricsRow>,
 ) -> Result<String, String> {
     #[derive(Serialize)]
     struct EventExport {
@@ -51,6 +80,30 @@ pub async fn export_session_to_json(
     }
 
     #[derive(Serialize)]
+    struct SessionMetricsExport {
+        total_events: i64,
+        message_count: i64,
+        tool_call_count: i64,
+        tool_result_count: i64,
+        error_count: i64,
+        user_messages: i64,
+        assistant_messages: i64,
+        duration_seconds: Option<i64>,
+        files_touched: i64,
+        lines_added: i64,
+        lines_removed: i64,
+        model: Option<String>,
+        provider: Option<String>,
+        input_tokens: Option<i64>,
+        output_tokens: Option<i64>,
+        estimated_cost: Option<f64>,
+        total_latency_ms: Option<i64>,
+        avg_latency_ms: Option<f64>,
+        p50_latency_ms: Option<i64>,
+        p95_latency_ms: Option<i64>,
+    }
+
+    #[derive(Serialize)]
     struct SessionExport {
         id: String,
         source: String,
@@ -60,7 +113,31 @@ pub async fn export_session_to_json(
         created_at: String,
         updated_at: String,
         events: Vec<EventExport>,
+        metrics: Option<SessionMetricsExport>,
     }
+
+    let metrics_export = metrics.map(|m| SessionMetricsExport {
+        total_events: m.total_events,
+        message_count: m.message_count,
+        tool_call_count: m.tool_call_count,
+        tool_result_count: m.tool_result_count,
+        error_count: m.error_count,
+        user_messages: m.user_messages,
+        assistant_messages: m.assistant_messages,
+        duration_seconds: m.duration_seconds,
+        files_touched: m.files_touched,
+        lines_added: m.lines_added,
+        lines_removed: m.lines_removed,
+        model: m.model.clone(),
+        provider: m.provider.clone(),
+        input_tokens: m.input_tokens,
+        output_tokens: m.output_tokens,
+        estimated_cost: m.estimated_cost,
+        total_latency_ms: m.total_latency_ms,
+        avg_latency_ms: m.avg_latency_ms,
+        p50_latency_ms: m.p50_latency_ms,
+        p95_latency_ms: m.p95_latency_ms,
+    });
 
     let export = SessionExport {
         id: session.id.clone(),
@@ -81,6 +158,7 @@ pub async fn export_session_to_json(
                 raw_payload: serde_json::from_str(&e.raw_payload).unwrap_or(serde_json::Value::Null),
             })
             .collect(),
+        metrics: metrics_export,
     };
 
     serde_json::to_string_pretty(&export).map_err(|e| e.to_string())
@@ -88,9 +166,44 @@ pub async fn export_session_to_json(
 
 /// Export a session to JSONL format
 pub async fn export_session_to_jsonl(
-    _session: &agent_v_store::SessionRow, events: &[agent_v_store::EventRow],
+    session: &agent_v_store::SessionRow, events: &[agent_v_store::EventRow],
+    metrics: Option<&agent_v_store::SessionMetricsRow>,
 ) -> Result<String, String> {
     let mut lines = Vec::new();
+
+    let metadata = serde_json::json!({
+        "type": "session_metadata",
+        "id": session.id,
+        "source": session.source,
+        "external_id": session.external_id,
+        "project": session.project,
+        "title": session.title,
+        "created_at": session.created_at,
+        "updated_at": session.updated_at,
+        "metrics": metrics.map(|m| serde_json::json!({
+            "total_events": m.total_events,
+            "message_count": m.message_count,
+            "tool_call_count": m.tool_call_count,
+            "tool_result_count": m.tool_result_count,
+            "error_count": m.error_count,
+            "user_messages": m.user_messages,
+            "assistant_messages": m.assistant_messages,
+            "duration_seconds": m.duration_seconds,
+            "files_touched": m.files_touched,
+            "lines_added": m.lines_added,
+            "lines_removed": m.lines_removed,
+            "model": m.model,
+            "provider": m.provider,
+            "input_tokens": m.input_tokens,
+            "output_tokens": m.output_tokens,
+            "estimated_cost": m.estimated_cost,
+            "total_latency_ms": m.total_latency_ms,
+            "avg_latency_ms": m.avg_latency_ms,
+            "p50_latency_ms": m.p50_latency_ms,
+            "p95_latency_ms": m.p95_latency_ms,
+        })),
+    });
+    lines.push(serde_json::to_string(&metadata).map_err(|e| e.to_string())?);
 
     for event in events {
         let obj = serde_json::json!({

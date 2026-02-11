@@ -361,13 +361,14 @@ pub async fn export_session(db: State<'_, Database>, session_id: String, format:
         .get_session_events(session.id.clone())
         .await
         .map_err(|e| e.to_string())?;
+    let metrics = db.get_session_metrics(&session.id).await.ok().flatten();
 
     let export_format = ExportFormat::from_str(&format)?;
 
     match export_format {
-        ExportFormat::Markdown => export::export_session_to_markdown(&session, &events).await,
-        ExportFormat::Json => export::export_session_to_json(&session, &events).await,
-        ExportFormat::Jsonl => export::export_session_to_jsonl(&session, &events).await,
+        ExportFormat::Markdown => export::export_session_to_markdown(&session, &events, metrics.as_ref()).await,
+        ExportFormat::Json => export::export_session_to_json(&session, &events, metrics.as_ref()).await,
+        ExportFormat::Jsonl => export::export_session_to_jsonl(&session, &events, metrics.as_ref()).await,
     }
 }
 
@@ -421,4 +422,170 @@ pub async fn recompute_all_metrics(db: State<'_, Database>) -> Result<models::Re
     }
 
     Ok(models::RecomputeResult { total })
+}
+
+/// Get metrics for a specific session
+#[tauri::command]
+pub async fn get_session_metrics(
+    db: State<'_, Database>, session_id: String,
+) -> Result<Option<models::SessionMetricsData>, String> {
+    let metrics = db
+        .get_session_metrics(&session_id)
+        .await
+        .map_err(|e| format!("Failed to get session metrics: {}", e))?;
+
+    Ok(metrics.map(|m| models::SessionMetricsData {
+        session_id: m.session_id,
+        total_events: m.total_events,
+        message_count: m.message_count,
+        tool_call_count: m.tool_call_count,
+        tool_result_count: m.tool_result_count,
+        error_count: m.error_count,
+        user_messages: m.user_messages,
+        assistant_messages: m.assistant_messages,
+        duration_seconds: m.duration_seconds,
+        files_touched: m.files_touched,
+        lines_added: m.lines_added,
+        lines_removed: m.lines_removed,
+        model: m.model,
+        provider: m.provider,
+        input_tokens: m.input_tokens,
+        output_tokens: m.output_tokens,
+        estimated_cost: m.estimated_cost,
+        total_latency_ms: m.total_latency_ms,
+        avg_latency_ms: m.avg_latency_ms,
+        p50_latency_ms: m.p50_latency_ms,
+        p95_latency_ms: m.p95_latency_ms,
+    }))
+}
+
+/// Get cost stats by source
+#[tauri::command]
+pub async fn get_cost_stats_by_source(
+    db: State<'_, Database>, source: Option<String>, since: Option<String>, until: Option<String>,
+) -> Result<Vec<models::CostStats>, String> {
+    let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+    let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+
+    let stats = db
+        .get_cost_stats_by_source(source, since_dt, until_dt)
+        .await
+        .map_err(|e| format!("Failed to get cost stats by source: {}", e))?;
+
+    Ok(stats
+        .into_iter()
+        .map(|s| models::CostStats {
+            dimension: s.dimension,
+            session_count: s.session_count,
+            total_cost: s.total_cost,
+            avg_cost_per_session: s.avg_cost_per_session,
+            total_input_tokens: s.total_input_tokens,
+            total_output_tokens: s.total_output_tokens,
+            avg_latency_ms: s.avg_latency_ms,
+            p50_latency_ms: s.p50_latency_ms,
+            p95_latency_ms: s.p95_latency_ms,
+        })
+        .collect())
+}
+
+/// Get cost stats by project
+#[tauri::command]
+pub async fn get_cost_stats_by_project(
+    db: State<'_, Database>, source: Option<String>, since: Option<String>, until: Option<String>,
+) -> Result<Vec<models::CostStats>, String> {
+    let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+    let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+
+    let stats = db
+        .get_cost_stats_by_project(source, since_dt, until_dt)
+        .await
+        .map_err(|e| format!("Failed to get cost stats by project: {}", e))?;
+
+    Ok(stats
+        .into_iter()
+        .map(|s| models::CostStats {
+            dimension: s.dimension,
+            session_count: s.session_count,
+            total_cost: s.total_cost,
+            avg_cost_per_session: s.avg_cost_per_session,
+            total_input_tokens: s.total_input_tokens,
+            total_output_tokens: s.total_output_tokens,
+            avg_latency_ms: s.avg_latency_ms,
+            p50_latency_ms: s.p50_latency_ms,
+            p95_latency_ms: s.p95_latency_ms,
+        })
+        .collect())
+}
+
+/// Get model usage stats
+#[tauri::command]
+pub async fn get_model_usage_stats(
+    db: State<'_, Database>, source: Option<String>, since: Option<String>, until: Option<String>,
+) -> Result<Vec<models::ModelUsageStats>, String> {
+    let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+    let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+
+    let stats = db
+        .get_model_usage_stats(source, since_dt, until_dt)
+        .await
+        .map_err(|e| format!("Failed to get model usage stats: {}", e))?;
+
+    Ok(stats
+        .into_iter()
+        .map(|s| models::ModelUsageStats {
+            model: s.model,
+            provider: s.provider,
+            session_count: s.session_count,
+            total_input_tokens: s.total_input_tokens,
+            total_output_tokens: s.total_output_tokens,
+            total_cost: s.total_cost,
+            avg_latency_ms: s.avg_latency_ms,
+        })
+        .collect())
+}
+
+/// Get latency distribution stats
+#[tauri::command]
+pub async fn get_latency_distribution(
+    db: State<'_, Database>, source: Option<String>, since: Option<String>, until: Option<String>,
+) -> Result<models::LatencyDistribution, String> {
+    let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+    let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+
+    let stats = db
+        .get_latency_distribution(source, since_dt, until_dt)
+        .await
+        .map_err(|e| format!("Failed to get latency distribution: {}", e))?;
+
+    Ok(models::LatencyDistribution {
+        avg_latency: stats.avg_latency,
+        p50_latency: stats.p50_latency,
+        p95_latency: stats.p95_latency,
+        max_p95: stats.max_p95,
+        session_count: stats.session_count,
+    })
+}
+
+/// Get aggregate efficiency stats
+#[tauri::command]
+pub async fn get_efficiency_stats(
+    db: State<'_, Database>, source: Option<String>, since: Option<String>, until: Option<String>,
+) -> Result<models::EfficiencyStats, String> {
+    let since_dt = since.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+    let until_dt = until.and_then(|s| parse_duration(&s)).map(|dur| Utc::now() - dur);
+
+    let stats = db
+        .get_efficiency_stats(source, since_dt, until_dt)
+        .await
+        .map_err(|e| format!("Failed to get efficiency stats: {}", e))?;
+
+    Ok(models::EfficiencyStats {
+        total_sessions: stats.total_sessions,
+        total_cost: stats.total_cost,
+        avg_cost_per_session: stats.avg_cost_per_session,
+        tool_error_rate: stats.tool_error_rate,
+        retry_loops: stats.retry_loops,
+        p50_latency_ms: stats.p50_latency_ms,
+        p95_latency_ms: stats.p95_latency_ms,
+    })
 }

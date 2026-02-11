@@ -510,3 +510,36 @@ pub const MODEL_USAGE_STATS: &str = r#"
     GROUP BY m.model, m.provider
     ORDER BY total_cost DESC NULLS LAST
 "#;
+
+/// Get aggregate efficiency stats
+pub const EFFICIENCY_STATS: &str = r#"
+    SELECT
+        COUNT(DISTINCT m.session_id) as total_sessions,
+        COALESCE(SUM(m.estimated_cost), 0.0) as total_cost,
+        COALESCE(AVG(m.estimated_cost), 0.0) as avg_cost_per_session,
+        COALESCE(
+            CAST((SELECT COUNT(*) FROM tool_calls tc JOIN sessions s2 ON tc.session_id = s2.id
+                  WHERE tc.success = 0
+                  AND (?1 = '' OR s2.source = ?1)
+                  AND (?2 = '' OR tc.started_at >= ?2)
+                  AND (?3 = '' OR tc.started_at < ?3)) AS REAL) /
+            NULLIF((SELECT COUNT(*) FROM tool_calls tc JOIN sessions s2 ON tc.session_id = s2.id
+                  WHERE (?1 = '' OR s2.source = ?1)
+                  AND (?2 = '' OR tc.started_at >= ?2)
+                  AND (?3 = '' OR tc.started_at < ?3)), 0),
+            0.0
+        ) as tool_error_rate,
+        (SELECT COUNT(DISTINCT m2.session_id) FROM session_metrics m2
+         JOIN sessions s2 ON m2.session_id = s2.id
+         WHERE m2.error_count > 2
+         AND (?1 = '' OR s2.source = ?1)
+         AND (?2 = '' OR m2.computed_at >= ?2)
+         AND (?3 = '' OR m2.computed_at < ?3)) as retry_loops,
+        COALESCE(AVG(m.p50_latency_ms), 0.0) as p50_latency_ms,
+        COALESCE(AVG(m.p95_latency_ms), 0.0) as p95_latency_ms
+    FROM session_metrics m
+    JOIN sessions s ON m.session_id = s.id
+    WHERE (?1 = '' OR s.source = ?1)
+        AND (?2 = '' OR m.computed_at >= ?2)
+        AND (?3 = '' OR m.computed_at < ?3)
+"#;

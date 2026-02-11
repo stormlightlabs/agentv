@@ -1,7 +1,9 @@
 <script lang="ts">
   import { useToast } from "$lib/stores/toast.svelte";
-  import type { ContentBlock, EventData, EventPayload, SessionData } from "$lib/types";
+  import type { ContentBlock, EventData, EventPayload, ExportFormat, SessionData } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
+  import { fade } from "svelte/transition";
+  import CostLatencyPanel from "./CostLatencyPanel.svelte";
 
   type Props = {
     session: SessionData;
@@ -87,13 +89,9 @@
     return thinkingBlock?.thinking ?? null;
   }
 
-  function extractGitBranch(rawPayload: EventPayload | null | undefined): string | null {
-    return rawPayload?.gitBranch ?? null;
-  }
+  const extractGitBranch = (rawPayload?: EventPayload | null): string | null => rawPayload?.gitBranch ?? null;
 
-  function extractCwd(rawPayload: EventPayload | null | undefined): string | null {
-    return rawPayload?.cwd ?? null;
-  }
+  const extractCwd = (rawPayload?: EventPayload | null): string | null => rawPayload?.cwd ?? null;
 
   function extractContentFromPayload(payload: EventPayload | null | undefined): string | null {
     if (!payload) return null;
@@ -159,7 +157,7 @@
     return groups;
   }
 
-  async function exportSession(format: "md" | "json" | "jsonl") {
+  async function exportSession(format: ExportFormat) {
     exporting = true;
     try {
       const content = await invoke<string>("export_session", { sessionId: session.id, format });
@@ -267,9 +265,11 @@
     </div>
   </header>
 
+  <CostLatencyPanel {session} />
+
   <div class="flex-1 overflow-y-auto px-6 py-4">
     {#if events.length === 0}
-      <div class="flex items-center justify-center h-full text-fg-dim">
+      <div class="flex items-center justify-center h-full text-fg-dim" transition:fade>
         <p>No events in this session</p>
       </div>
     {:else}

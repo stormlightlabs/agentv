@@ -1275,6 +1275,33 @@ impl Database {
             })
             .await
     }
+
+    /// Get aggregate efficiency stats
+    pub async fn get_efficiency_stats(
+        &self, source_filter: Option<String>, since: Option<DateTime<Utc>>, until: Option<DateTime<Utc>>,
+    ) -> Result<EfficiencyStats, tokio_rusqlite::Error> {
+        let source = source_filter.unwrap_or_default();
+        let since_str = since.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+        let until_str = until.map(|dt| dt.to_rfc3339()).unwrap_or_default();
+
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::EFFICIENCY_STATS)?;
+                let row = stmt.query_row([source, since_str, until_str], |row| {
+                    Ok(EfficiencyStats {
+                        total_sessions: row.get(0)?,
+                        total_cost: row.get(1)?,
+                        avg_cost_per_session: row.get(2)?,
+                        tool_error_rate: row.get(3)?,
+                        retry_loops: row.get(4)?,
+                        p50_latency_ms: row.get(5)?,
+                        p95_latency_ms: row.get(6)?,
+                    })
+                })?;
+                Ok(row)
+            })
+            .await
+    }
 }
 
 /// Stats for tool call frequency
@@ -1369,6 +1396,18 @@ pub struct ModelUsageStats {
     pub total_output_tokens: Option<i64>,
     pub total_cost: Option<f64>,
     pub avg_latency_ms: Option<f64>,
+}
+
+/// Aggregate efficiency stats
+#[derive(Debug, Clone)]
+pub struct EfficiencyStats {
+    pub total_sessions: i64,
+    pub total_cost: f64,
+    pub avg_cost_per_session: f64,
+    pub tool_error_rate: f64,
+    pub retry_loops: i64,
+    pub p50_latency_ms: f64,
+    pub p95_latency_ms: f64,
 }
 
 /// Check health of all configured data sources

@@ -2,10 +2,11 @@ mod commands;
 
 use agent_v_store::Database;
 use commands::{
-    check_for_new_sessions, export_search, export_session, get_activity_stats, get_error_stats, get_event_kinds,
-    get_files_leaderboard, get_long_running_tools, get_patch_churn, get_projects, get_session_events,
-    get_source_health, get_sources, get_tool_call_frequency, ingest_all_sources, ingest_source, list_sessions,
-    recompute_all_metrics, search_events,
+    check_for_new_sessions, export_search, export_session, get_activity_stats, get_cost_stats_by_project,
+    get_cost_stats_by_source, get_efficiency_stats, get_error_stats, get_event_kinds, get_files_leaderboard,
+    get_latency_distribution, get_long_running_tools, get_model_usage_stats, get_patch_churn, get_projects,
+    get_session_events, get_session_metrics, get_source_health, get_sources, get_tool_call_frequency,
+    ingest_all_sources, ingest_source, list_sessions, recompute_all_metrics, search_events,
 };
 use tauri::Manager;
 
@@ -42,7 +43,13 @@ pub fn run() {
             get_long_running_tools,
             export_session,
             export_search,
-            recompute_all_metrics
+            recompute_all_metrics,
+            get_session_metrics,
+            get_cost_stats_by_source,
+            get_cost_stats_by_project,
+            get_model_usage_stats,
+            get_latency_distribution,
+            get_efficiency_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

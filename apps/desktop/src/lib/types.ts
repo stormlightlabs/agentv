@@ -112,3 +112,67 @@ export type DataTableColumn<T = Record<string, unknown>> = {
   width?: string;
   render?: (row: T) => string | { text: string; className?: string };
 };
+
+export type SessionMetricsData = {
+  session_id: string;
+  total_events: number;
+  message_count: number;
+  tool_call_count: number;
+  tool_result_count: number;
+  error_count: number;
+  user_messages: number;
+  assistant_messages: number;
+  duration_seconds: number | null;
+  files_touched: number;
+  lines_added: number;
+  lines_removed: number;
+  model: string | null;
+  provider: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  estimated_cost: number | null;
+  total_latency_ms: number | null;
+  avg_latency_ms: number | null;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
+};
+
+export type CostStats = {
+  dimension: string;
+  session_count: number;
+  total_cost: number | null;
+  avg_cost_per_session: number | null;
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  avg_latency_ms: number | null;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
+};
+
+export type ModelUsageStats = {
+  model: string;
+  provider: string;
+  session_count: number;
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  total_cost: number | null;
+  avg_latency_ms: number | null;
+};
+
+export type LatencyDistribution = {
+  avg_latency: number | null;
+  p50_latency: number | null;
+  p95_latency: number | null;
+  max_p95: number | null;
+  session_count: number;
+};
+
+export type EfficiencyStats = {
+  total_sessions: number;
+  total_cost: number;
+  avg_cost_per_session: number;
+  tool_error_rate: number;
+  retry_loops: number;
+  p50_latency_ms: number;
+  p95_latency_ms: number;
+};
