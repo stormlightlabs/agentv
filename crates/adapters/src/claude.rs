@@ -424,6 +424,55 @@ impl ClaudeAdapter {
         })
     }
 
+    /// Parse new events from a session file starting at a byte offset.
+    /// Returns new events and the new byte offset (end of file).
+    /// Skips to the next newline after `byte_offset` to avoid partial lines.
+    pub async fn parse_session_incremental(
+        &self, session_file: &ClaudeSessionFile, byte_offset: u64,
+    ) -> Result<(Vec<Event>, u64), Box<dyn std::error::Error + Send + Sync>> {
+        use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+        let mut file = tokio::fs::File::open(&session_file.path).await?;
+        let file_len = file.metadata().await?.len();
+
+        if file_len <= byte_offset {
+            return Ok((Vec::new(), byte_offset));
+        }
+
+        file.seek(std::io::SeekFrom::Start(byte_offset)).await?;
+
+        let mut remaining = String::new();
+        file.read_to_string(&mut remaining).await?;
+
+        let mut events = Vec::new();
+        let mut lines = remaining.lines();
+
+        if byte_offset > 0 {
+            lines.next();
+        }
+
+        for line in lines {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            let value: serde_json::Value = match serde_json::from_str(line) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            if value.get("type").and_then(|t| t.as_str()) == Some("summary") {
+                continue;
+            }
+
+            if let Some(event) = self.parse_event_line(&value, 0) {
+                events.push(event);
+            }
+        }
+
+        Ok((events, file_len))
+    }
+
     /// Get statistics about a session file
     pub async fn get_session_stats(
         &self, session_file: &ClaudeSessionFile,

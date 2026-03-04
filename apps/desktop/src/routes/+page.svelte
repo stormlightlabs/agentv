@@ -31,14 +31,18 @@
   } from "$lib/stores/keyboard.svelte";
   import { logInfo } from "$lib/stores/logger.svelte";
   import { supportNudgeStore } from "$lib/stores/supportNudge.svelte";
+  import { useNotifications } from "$lib/stores/notifications.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
-  import type { EventData, IngestResult, SessionData } from "$lib/types";
+  import type { EventData, IngestResult, SessionData, StreamingEventPayload } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { onDestroy, onMount } from "svelte";
   import { fade, slide } from "svelte/transition";
 
   type Tab = "sessions" | "search" | "analytics" | "status" | "support";
   const toast = useToast();
+  const notifications = useNotifications();
+  let unlistenAgentEvents: UnlistenFn | null = null;
 
   let bookmarksOpen = $state(false);
   let selectedEvent = $state<EventData | null>(null);
@@ -103,7 +107,7 @@
 
     refreshInterval = window.setInterval(() => {
       checkForNewSessions();
-    }, 30000);
+    }, 120000);
   }
 
   function stopAutoRefresh() {
@@ -206,11 +210,9 @@
 
       if (result.imported > 0) {
         toast.success(`Imported ${result.imported} sessions from ${sourceId} in ${result.duration_ms}ms`);
-        // Check if this is the first successful ingest
         if (!supportNudgeStore.state.firstIngestCompleted) {
           supportNudgeStore.markFirstIngestCompleted();
           supportNudgeStore.markOnboardingComplete();
-          // Show nudge after a short delay
           setTimeout(() => {
             if (supportNudgeStore.shouldShowNudge()) {
               showSupportNudge = true;
@@ -245,11 +247,10 @@
 
       if (totalImported > 0) {
         toast.success(`Imported ${totalImported} sessions from all sources`);
-        // Check if this is the first successful ingest
+
         if (!supportNudgeStore.state.firstIngestCompleted) {
           supportNudgeStore.markFirstIngestCompleted();
           supportNudgeStore.markOnboardingComplete();
-          // Show nudge after a short delay
           setTimeout(() => {
             if (supportNudgeStore.shouldShowNudge()) {
               showSupportNudge = true;
@@ -522,12 +523,33 @@
     handleKeyboardEvent(event);
   }
 
+  async function setupAgentEventListener() {
+    unlistenAgentEvents = await listen<StreamingEventPayload>("agent-events", (event) => {
+      const payload = event.payload;
+
+      if (payload.is_new_session) {
+        loadSessions();
+        notifications.notify(`New ${payload.source} session`, `New session from ${payload.source}`);
+      } else if (selectedSession && selectedSession.external_id === payload.session_external_id) {
+        events = [...events, ...payload.events];
+      }
+
+      if (!payload.is_new_session && payload.events.length > 0) {
+        const lastEvent = payload.events[payload.events.length - 1];
+        const summary = (lastEvent.content ?? lastEvent.kind).slice(0, 80);
+        notifications.notify(payload.source, summary);
+      }
+    });
+  }
+
   onMount(() => {
     bookmarkStore.init();
+    notifications.init();
     loadSessions();
     startAutoRefresh();
     setupKeyboardShortcuts();
     handleUrlParams();
+    setupAgentEventListener();
 
     window.addEventListener("keydown", handleKeydown);
     window.addEventListener("mousemove", handleResize);
@@ -535,6 +557,7 @@
 
     return () => {
       stopAutoRefresh();
+      if (unlistenAgentEvents) unlistenAgentEvents();
       window.removeEventListener("keydown", handleKeydown);
       window.removeEventListener("mousemove", handleResize);
       window.removeEventListener("mouseup", stopResizing);
@@ -543,6 +566,7 @@
 
   onDestroy(() => {
     stopAutoRefresh();
+    if (unlistenAgentEvents) unlistenAgentEvents();
   });
 
   $effect(() => {
@@ -720,6 +744,9 @@
   <aside
     class="bg-surface-soft border-r border-surface-muted flex flex-col overflow-hidden relative"
     style="width: {sidebarWidth}px; min-width: {minSidebarWidth}px;">
+    <!-- TODO: address these -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
       class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue/50 transition-colors z-10"
       onmousedown={startResizing}

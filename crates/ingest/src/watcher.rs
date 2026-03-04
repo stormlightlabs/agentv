@@ -2,7 +2,8 @@ use agent_v_adapters::{ClaudeAdapter, CodexAdapter, CrushAdapter, OpenCodeAdapte
 use agent_v_core::Source;
 use agent_v_store::Database;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};
-use std::collections::HashMap;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -33,10 +34,36 @@ pub struct IngestStats {
     pub timestamp: SystemTime,
 }
 
+/// A streaming event pushed to the callback when new data is detected
+#[derive(Debug, Clone, Serialize)]
+pub struct StreamingEvent {
+    pub session_external_id: String,
+    pub source: String,
+    pub project: Option<String>,
+    pub new_events: Vec<agent_v_core::Event>,
+    pub is_new_session: bool,
+}
+
+/// Callback type invoked when new events are detected
+pub type EventCallback = Arc<dyn Fn(StreamingEvent) + Send + Sync>;
+
+/// Cursor for tracking incremental parse position per session
+#[derive(Debug, Clone)]
+enum SessionCursor {
+    /// Byte offset for JSONL files (Claude, Codex)
+    ByteOffset(u64),
+    /// Known message file names (OpenCode)
+    KnownFiles(HashSet<String>),
+    /// Last message created_at timestamp (Crush)
+    LastCreatedAt(i64),
+}
+
 /// Watcher for file system changes and database updates
 pub struct Watcher {
     config: WatcherConfig,
     stats: Arc<Mutex<Vec<IngestStats>>>,
+    cursors: Arc<Mutex<HashMap<String, SessionCursor>>>,
+    event_callback: Option<EventCallback>,
 }
 
 impl Watcher {
@@ -47,7 +74,22 @@ impl Watcher {
 
     /// Create a new watcher with custom configuration
     pub fn with_config(config: WatcherConfig) -> Self {
-        Self { config, stats: Arc::new(Mutex::new(Vec::new())) }
+        Self {
+            config,
+            stats: Arc::new(Mutex::new(Vec::new())),
+            cursors: Arc::new(Mutex::new(HashMap::new())),
+            event_callback: None,
+        }
+    }
+
+    /// Create a new watcher with a callback for streaming events
+    pub fn with_callback(config: WatcherConfig, callback: EventCallback) -> Self {
+        Self {
+            config,
+            stats: Arc::new(Mutex::new(Vec::new())),
+            cursors: Arc::new(Mutex::new(HashMap::new())),
+            event_callback: Some(callback),
+        }
     }
 
     /// Start watching all sources
@@ -97,10 +139,20 @@ impl Watcher {
         }
 
         let crush_poll_interval = self.config.crush_poll_interval;
-        let crush_handle = tokio::spawn(Self::watch_crush(crush_poll_interval, self.stats.clone()));
+        let crush_stats = self.stats.clone();
+        let crush_cursors = self.cursors.clone();
+        let crush_callback = self.event_callback.clone();
+        let crush_handle = tokio::spawn(Self::watch_crush_streaming(
+            crush_poll_interval,
+            crush_stats,
+            crush_cursors,
+            crush_callback,
+        ));
 
         let debounce_duration = self.config.debounce_duration;
         let stats = self.stats.clone();
+        let cursors = self.cursors.clone();
+        let callback = self.event_callback.clone();
         let file_watcher = tokio::spawn(async move {
             let mut pending_events: HashMap<String, SystemTime> = HashMap::new();
             let mut debounce_interval = interval(Duration::from_millis(500));
@@ -131,16 +183,25 @@ impl Watcher {
                             };
 
                             if let Some(src) = source {
-                                if let Err(e) = Self::ingest_source(src).await {
-                                    log::error!("Failed to ingest from {:?}: {}", src, e);
-                                } else {
-                                    let mut s = stats.lock().await;
-                                    s.push(IngestStats {
-                                        source: source_str.clone(),
-                                        imported: 1,
-                                        failed: 0,
-                                        timestamp: SystemTime::now(),
-                                    });
+                                let result = Self::ingest_source_streaming(
+                                    src,
+                                    cursors.clone(),
+                                    callback.clone(),
+                                ).await;
+
+                                match result {
+                                    Ok(_) => {
+                                        let mut s = stats.lock().await;
+                                        s.push(IngestStats {
+                                            source: source_str.clone(),
+                                            imported: 1,
+                                            failed: 0,
+                                            timestamp: SystemTime::now(),
+                                        });
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to ingest from {:?}: {}", src, e);
+                                    }
                                 }
                             }
                         }
@@ -187,6 +248,8 @@ impl Watcher {
 
                 let debounce_duration = self.config.debounce_duration;
                 let stats = self.stats.clone();
+                let cursors = self.cursors.clone();
+                let callback = self.event_callback.clone();
                 let source_str = source.to_string();
 
                 while let Some(_ts) = rx.recv().await {
@@ -197,7 +260,7 @@ impl Watcher {
                     }
 
                     log::info!("Ingesting from {:?} due to file change", source);
-                    match Self::ingest_source(source).await {
+                    match Self::ingest_source_streaming(source, cursors.clone(), callback.clone()).await {
                         Ok(_) => {
                             let mut s = stats.lock().await;
                             s.push(IngestStats {
@@ -214,15 +277,24 @@ impl Watcher {
                 }
             }
             Source::Crush => {
-                let _ = Self::watch_crush(self.config.crush_poll_interval, self.stats.clone()).await;
+                Self::watch_crush_streaming(
+                    self.config.crush_poll_interval,
+                    self.stats.clone(),
+                    self.cursors.clone(),
+                    self.event_callback.clone(),
+                )
+                .await;
             }
         }
 
         Ok(())
     }
 
-    /// Watch Crush database for changes
-    async fn watch_crush(poll_interval: Duration, stats: Arc<Mutex<Vec<IngestStats>>>) {
+    /// Watch Crush database for changes with streaming support
+    async fn watch_crush_streaming(
+        poll_interval: Duration, stats: Arc<Mutex<Vec<IngestStats>>>,
+        cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+    ) {
         let adapter = CrushAdapter::new();
         let mut last_check = SystemTime::now();
         let mut check_interval = interval(poll_interval);
@@ -245,7 +317,7 @@ impl Watcher {
 
             if needs_ingest {
                 log::info!("Crush database modified, re-ingesting");
-                match Self::ingest_crush().await {
+                match Self::ingest_crush_streaming(cursors.clone(), callback.clone()).await {
                     Ok(_) => {
                         let mut s = stats.lock().await;
                         s.push(IngestStats {
@@ -276,20 +348,20 @@ impl Watcher {
     }
 
     /// Get paths to watch for OpenCode
-    ///
-    /// Watches the storage directory for new session files.
     async fn get_opencode_watch_paths(&self) -> Vec<PathBuf> {
         let adapter = OpenCodeAdapter::new();
         vec![adapter.storage_path().clone()]
     }
 
-    /// Ingest from a specific source
-    async fn ingest_source(source: Source) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    /// Ingest from a specific source with streaming callback support
+    async fn ingest_source_streaming(
+        source: Source, cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         match source {
-            Source::Claude => Self::ingest_claude().await,
-            Source::Codex => Self::ingest_codex().await,
-            Source::OpenCode => Self::ingest_opencode().await,
-            Source::Crush => Self::ingest_crush().await,
+            Source::Claude => Self::ingest_claude_streaming(cursors, callback).await,
+            Source::Codex => Self::ingest_codex_streaming(cursors, callback).await,
+            Source::OpenCode => Self::ingest_opencode_streaming(cursors, callback).await,
+            Source::Crush => Self::ingest_crush_streaming(cursors, callback).await,
         }
     }
 
@@ -301,64 +373,346 @@ impl Watcher {
         }
     }
 
-    /// Ingest Claude sessions
-    async fn ingest_claude() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    /// Ingest Claude sessions with incremental parsing and callback
+    async fn ingest_claude_streaming(
+        cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = ClaudeAdapter::new();
 
         for session_file in adapter.discover_sessions().await {
-            if let Ok((session, events)) = adapter.parse_session(&session_file).await
-                && db.insert_session_with_events(&session, &events).await.is_ok()
-            {
-                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+            let cursor_key = format!("claude:{}", session_file.session_id);
+
+            let byte_offset = {
+                let c = cursors.lock().await;
+                match c.get(&cursor_key) {
+                    Some(SessionCursor::ByteOffset(off)) => *off,
+                    _ => 0,
+                }
+            };
+
+            let is_new_session = byte_offset == 0;
+
+            if is_new_session {
+                if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                    let _ = db.insert_session_with_events(&session, &events).await;
+                    let _ = db.compute_session_metrics(&session.id.to_string()).await;
+
+                    let file_len = tokio::fs::metadata(&session_file.path)
+                        .await
+                        .map(|m| m.len())
+                        .unwrap_or(0);
+
+                    {
+                        let mut c = cursors.lock().await;
+                        c.insert(cursor_key, SessionCursor::ByteOffset(file_len));
+                    }
+
+                    if let Some(ref cb) = callback
+                        && !events.is_empty()
+                    {
+                        cb(StreamingEvent {
+                            session_external_id: session_file.session_id.clone(),
+                            source: "claude".to_string(),
+                            project: Some(session_file.project.clone()),
+                            new_events: events,
+                            is_new_session: true,
+                        });
+                    }
+                }
+            } else {
+                match adapter.parse_session_incremental(&session_file, byte_offset).await {
+                    Ok((new_events, new_offset)) => {
+                        if !new_events.is_empty() {
+                            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                                let _ = db.insert_session_with_events(&session, &events).await;
+                                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                            }
+
+                            if let Some(ref cb) = callback {
+                                cb(StreamingEvent {
+                                    session_external_id: session_file.session_id.clone(),
+                                    source: "claude".to_string(),
+                                    project: Some(session_file.project.clone()),
+                                    new_events,
+                                    is_new_session: false,
+                                });
+                            }
+                        }
+
+                        {
+                            let mut c = cursors.lock().await;
+                            c.insert(cursor_key, SessionCursor::ByteOffset(new_offset));
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e);
+                    }
+                }
             }
         }
 
         Ok(())
     }
 
-    /// Ingest Codex sessions
-    async fn ingest_codex() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    /// Ingest Codex sessions with incremental parsing and callback
+    async fn ingest_codex_streaming(
+        cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = CodexAdapter::new();
 
         for session_file in adapter.discover_sessions().await {
-            if let Ok((session, events)) = adapter.parse_session(&session_file).await
-                && db.insert_session_with_events(&session, &events).await.is_ok()
-            {
-                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+            let cursor_key = format!("codex:{}", session_file.session_id);
+
+            let byte_offset = {
+                let c = cursors.lock().await;
+                match c.get(&cursor_key) {
+                    Some(SessionCursor::ByteOffset(off)) => *off,
+                    _ => 0,
+                }
+            };
+
+            let is_new_session = byte_offset == 0;
+
+            if is_new_session {
+                if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                    let _ = db.insert_session_with_events(&session, &events).await;
+                    let _ = db.compute_session_metrics(&session.id.to_string()).await;
+
+                    let file_len = tokio::fs::metadata(&session_file.path)
+                        .await
+                        .map(|m| m.len())
+                        .unwrap_or(0);
+
+                    {
+                        let mut c = cursors.lock().await;
+                        c.insert(cursor_key, SessionCursor::ByteOffset(file_len));
+                    }
+
+                    if let Some(ref cb) = callback
+                        && !events.is_empty()
+                    {
+                        cb(StreamingEvent {
+                            session_external_id: session_file.session_id.clone(),
+                            source: "codex".to_string(),
+                            project: None,
+                            new_events: events,
+                            is_new_session: true,
+                        });
+                    }
+                }
+            } else {
+                match adapter.parse_session_incremental(&session_file, byte_offset).await {
+                    Ok((new_events, new_offset)) => {
+                        if !new_events.is_empty() {
+                            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                                let _ = db.insert_session_with_events(&session, &events).await;
+                                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                            }
+
+                            if let Some(ref cb) = callback {
+                                cb(StreamingEvent {
+                                    session_external_id: session_file.session_id.clone(),
+                                    source: "codex".to_string(),
+                                    project: None,
+                                    new_events,
+                                    is_new_session: false,
+                                });
+                            }
+                        }
+
+                        {
+                            let mut c = cursors.lock().await;
+                            c.insert(cursor_key, SessionCursor::ByteOffset(new_offset));
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e);
+                    }
+                }
             }
         }
 
         Ok(())
     }
 
-    /// Ingest OpenCode sessions
-    async fn ingest_opencode() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    /// Ingest OpenCode sessions with incremental parsing and callback
+    async fn ingest_opencode_streaming(
+        cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = OpenCodeAdapter::new();
 
         for session in adapter.discover_sessions().await {
-            if let Ok((session_obj, events)) = adapter.parse_session(&session).await
-                && db.insert_session_with_events(&session_obj, &events).await.is_ok()
-            {
-                let _ = db.compute_session_metrics(&session_obj.id.to_string()).await;
+            let cursor_key = format!("opencode:{}", session.id);
+
+            let known_files = {
+                let c = cursors.lock().await;
+                match c.get(&cursor_key) {
+                    Some(SessionCursor::KnownFiles(files)) => files.clone(),
+                    _ => HashSet::new(),
+                }
+            };
+
+            let is_new_session = known_files.is_empty();
+
+            if is_new_session {
+                if let Ok((session_obj, events)) = adapter.parse_session(&session).await {
+                    let _ = db.insert_session_with_events(&session_obj, &events).await;
+                    let _ = db.compute_session_metrics(&session_obj.id.to_string()).await;
+
+                    let msg_dir = adapter.storage_path().join("message").join(&session.id);
+                    let mut files = HashSet::new();
+                    if let Ok(mut entries) = tokio::fs::read_dir(&msg_dir).await {
+                        while let Ok(Some(entry)) = entries.next_entry().await {
+                            if let Some(name) = entry.file_name().to_str() {
+                                files.insert(name.to_string());
+                            }
+                        }
+                    }
+
+                    {
+                        let mut c = cursors.lock().await;
+                        c.insert(cursor_key, SessionCursor::KnownFiles(files));
+                    }
+
+                    if let Some(ref cb) = callback
+                        && !events.is_empty()
+                    {
+                        cb(StreamingEvent {
+                            session_external_id: session.id.clone(),
+                            source: "opencode".to_string(),
+                            project: session.directory.clone(),
+                            new_events: events,
+                            is_new_session: true,
+                        });
+                    }
+                }
+            } else {
+                match adapter.parse_session_incremental(&session, &known_files).await {
+                    Ok((new_events, new_known)) => {
+                        if !new_events.is_empty() {
+                            if let Ok((session_obj, events)) = adapter.parse_session(&session).await {
+                                let _ = db.insert_session_with_events(&session_obj, &events).await;
+                                let _ = db.compute_session_metrics(&session_obj.id.to_string()).await;
+                            }
+
+                            if let Some(ref cb) = callback {
+                                cb(StreamingEvent {
+                                    session_external_id: session.id.clone(),
+                                    source: "opencode".to_string(),
+                                    project: session.directory.clone(),
+                                    new_events,
+                                    is_new_session: false,
+                                });
+                            }
+                        }
+
+                        {
+                            let mut c = cursors.lock().await;
+                            c.insert(cursor_key, SessionCursor::KnownFiles(new_known));
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Incremental parse failed for {}: {}", session.id, e);
+                    }
+                }
             }
         }
 
         Ok(())
     }
 
-    /// Ingest Crush sessions
-    async fn ingest_crush() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    /// Ingest Crush sessions with incremental parsing and callback
+    async fn ingest_crush_streaming(
+        cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = CrushAdapter::new();
 
         for session_file in adapter.discover_sessions().await {
-            if let Ok((session, events)) = adapter.parse_session(&session_file).await
-                && db.insert_session_with_events(&session, &events).await.is_ok()
-            {
-                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+            let cursor_key = format!("crush:{}", session_file.session_id);
+
+            let last_created_at = {
+                let c = cursors.lock().await;
+                match c.get(&cursor_key) {
+                    Some(SessionCursor::LastCreatedAt(ts)) => *ts,
+                    _ => 0,
+                }
+            };
+
+            let is_new_session = last_created_at == 0;
+
+            if is_new_session {
+                if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                    let _ = db.insert_session_with_events(&session, &events).await;
+                    let _ = db.compute_session_metrics(&session.id.to_string()).await;
+
+                    let max_ts = events
+                        .iter()
+                        .filter_map(|e| e.raw_payload.get("created_at").and_then(|v| v.as_i64()))
+                        .max()
+                        .unwrap_or(0);
+
+                    {
+                        let mut c = cursors.lock().await;
+                        c.insert(cursor_key, SessionCursor::LastCreatedAt(max_ts));
+                    }
+
+                    if let Some(ref cb) = callback
+                        && !events.is_empty()
+                    {
+                        cb(StreamingEvent {
+                            session_external_id: session_file.session_id.clone(),
+                            source: "crush".to_string(),
+                            project: session_file
+                                .path
+                                .parent()
+                                .and_then(|p| p.parent())
+                                .and_then(|p| p.file_name())
+                                .and_then(|n| n.to_str())
+                                .map(|s| s.to_string()),
+                            new_events: events,
+                            is_new_session: true,
+                        });
+                    }
+                }
+            } else {
+                match adapter.parse_session_incremental(&session_file, last_created_at).await {
+                    Ok((new_events, new_last)) => {
+                        if !new_events.is_empty() {
+                            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                                let _ = db.insert_session_with_events(&session, &events).await;
+                                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                            }
+
+                            if let Some(ref cb) = callback {
+                                cb(StreamingEvent {
+                                    session_external_id: session_file.session_id.clone(),
+                                    source: "crush".to_string(),
+                                    project: session_file
+                                        .path
+                                        .parent()
+                                        .and_then(|p| p.parent())
+                                        .and_then(|p| p.file_name())
+                                        .and_then(|n| n.to_str())
+                                        .map(|s| s.to_string()),
+                                    new_events,
+                                    is_new_session: false,
+                                });
+                            }
+                        }
+
+                        {
+                            let mut c = cursors.lock().await;
+                            c.insert(cursor_key, SessionCursor::LastCreatedAt(new_last));
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e);
+                    }
+                }
             }
         }
 
@@ -394,5 +748,24 @@ mod tests {
         let watcher = Watcher::new();
         let stats = watcher.get_stats().await;
         assert!(stats.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_watcher_with_callback() {
+        let called = Arc::new(Mutex::new(false));
+        let called_clone = called.clone();
+        let callback: EventCallback = Arc::new(move |_event| {
+            let c = called_clone.clone();
+            tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(async {
+                    let mut called = c.lock().await;
+                    *called = true;
+                });
+            });
+        });
+
+        let watcher = Watcher::with_callback(WatcherConfig::default(), callback);
+        assert!(watcher.event_callback.is_some());
     }
 }

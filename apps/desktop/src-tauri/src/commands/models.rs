@@ -198,6 +198,16 @@ pub struct LatencyDistribution {
     pub session_count: i64,
 }
 
+/// Streaming event payload pushed to the frontend via Tauri events
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingEventPayload {
+    pub session_external_id: String,
+    pub source: String,
+    pub project: Option<String>,
+    pub events: Vec<EventData>,
+    pub is_new_session: bool,
+}
+
 /// Export format enum
 #[derive(Debug, Clone, Copy)]
 pub enum ExportFormat {

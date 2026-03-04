@@ -1,3 +1,3 @@
 pub mod watcher;
 
-pub use watcher::Watcher;
+pub use watcher::{EventCallback, StreamingEvent, Watcher, WatcherConfig};

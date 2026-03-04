@@ -4,6 +4,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { fade } from "svelte/transition";
   import CostLatencyPanel from "./CostLatencyPanel.svelte";
+  import LiveLogViewer from "./LiveLogViewer.svelte";
 
   type Props = {
     session: SessionData;
@@ -16,6 +17,7 @@
 
   const toast = useToast();
   let exporting = $state(false);
+  let viewMode = $state<"static" | "live">("static");
 
   function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
@@ -231,6 +233,15 @@
         {formatDate(session.updated_at)}
       </div>
       <div class="flex gap-1 justify-end">
+        <button
+          class="px-2 py-1 border rounded text-xs cursor-pointer transition-colors {viewMode === 'live'
+            ? 'bg-green/10 border-green text-green'
+            : 'bg-surface border-surface-muted hover:border-green hover:text-green'}"
+          onclick={() => (viewMode = viewMode === "live" ? "static" : "live")}
+          title="Toggle live log view">
+          <span class="i-ri-live-line"></span>
+          Live
+        </button>
         {#if onOpenDrawer}
           <button
             class="px-2 py-1 bg-surface border border-surface-muted rounded text-xs cursor-pointer transition-colors hover:border-blue hover:text-blue"
@@ -267,6 +278,11 @@
 
   <CostLatencyPanel {session} />
 
+  {#if viewMode === "live"}
+    <div class="flex-1 overflow-hidden">
+      <LiveLogViewer sessionId={session.external_id} initialEvents={events} />
+    </div>
+  {:else}
   <div class="flex-1 overflow-y-auto px-6 py-4">
     {#if events.length === 0}
       <div class="flex items-center justify-center h-full text-fg-dim" transition:fade>
@@ -398,4 +414,5 @@
       {/each}
     {/if}
   </div>
+  {/if}
 </div>

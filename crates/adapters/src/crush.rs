@@ -533,6 +533,60 @@ impl CrushAdapter {
 
         (kind, content)
     }
+
+    /// Parse only new messages from a Crush session since the last known created_at timestamp.
+    /// Returns new events and the new last_created_at value.
+    pub async fn parse_session_incremental(
+        &self, session_file: &CrushSessionFile, last_created_at: i64,
+    ) -> Result<(Vec<Event>, i64), Box<dyn std::error::Error + Send + Sync>> {
+        let conn = Connection::open(&session_file.path)?;
+        let features = self.detect_schema_features(&conn)?;
+
+        let query = if features.has_provider_column && features.has_is_summary_message {
+            "SELECT id, session_id, role, parts, model, provider, created_at, updated_at, finished_at, is_summary_message \
+             FROM messages WHERE session_id = ? AND created_at > ? ORDER BY created_at ASC"
+        } else if features.has_provider_column {
+            "SELECT id, session_id, role, parts, model, provider, created_at, updated_at, finished_at, 0 as is_summary_message \
+             FROM messages WHERE session_id = ? AND created_at > ? ORDER BY created_at ASC"
+        } else if features.has_is_summary_message {
+            "SELECT id, session_id, role, parts, model, NULL as provider, created_at, updated_at, finished_at, is_summary_message \
+             FROM messages WHERE session_id = ? AND created_at > ? ORDER BY created_at ASC"
+        } else {
+            "SELECT id, session_id, role, parts, model, NULL as provider, created_at, updated_at, finished_at, 0 as is_summary_message \
+             FROM messages WHERE session_id = ? AND created_at > ? ORDER BY created_at ASC"
+        };
+
+        let mut stmt = conn.prepare(query)?;
+        let messages: Vec<CrushMessage> = stmt
+            .query_map(rusqlite::params![&session_file.session_id, last_created_at], |row| {
+                Ok(CrushMessage {
+                    id: row.get(0)?,
+                    session_id: row.get(1)?,
+                    role: row.get(2)?,
+                    parts: row.get(3)?,
+                    model: row.get(4)?,
+                    provider: row.get(5)?,
+                    created_at: row.get(6)?,
+                    updated_at: row.get(7)?,
+                    finished_at: row.get(8)?,
+                    is_summary_message: row.get(9)?,
+                })
+            })?
+            .collect::<SqliteResult<Vec<_>>>()?;
+
+        let mut new_last = last_created_at;
+        let events: Vec<Event> = messages
+            .into_iter()
+            .filter_map(|msg| {
+                if msg.created_at > new_last {
+                    new_last = msg.created_at;
+                }
+                self.message_to_event(msg, &features)
+            })
+            .collect();
+
+        Ok((events, new_last))
+    }
 }
 
 impl Default for CrushAdapter {

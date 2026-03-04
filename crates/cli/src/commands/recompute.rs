@@ -1,6 +1,6 @@
 use agent_v_store::Database;
-use owo_colors::OwoColorize;
 use log::info;
+use owo_colors::OwoColorize;
 
 /// Recompute metrics for all sessions
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {

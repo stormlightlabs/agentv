@@ -1,7 +1,7 @@
 use agent_v_core::{Event, EventKind, Role, Session, Source};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -497,6 +497,98 @@ impl OpenCodeAdapter {
         }
 
         content_parts.join("\n\n")
+    }
+
+    /// Parse only new events from a session by tracking known message file names.
+    /// Returns new events and the updated set of known file names.
+    pub async fn parse_session_incremental(
+        &self, session: &OpenCodeSession, known_files: &HashSet<String>,
+    ) -> Result<(Vec<Event>, HashSet<String>), Box<dyn std::error::Error + Send + Sync>> {
+        let message_dir = self.storage_path.join("message").join(&session.id);
+        if !message_dir.exists() {
+            return Ok((Vec::new(), known_files.clone()));
+        }
+
+        let mut new_known = known_files.clone();
+        let mut new_events = Vec::new();
+
+        let Ok(entries) = tokio::fs::read_dir(&message_dir).await else {
+            return Ok((Vec::new(), new_known));
+        };
+
+        let mut entries = entries;
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+
+            if known_files.contains(&file_name) {
+                continue;
+            }
+
+            new_known.insert(file_name);
+
+            let content = match tokio::fs::read_to_string(&path).await {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let message: OpenCodeMessageStorage = match serde_json::from_str(&content) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            let timestamp = DateTime::from_timestamp(message.time.created / 1000, 0).unwrap_or_else(Utc::now);
+            let role = match message.role.as_str() {
+                "user" => Some(Role::User),
+                "assistant" => Some(Role::Assistant),
+                "system" => Some(Role::System),
+                _ => None,
+            };
+            let event_kind = if role.is_some() { EventKind::Message } else { EventKind::System };
+
+            let parts = self.load_message_parts(&message.id).await.unwrap_or_default();
+            let content_str = self.format_message_content(&parts, &message);
+
+            new_events.push(Event {
+                id: Uuid::new_v4(),
+                session_id: Uuid::nil(),
+                kind: event_kind,
+                role,
+                content: Some(content_str),
+                timestamp,
+                raw_payload: serde_json::to_value(&message).unwrap_or_default(),
+            });
+
+            for part in &parts {
+                if part.part_type == "tool" {
+                    let tool_content = part.state.as_ref().map(|state| {
+                        serde_json::to_string(&serde_json::json!({
+                            "tool": part.tool,
+                            "status": state.status,
+                            "input": state.input,
+                            "output": state.output,
+                        }))
+                        .unwrap_or_default()
+                    });
+
+                    new_events.push(Event {
+                        id: Uuid::new_v4(),
+                        session_id: Uuid::nil(),
+                        kind: EventKind::ToolCall,
+                        role: Some(Role::Assistant),
+                        content: tool_content.or_else(|| part.tool.clone()),
+                        timestamp,
+                        raw_payload: serde_json::to_value(part).unwrap_or_default(),
+                    });
+                }
+            }
+        }
+
+        Ok((new_events, new_known))
     }
 
     /// Get provider information from auth.json

@@ -91,6 +91,14 @@ export type LongRunningToolCall = {
   error_message: string | null;
 };
 
+export type StreamingEventPayload = {
+  session_external_id: string;
+  source: string;
+  project: string | null;
+  events: EventData[];
+  is_new_session: boolean;
+};
+
 export type ExportFormat = "md" | "json" | "jsonl";
 
 export type SourceHealth = {

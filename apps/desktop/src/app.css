@@ -1,9 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap");
 @import "tailwindcss";
 @plugin "@egoist/tailwindcss-icons";
 
+/* Based on Spacemacs Base16 Dark Colors */
 @theme {
-  /* Spacemacs Base16 Dark Colors */
   --color-surface: #282828;
   --color-surface-soft: #444155;
   --color-surface-muted: #585858;
@@ -13,7 +13,6 @@
   --color-fg-dim: #a3a3a3;
   --color-fg-muted: #b8b8b8;
 
-  /* Spacemacs Base16 Accents */
   --color-red: #f2241f;
   --color-red-bright: #f2241f;
   --color-green: #67b11d;
@@ -29,13 +28,17 @@
   --color-orange: #ffa500;
   --color-orange-bright: #ffa500;
 
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans:
+    "Google Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  --font-mono: "Google Sans Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   --spacing-sidebar: 280px;
 }
 
 html {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   background-color: var(--color-surface);
   color: var(--color-fg);
 }
@@ -73,48 +76,48 @@ body {
   color: var(--color-surface);
 }
 
-.text-muted {
+@utility text-muted {
   color: var(--color-fg-muted);
 }
 
-.text-dim {
+@utility text-dim {
   color: var(--color-fg-dim);
 }
 
-.bg-soft {
+@utility bg-soft {
   background-color: var(--color-surface-soft);
 }
 
-.bg-muted {
+@utility bg-muted {
   background-color: var(--color-surface-muted);
 }
 
-.bg-hard {
+@utility bg-hard {
   background-color: var(--color-surface-hard);
 }
 
-.border-subtle {
+@utility border-subtle {
   border-color: var(--color-surface-muted);
 }
 
-.accent-red {
+@utility accent-red {
   color: var(--color-red-bright);
 }
-.accent-green {
+@utility accent-green {
   color: var(--color-green-bright);
 }
-.accent-yellow {
+@utility accent-yellow {
   color: var(--color-yellow-bright);
 }
-.accent-blue {
+@utility accent-blue {
   color: var(--color-blue-bright);
 }
-.accent-purple {
+@utility accent-purple {
   color: var(--color-purple-bright);
 }
-.accent-aqua {
+@utility accent-aqua {
   color: var(--color-aqua-bright);
 }
-.accent-orange {
+@utility accent-orange {
   color: var(--color-orange-bright);
 }
