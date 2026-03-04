@@ -64,7 +64,7 @@ pub type ProgressCallback = Arc<dyn Fn(IngestProgress) + Send + Sync>;
 enum SessionCursor {
     /// Byte offset for JSONL files (Claude, Codex)
     ByteOffset(u64),
-    /// Known message file names (OpenCode)
+    /// Known message keys/signatures (OpenCode)
     KnownFiles(HashSet<String>),
     /// Last message created_at timestamp (Crush)
     LastCreatedAt(i64),
@@ -135,13 +135,31 @@ impl Watcher {
         let claude_paths = self.get_claude_watch_paths().await;
         let codex_paths = self.get_codex_watch_paths().await;
         let opencode_paths = self.get_opencode_watch_paths().await;
+        let source_roots: Vec<(String, PathBuf)> = claude_paths
+            .iter()
+            .cloned()
+            .map(|p| ("claude".to_string(), p))
+            .chain(codex_paths.iter().cloned().map(|p| ("codex".to_string(), p)))
+            .chain(opencode_paths.iter().cloned().map(|p| ("opencode".to_string(), p)))
+            .collect();
 
-        let _tx_clone = tx.clone();
-
+        let tx_clone = tx.clone();
+        let roots_for_events = source_roots.clone();
         let mut watcher = RecommendedWatcher::new(
             move |res: Result<Event, notify::Error>| {
-                if let Ok(_event) = res {
-                    let _ = _tx_clone.try_send(("claude", SystemTime::now()));
+                if let Ok(event) = res {
+                    let mut matched_sources = HashSet::new();
+                    for changed_path in &event.paths {
+                        for (source, root) in &roots_for_events {
+                            if changed_path.starts_with(root) {
+                                matched_sources.insert(source.clone());
+                            }
+                        }
+                    }
+
+                    for source in matched_sources {
+                        let _ = tx_clone.try_send((source, SystemTime::now()));
+                    }
                 }
             },
             Config::default(),
@@ -474,7 +492,7 @@ impl Watcher {
     /// Get paths to watch for OpenCode
     async fn get_opencode_watch_paths(&self) -> Vec<PathBuf> {
         let adapter = OpenCodeAdapter::new();
-        vec![adapter.storage_path().clone()]
+        vec![adapter.log_path().clone()]
     }
 
     /// Check if a file has been modified since last processing
@@ -793,15 +811,7 @@ impl Watcher {
                     let _ = db.insert_session_with_events(&session_obj, &events).await;
                     Self::mark_dirty(&dirty_sessions, &session_id).await;
 
-                    let msg_dir = adapter.storage_path().join("message").join(&session.id);
-                    let mut files = HashSet::new();
-                    if let Ok(mut entries) = tokio::fs::read_dir(&msg_dir).await {
-                        while let Ok(Some(entry)) = entries.next_entry().await {
-                            if let Some(name) = entry.file_name().to_str() {
-                                files.insert(name.to_string());
-                            }
-                        }
-                    }
+                    let files = adapter.collect_incremental_known_files(&session.id).await;
 
                     {
                         let mut c = cursors.lock().await;

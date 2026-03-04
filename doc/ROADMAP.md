@@ -309,7 +309,35 @@ just list
 ./target/debug/agent-viz stats --by cost --since 7d
 ```
 
-### M10 - Log Browser Core
+### M10 - UI/UX Refactor (Information Architecture)
+
+**Goal:** Restructure the desktop layout so global controls live in the top bar, the sidebar is purely for browsing, and the main pane owns session detail — following HIG split-view conventions.
+
+**Principle:** Top bar = global, left sidebar = browse, main = inspect.
+
+**Tasks:**
+
+- [ ] Move mode tabs (Sessions/Search/Analytics/Status/Support) from sidebar to top app bar as primary navigation
+- [ ] Move source toggles (All/Claude/Codex/OpenCode/Crush) to top bar as a segmented scope control
+- [ ] Move refresh/auto-refresh, export, and command palette entrypoint to top bar
+- [ ] Move global search and filter chips (date, has-diff, errors) to top bar
+- [ ] Simplify sidebar filters to list-level only: title, project, sort/pin, pagination (remove source filter from sidebar)
+- [ ] Make Search and Analytics full-screen top-level modes (cross-session operations)
+- [ ] Add collapsible top filter panel so filters/facets can expand on demand without overwhelming the main view
+- [ ] Make session detail right-pane header sticky (Live/Details/.md/.json/.jsonl toggles) with scrolling timeline beneath
+- [ ] Add empty-state guidance for detail pane: keyboard hints (Cmd+K), search prompt, "Live" follow link
+- [ ] Add responsive collapse behavior: narrow window collapses session list into overlay drawer
+- [ ] Verify layout against Apple HIG toolbar/sidebar/split-view and Material responsive navigation patterns
+
+**References:**
+
+- [Apple HIG: Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)
+- [Apple HIG: Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars)
+- [Apple HIG: Searching](https://developer.apple.com/design/human-interface-guidelines/searching)
+- [NN/g: Filters vs. Facets](https://www.nngroup.com/articles/filters-vs-facets/)
+- [Material: Navigation Drawer](https://m2.material.io/components/navigation-drawer)
+
+### M11 - Log Browser Core
 
 **Goal:** Make high-volume agent event logs fast to browse and filter.
 
@@ -321,7 +349,7 @@ just list
 - [ ] Add keyboard-first navigation and quick actions (copy id/payload/open session)
 - [ ] Add saved filter presets for recurring investigations
 
-### M11 - Tool-Call Forensics (Investigation Workflow)
+### M12 - Tool-Call Forensics (Investigation Workflow)
 
 **Goal:** Make tool usage inspectable at scale: "show me every edit/run/write and what it changed."
 
@@ -333,7 +361,7 @@ just list
 - [ ] Add "files touched" and "commands run" derived views per session
 - [ ] Add saved investigation presets (e.g., "all failing commands", "all file writes", "all approvals")
 
-### M12 - Event Inspector + Correlation
+### M13 - Event Inspector + Correlation
 
 **Goal:** Make each event inspectable, explainable, and traceable.
 
@@ -345,7 +373,7 @@ just list
 - [ ] Adjacent-event diff mode for prompt/response and tool output changes
 - [ ] Sensitive-field redaction toggles for copy/export safety
 
-### M13 - Trace Timeline (Causality-First View)
+### M14 - Trace Timeline (Causality-First View)
 
 **Goal:** Render each session as a trace with causality: prompt -> tool -> output -> patch.
 
@@ -356,7 +384,7 @@ just list
 - [ ] CLI: `show session <id> --trace` (tree + latency + status icons)
 - [ ] Store: persist correlation ids (span_id/parent_span_id) across normalized events
 
-### M14 - Visual Analytics Workbench
+### M15 - Visual Analytics Workbench
 
 **Goal:** Turn logs into interactive operational insights.
 
@@ -368,7 +396,7 @@ just list
 - [ ] Error signature trends and top-regression views
 - [ ] Click-through from chart points into pre-filtered event browser results
 
-### M15 - Export Bundles (Bug Reports + PR Review)
+### M16 - Export Bundles (Bug Reports + PR Review)
 
 **Goal:** Make "share the evidence" a first-class workflow without cloud dependency.
 
@@ -382,9 +410,9 @@ just list
     - (e) selected screenshots
 - [ ] Desktop: "Create bundle" button from session + from search result set
 - [ ] CLI: `export bundle --session <id> --out <path>` and `export bundle --search "<q>"`
-- [ ] Add redaction rules to bundle pipeline (reuse M10 redaction toggles)
+- [ ] Add redaction rules to bundle pipeline (reuse M11 redaction toggles)
 
-### M16 - Compare Modes + Regression Signals
+### M17 - Compare Modes + Regression Signals
 
 **Goal:** Explain what changed between runs, projects, or date windows.
 
@@ -396,7 +424,7 @@ just list
 - [ ] Timeline annotations (release markers, ingest incidents, manual notes)
 - [ ] Export comparison reports (`md`/`json`) with reproducible query parameters
 
-### M17 - Session Diff + Replay
+### M18 - Session Diff + Replay
 
 **Goal:** Reproduce and compare two sessions end-to-end (tools, outputs, patches) locally.
 
@@ -411,7 +439,7 @@ just list
 - [ ] Replay (offline): re-render a stored session as-if live (no model calls; use stored tool outputs)
 - [ ] Replay (live): re-run tools with safety gates (explicit allowlist + dry-run) and compare with stored outputs
 
-### M18 - Ingestion Freshness + Reliability
+### M19 - Ingestion Freshness + Reliability
 
 **Goal:** Ensure near-real-time ingest is trustworthy at scale.
 
@@ -423,7 +451,7 @@ just list
 - [ ] Add stale-source alerts in desktop status panel
 - [ ] Add idempotency and duplicate-ingest verification checks
 
-### M19 - Daily Driver Polish for Analysts
+### M20 - Daily Driver Polish for Analysts
 
 **Goal:** Make the app a default workflow for log triage and performance analysis.
 
@@ -443,10 +471,11 @@ just list
 - **M6:** New sessions appear automatically without manual re-ingest
 - **M7:** Can export sessions and view comprehensive analytics
 - **M8:** Users can download an alpha build, install it, and receive updates via Cloudflare Worker-backed Tauri updater
-- **M9-M13:** Users can browse large log volumes, deeply inspect correlated event details, and trace session causality
-- **M14-M17:** Users can visualize trends, export shareable bundles, and compare windows/projects to detect regressions
-- **M18:** Continuous ingest is observable, resilient, and freshness-aware across all sources
-- **M19:** The tool is polished enough for daily investigation workflows
+- **M10:** Desktop layout follows HIG split-view conventions: global controls in top bar, sidebar for browsing, main pane for detail
+- **M11-M14:** Users can browse large log volumes, deeply inspect correlated event details, and trace session causality
+- **M15-M18:** Users can visualize trends, export shareable bundles, and compare windows/projects to detect regressions
+- **M19:** Continuous ingest is observable, resilient, and freshness-aware across all sources
+- **M20:** The tool is polished enough for daily investigation workflows
 
 ## References
 

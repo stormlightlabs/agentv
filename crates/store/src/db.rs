@@ -410,9 +410,7 @@ impl Database {
     }
 
     /// Append new events to an existing session without deleting existing events
-    pub async fn append_events(
-        &self, session_id: &str, events: &[Event],
-    ) -> Result<(), tokio_rusqlite::Error> {
+    pub async fn append_events(&self, session_id: &str, events: &[Event]) -> Result<(), tokio_rusqlite::Error> {
         let session_id_owned = session_id.to_string();
         let events: Vec<Event> = events.to_vec();
         let event_count = events.len();
@@ -1540,28 +1538,60 @@ async fn check_codex_health() -> SourceHealth {
 }
 
 async fn check_opencode_health() -> SourceHealth {
-    let opencode_dir = dirs::data_local_dir().map(|d| d.join("opencode"));
+    let candidates = opencode_candidate_paths();
+    let existing = candidates.iter().find(|path| path.exists()).cloned();
+    let primary = candidates.first().cloned();
 
-    match opencode_dir {
-        Some(path) if path.exists() => SourceHealth {
-            source: Source::OpenCode,
-            status: HealthStatus::Healthy,
-            path: Some(path.to_string_lossy().to_string()),
-            message: Some("OpenCode data found".to_string()),
-        },
-        Some(path) => SourceHealth {
-            source: Source::OpenCode,
-            status: HealthStatus::Unknown,
-            path: Some(path.to_string_lossy().to_string()),
-            message: Some("OpenCode data not found".to_string()),
-        },
+    match existing {
+        Some(path) => {
+            let storage_path = path.join("storage");
+            let log_path = path.join("log");
+            SourceHealth {
+                source: Source::OpenCode,
+                status: HealthStatus::Healthy,
+                path: Some(path.to_string_lossy().to_string()),
+                message: Some(format!(
+                    "OpenCode data found (storage: {}, log: {})",
+                    storage_path.exists(),
+                    log_path.exists()
+                )),
+            }
+        }
         None => SourceHealth {
             source: Source::OpenCode,
             status: HealthStatus::Unknown,
-            path: None,
-            message: Some("Could not determine local data directory".to_string()),
+            path: primary.map(|p| p.to_string_lossy().to_string()),
+            message: Some(format!(
+                "OpenCode data not found (checked: {})",
+                candidates
+                    .iter()
+                    .map(|p| p.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
         },
     }
+}
+
+fn opencode_candidate_paths() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(home) = dirs::home_dir() {
+        candidates.push(home.join(".local/share/opencode"));
+    }
+
+    if let Some(local_data) = dirs::data_local_dir() {
+        let fallback = local_data.join("opencode");
+        if !candidates.iter().any(|p| p == &fallback) {
+            candidates.push(fallback);
+        }
+    }
+
+    if candidates.is_empty() {
+        candidates.push(PathBuf::from("~/.local/share/opencode"));
+    }
+
+    candidates
 }
 
 async fn check_crush_health() -> SourceHealth {
