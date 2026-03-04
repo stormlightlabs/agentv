@@ -1,9 +1,5 @@
 import { useToast } from "$lib/stores/toast.svelte";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
 type NotificationStore = {
   get windowFocused(): boolean;
@@ -13,6 +9,7 @@ type NotificationStore = {
 
 let store: NotificationStore | null = null;
 
+// TODO: this should be a class
 export function useNotifications(): NotificationStore {
   if (store) return store;
 
@@ -48,7 +45,6 @@ export function useNotifications(): NotificationStore {
   }
 
   function notify(title: string, body: string) {
-    // Throttle: max 1 OS notification per session per 10s
     const now = Date.now();
     const lastTime = throttleMap.get(title) ?? 0;
     const throttled = now - lastTime < THROTTLE_MS;

@@ -33,7 +33,7 @@
   import { supportNudgeStore } from "$lib/stores/supportNudge.svelte";
   import { useNotifications } from "$lib/stores/notifications.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
-  import type { EventData, IngestResult, SessionData, StreamingEventPayload } from "$lib/types";
+  import type { EventData, IngestProgress, IngestResult, SessionData, StreamingEventPayload } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { onDestroy, onMount } from "svelte";
@@ -43,6 +43,7 @@
   const toast = useToast();
   const notifications = useNotifications();
   let unlistenAgentEvents: UnlistenFn | null = null;
+  let unlistenIngestProgress: UnlistenFn | null = null;
 
   let bookmarksOpen = $state(false);
   let selectedEvent = $state<EventData | null>(null);
@@ -66,6 +67,8 @@
   let autoRefreshEnabled = $state(true);
   let refreshInterval: number | null = null;
   let showSupportNudge = $state(false);
+  let ingestProgress = $state<IngestProgress | null>(null);
+  let progressHideTimeout: number | null = null;
 
   const sources = [
     { id: "claude", name: "Claude", color: "blue" },
@@ -523,6 +526,24 @@
     handleKeyboardEvent(event);
   }
 
+  async function setupIngestProgressListener() {
+    unlistenIngestProgress = await listen<IngestProgress>("ingest-progress", (event) => {
+      const p = event.payload;
+      if (p.phase === "Complete") {
+        if (progressHideTimeout) clearTimeout(progressHideTimeout);
+        progressHideTimeout = window.setTimeout(() => {
+          ingestProgress = null;
+        }, 1500);
+      } else {
+        if (progressHideTimeout) {
+          clearTimeout(progressHideTimeout);
+          progressHideTimeout = null;
+        }
+        ingestProgress = p;
+      }
+    });
+  }
+
   async function setupAgentEventListener() {
     unlistenAgentEvents = await listen<StreamingEventPayload>("agent-events", (event) => {
       const payload = event.payload;
@@ -550,6 +571,7 @@
     setupKeyboardShortcuts();
     handleUrlParams();
     setupAgentEventListener();
+    setupIngestProgressListener();
 
     window.addEventListener("keydown", handleKeydown);
     window.addEventListener("mousemove", handleResize);
@@ -558,6 +580,7 @@
     return () => {
       stopAutoRefresh();
       if (unlistenAgentEvents) unlistenAgentEvents();
+      if (unlistenIngestProgress) unlistenIngestProgress();
       window.removeEventListener("keydown", handleKeydown);
       window.removeEventListener("mousemove", handleResize);
       window.removeEventListener("mouseup", stopResizing);
@@ -567,6 +590,7 @@
   onDestroy(() => {
     stopAutoRefresh();
     if (unlistenAgentEvents) unlistenAgentEvents();
+    if (unlistenIngestProgress) unlistenIngestProgress();
   });
 
   $effect(() => {
@@ -1002,3 +1026,21 @@
     </div>
   </div>
 </Dialog>
+
+{#if ingestProgress}
+  <div class="fixed bottom-0 left-0 right-0 z-50" transition:fade={{ duration: 200 }}>
+    <div
+      class="flex items-center justify-between px-3 py-1 bg-surface-soft/90 backdrop-blur-sm border-t border-surface-muted text-xs text-fg-dim">
+      <span>
+        Ingesting {ingestProgress.source}... {ingestProgress.current}/{ingestProgress.total}
+      </span>
+      <span>{ingestProgress.total > 0 ? Math.round((ingestProgress.current / ingestProgress.total) * 100) : 0}%</span>
+    </div>
+    <div class="h-1 bg-surface-muted">
+      <div
+        class="h-full bg-blue transition-all duration-300 ease-out"
+        style="width: {ingestProgress.total > 0 ? (ingestProgress.current / ingestProgress.total) * 100 : 0}%">
+      </div>
+    </div>
+  </div>
+{/if}

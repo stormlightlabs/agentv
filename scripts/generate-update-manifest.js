@@ -35,7 +35,7 @@ try {
     const sigPath = join(artifactsDir, sigFile);
     const signature = readFileSync(sigPath, "utf8").trim();
 
-    // Find the corresponding artifact
+
     for (const [suffix, platformKeys] of Object.entries(platformMap)) {
       if (baseName.endsWith(suffix)) {
         for (const platformKey of platformKeys) {

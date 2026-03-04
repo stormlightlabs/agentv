@@ -1,6 +1,6 @@
 mod commands;
 
-use agent_v_ingest::{StreamingEvent, WatcherConfig};
+use agent_v_ingest::{IngestProgress, StreamingEvent, WatcherConfig};
 use agent_v_store::Database;
 use commands::{
     check_for_new_sessions, export_search, export_session, get_activity_stats, get_cost_stats_by_project,
@@ -42,7 +42,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Debug).build())
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 let db = Database::open_default().await.expect("Failed to open database");
@@ -51,13 +51,19 @@ pub fn run() {
             });
 
             let app_handle = app.handle().clone();
+            let progress_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                let watcher = agent_v_ingest::Watcher::with_callback(
+                let watcher = agent_v_ingest::Watcher::with_callbacks(
                     WatcherConfig::default(),
                     Arc::new(move |event: StreamingEvent| {
                         let payload = streaming_event_to_payload(event);
                         if let Err(e) = app_handle.emit("agent-events", &payload) {
                             log::error!("Failed to emit agent-events: {}", e);
+                        }
+                    }),
+                    Arc::new(move |progress: IngestProgress| {
+                        if let Err(e) = progress_handle.emit("ingest-progress", &progress) {
+                            log::error!("Failed to emit ingest-progress: {}", e);
                         }
                     }),
                 );

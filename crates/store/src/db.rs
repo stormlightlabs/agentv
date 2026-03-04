@@ -394,6 +394,72 @@ impl Database {
         Ok(())
     }
 
+    /// Look up internal session ID by source and external_id
+    pub async fn get_session_id_by_external(
+        &self, source: &str, external_id: &str,
+    ) -> Result<Option<String>, tokio_rusqlite::Error> {
+        let source = source.to_string();
+        let external_id = external_id.to_string();
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare(queries::GET_SESSION_ID_BY_SOURCE_AND_EXTERNAL_ID)?;
+                let id: Option<String> = stmt.query_row([&source, &external_id], |row| row.get(0)).ok();
+                Ok(id)
+            })
+            .await
+    }
+
+    /// Append new events to an existing session without deleting existing events
+    pub async fn append_events(
+        &self, session_id: &str, events: &[Event],
+    ) -> Result<(), tokio_rusqlite::Error> {
+        let session_id_owned = session_id.to_string();
+        let events: Vec<Event> = events.to_vec();
+        let event_count = events.len();
+        let session_id_for_log = session_id_owned.clone();
+
+        self.conn
+            .call(move |conn| {
+                let tx = conn.transaction()?;
+
+                for event in &events {
+                    let id = event.id.to_string();
+                    let sid = session_id_owned.clone();
+                    let kind = event.kind.to_string();
+                    let role = event.role.map(|r| r.to_string()).unwrap_or_default();
+                    let content = event.content.clone().unwrap_or_default();
+                    let timestamp = event.timestamp.to_rfc3339();
+                    let raw_payload = serde_json::to_string(&event.raw_payload).unwrap_or_default();
+
+                    tx.execute(
+                        queries::APPEND_EVENTS,
+                        [id, sid, kind, role, content, timestamp, raw_payload],
+                    )?;
+                }
+
+                tx.commit()?;
+                Ok(())
+            })
+            .await?;
+
+        info!("Appended {} events to session {}", event_count, session_id_for_log);
+        Ok(())
+    }
+
+    /// Update a session's updated_at timestamp
+    pub async fn update_session_timestamp(
+        &self, session_id: &str, updated_at: &chrono::DateTime<Utc>,
+    ) -> Result<(), tokio_rusqlite::Error> {
+        let id = session_id.to_string();
+        let ts = updated_at.to_rfc3339();
+        self.conn
+            .call(move |conn| {
+                conn.execute(queries::UPDATE_SESSION_TIMESTAMP, [&id, &ts])?;
+                Ok(())
+            })
+            .await
+    }
+
     /// Search events with FTS5 and faceted filtering
     pub async fn search_events(
         &self, query: &str, facets: &SearchFacets, limit: i64, offset: i64,

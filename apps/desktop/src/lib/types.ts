@@ -99,6 +99,8 @@ export type StreamingEventPayload = {
   is_new_session: boolean;
 };
 
+export type IngestProgress = { source: string; phase: string; current: number; total: number };
+
 export type ExportFormat = "md" | "json" | "jsonl";
 
 export type SourceHealth = {

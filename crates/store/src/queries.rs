@@ -511,6 +511,17 @@ pub const MODEL_USAGE_STATS: &str = r#"
     ORDER BY total_cost DESC NULLS LAST
 "#;
 
+/// Append events to an existing session (without deleting existing events)
+pub const APPEND_EVENTS: &str = r#"
+    INSERT OR IGNORE INTO events (id, session_id, kind, role, content, timestamp, raw_payload)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+"#;
+
+/// Update a session's updated_at timestamp
+pub const UPDATE_SESSION_TIMESTAMP: &str = r#"
+    UPDATE sessions SET updated_at = ?2 WHERE id = ?1
+"#;
+
 /// Get aggregate efficiency stats
 pub const EFFICIENCY_STATS: &str = r#"
     SELECT

@@ -44,8 +44,20 @@ pub struct StreamingEvent {
     pub is_new_session: bool,
 }
 
+/// Progress information emitted during ingestion
+#[derive(Debug, Clone, Serialize)]
+pub struct IngestProgress {
+    pub source: String,
+    pub phase: String,
+    pub current: usize,
+    pub total: usize,
+}
+
 /// Callback type invoked when new events are detected
 pub type EventCallback = Arc<dyn Fn(StreamingEvent) + Send + Sync>;
+
+/// Callback type invoked to report ingestion progress
+pub type ProgressCallback = Arc<dyn Fn(IngestProgress) + Send + Sync>;
 
 /// Cursor for tracking incremental parse position per session
 #[derive(Debug, Clone)]
@@ -63,7 +75,10 @@ pub struct Watcher {
     config: WatcherConfig,
     stats: Arc<Mutex<Vec<IngestStats>>>,
     cursors: Arc<Mutex<HashMap<String, SessionCursor>>>,
+    file_mtimes: Arc<Mutex<HashMap<PathBuf, SystemTime>>>,
+    dirty_sessions: Arc<Mutex<HashSet<String>>>,
     event_callback: Option<EventCallback>,
+    progress_callback: Option<ProgressCallback>,
 }
 
 impl Watcher {
@@ -78,7 +93,10 @@ impl Watcher {
             config,
             stats: Arc::new(Mutex::new(Vec::new())),
             cursors: Arc::new(Mutex::new(HashMap::new())),
+            file_mtimes: Arc::new(Mutex::new(HashMap::new())),
+            dirty_sessions: Arc::new(Mutex::new(HashSet::new())),
             event_callback: None,
+            progress_callback: None,
         }
     }
 
@@ -88,7 +106,25 @@ impl Watcher {
             config,
             stats: Arc::new(Mutex::new(Vec::new())),
             cursors: Arc::new(Mutex::new(HashMap::new())),
+            file_mtimes: Arc::new(Mutex::new(HashMap::new())),
+            dirty_sessions: Arc::new(Mutex::new(HashSet::new())),
             event_callback: Some(callback),
+            progress_callback: None,
+        }
+    }
+
+    /// Create a new watcher with callbacks for streaming events and progress
+    pub fn with_callbacks(
+        config: WatcherConfig, event_callback: EventCallback, progress_callback: ProgressCallback,
+    ) -> Self {
+        Self {
+            config,
+            stats: Arc::new(Mutex::new(Vec::new())),
+            cursors: Arc::new(Mutex::new(HashMap::new())),
+            file_mtimes: Arc::new(Mutex::new(HashMap::new())),
+            dirty_sessions: Arc::new(Mutex::new(HashSet::new())),
+            event_callback: Some(event_callback),
+            progress_callback: Some(progress_callback),
         }
     }
 
@@ -142,17 +178,29 @@ impl Watcher {
         let crush_stats = self.stats.clone();
         let crush_cursors = self.cursors.clone();
         let crush_callback = self.event_callback.clone();
+        let crush_progress = self.progress_callback.clone();
+        let crush_mtimes = self.file_mtimes.clone();
+        let crush_dirty = self.dirty_sessions.clone();
         let crush_handle = tokio::spawn(Self::watch_crush_streaming(
             crush_poll_interval,
             crush_stats,
             crush_cursors,
             crush_callback,
+            crush_progress,
+            crush_mtimes,
+            crush_dirty,
         ));
+
+        let metrics_dirty = self.dirty_sessions.clone();
+        let _metrics_handle = tokio::spawn(Self::background_metrics_worker(metrics_dirty));
 
         let debounce_duration = self.config.debounce_duration;
         let stats = self.stats.clone();
         let cursors = self.cursors.clone();
         let callback = self.event_callback.clone();
+        let progress = self.progress_callback.clone();
+        let mtimes = self.file_mtimes.clone();
+        let dirty = self.dirty_sessions.clone();
         let file_watcher = tokio::spawn(async move {
             let mut pending_events: HashMap<String, SystemTime> = HashMap::new();
             let mut debounce_interval = interval(Duration::from_millis(500));
@@ -187,6 +235,9 @@ impl Watcher {
                                     src,
                                     cursors.clone(),
                                     callback.clone(),
+                                    progress.clone(),
+                                    mtimes.clone(),
+                                    dirty.clone(),
                                 ).await;
 
                                 match result {
@@ -199,9 +250,7 @@ impl Watcher {
                                             timestamp: SystemTime::now(),
                                         });
                                     }
-                                    Err(e) => {
-                                        log::error!("Failed to ingest from {:?}: {}", src, e);
-                                    }
+                                    Err(e) => log::error!("Failed to ingest from {:?}: {}", src, e),
                                 }
                             }
                         }
@@ -246,10 +295,16 @@ impl Watcher {
                     }
                 }
 
+                let metrics_dirty = self.dirty_sessions.clone();
+                let _metrics_handle = tokio::spawn(Self::background_metrics_worker(metrics_dirty));
+
                 let debounce_duration = self.config.debounce_duration;
                 let stats = self.stats.clone();
                 let cursors = self.cursors.clone();
                 let callback = self.event_callback.clone();
+                let progress = self.progress_callback.clone();
+                let mtimes = self.file_mtimes.clone();
+                let dirty = self.dirty_sessions.clone();
                 let source_str = source.to_string();
 
                 while let Some(_ts) = rx.recv().await {
@@ -260,7 +315,16 @@ impl Watcher {
                     }
 
                     log::info!("Ingesting from {:?} due to file change", source);
-                    match Self::ingest_source_streaming(source, cursors.clone(), callback.clone()).await {
+                    match Self::ingest_source_streaming(
+                        source,
+                        cursors.clone(),
+                        callback.clone(),
+                        progress.clone(),
+                        mtimes.clone(),
+                        dirty.clone(),
+                    )
+                    .await
+                    {
                         Ok(_) => {
                             let mut s = stats.lock().await;
                             s.push(IngestStats {
@@ -277,11 +341,17 @@ impl Watcher {
                 }
             }
             Source::Crush => {
+                let metrics_dirty = self.dirty_sessions.clone();
+                let _metrics_handle = tokio::spawn(Self::background_metrics_worker(metrics_dirty));
+
                 Self::watch_crush_streaming(
                     self.config.crush_poll_interval,
                     self.stats.clone(),
                     self.cursors.clone(),
                     self.event_callback.clone(),
+                    self.progress_callback.clone(),
+                    self.file_mtimes.clone(),
+                    self.dirty_sessions.clone(),
                 )
                 .await;
             }
@@ -290,10 +360,57 @@ impl Watcher {
         Ok(())
     }
 
+    /// Background worker that computes metrics for dirty sessions on a debounced interval
+    async fn background_metrics_worker(dirty_sessions: Arc<Mutex<HashSet<String>>>) {
+        let mut tick = interval(Duration::from_secs(5));
+        loop {
+            tick.tick().await;
+
+            let sessions_to_compute: Vec<String> = {
+                let mut dirty = dirty_sessions.lock().await;
+                if dirty.is_empty() {
+                    continue;
+                }
+                let batch: Vec<String> = dirty.drain().collect();
+                batch
+            };
+
+            if sessions_to_compute.is_empty() {
+                continue;
+            }
+
+            log::info!("Computing metrics for {} dirty sessions", sessions_to_compute.len());
+            let db_ok = match Database::open_default().await {
+                Ok(db) => Some(db),
+                Err(e) => {
+                    log::error!("Failed to open DB for metric computation: {}", e);
+                    None
+                }
+            };
+            match db_ok {
+                Some(db) => {
+                    for session_id in &sessions_to_compute {
+                        if let Err(e) = db.compute_session_metrics(session_id).await {
+                            log::warn!("Failed to compute metrics for {}: {}", session_id, e);
+                        }
+                    }
+                }
+                None => {
+                    let mut dirty = dirty_sessions.lock().await;
+                    for sid in sessions_to_compute {
+                        dirty.insert(sid);
+                    }
+                }
+            }
+        }
+    }
+
     /// Watch Crush database for changes with streaming support
     async fn watch_crush_streaming(
         poll_interval: Duration, stats: Arc<Mutex<Vec<IngestStats>>>,
         cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+        progress: Option<ProgressCallback>, _mtimes: Arc<Mutex<HashMap<PathBuf, SystemTime>>>,
+        dirty_sessions: Arc<Mutex<HashSet<String>>>,
     ) {
         let adapter = CrushAdapter::new();
         let mut last_check = SystemTime::now();
@@ -317,7 +434,14 @@ impl Watcher {
 
             if needs_ingest {
                 log::info!("Crush database modified, re-ingesting");
-                match Self::ingest_crush_streaming(cursors.clone(), callback.clone()).await {
+                match Self::ingest_crush_streaming(
+                    cursors.clone(),
+                    callback.clone(),
+                    progress.clone(),
+                    dirty_sessions.clone(),
+                )
+                .await
+                {
                     Ok(_) => {
                         let mut s = stats.lock().await;
                         s.push(IngestStats {
@@ -353,15 +477,50 @@ impl Watcher {
         vec![adapter.storage_path().clone()]
     }
 
+    /// Check if a file has been modified since last processing
+    async fn file_changed(path: &PathBuf, mtimes: &Arc<Mutex<HashMap<PathBuf, SystemTime>>>) -> bool {
+        let current_mtime = match tokio::fs::metadata(path).await {
+            Ok(meta) => match meta.modified() {
+                Ok(mtime) => mtime,
+                Err(_) => return true,
+            },
+            Err(_) => return true,
+        };
+
+        let cached = {
+            let cache = mtimes.lock().await;
+            cache.get(path).copied()
+        };
+
+        match cached {
+            Some(cached_mtime) => current_mtime != cached_mtime,
+            None => true,
+        }
+    }
+
+    /// Update the cached mtime for a file
+    async fn update_mtime(path: &PathBuf, mtimes: &Arc<Mutex<HashMap<PathBuf, SystemTime>>>) {
+        if let Ok(meta) = tokio::fs::metadata(path).await
+            && let Ok(mtime) = meta.modified()
+        {
+            let mut cache = mtimes.lock().await;
+            cache.insert(path.clone(), mtime);
+        }
+    }
+
     /// Ingest from a specific source with streaming callback support
     async fn ingest_source_streaming(
         source: Source, cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+        progress: Option<ProgressCallback>, mtimes: Arc<Mutex<HashMap<PathBuf, SystemTime>>>,
+        dirty_sessions: Arc<Mutex<HashSet<String>>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         match source {
-            Source::Claude => Self::ingest_claude_streaming(cursors, callback).await,
-            Source::Codex => Self::ingest_codex_streaming(cursors, callback).await,
-            Source::OpenCode => Self::ingest_opencode_streaming(cursors, callback).await,
-            Source::Crush => Self::ingest_crush_streaming(cursors, callback).await,
+            Source::Claude => Self::ingest_claude_streaming(cursors, callback, progress, mtimes, dirty_sessions).await,
+            Source::Codex => Self::ingest_codex_streaming(cursors, callback, progress, mtimes, dirty_sessions).await,
+            Source::OpenCode => {
+                Self::ingest_opencode_streaming(cursors, callback, progress, mtimes, dirty_sessions).await
+            }
+            Source::Crush => Self::ingest_crush_streaming(cursors, callback, progress, dirty_sessions).await,
         }
     }
 
@@ -373,14 +532,38 @@ impl Watcher {
         }
     }
 
+    /// Mark a session as needing metric recomputation
+    async fn mark_dirty(dirty_sessions: &Arc<Mutex<HashSet<String>>>, session_id: &str) {
+        let mut dirty = dirty_sessions.lock().await;
+        dirty.insert(session_id.to_string());
+    }
+
     /// Ingest Claude sessions with incremental parsing and callback
     async fn ingest_claude_streaming(
         cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+        progress: Option<ProgressCallback>, mtimes: Arc<Mutex<HashMap<PathBuf, SystemTime>>>,
+        dirty_sessions: Arc<Mutex<HashSet<String>>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = ClaudeAdapter::new();
+        let session_files = adapter.discover_sessions().await;
+        let total = session_files.len();
 
-        for session_file in adapter.discover_sessions().await {
+        for (idx, session_file) in session_files.into_iter().enumerate() {
+            if let Some(ref pcb) = progress {
+                pcb(IngestProgress {
+                    source: "claude".to_string(),
+                    phase: "Ingesting sessions".to_string(),
+                    current: idx,
+                    total,
+                });
+            }
+
+            if !Self::file_changed(&session_file.path, &mtimes).await {
+                log::debug!("Skipping unchanged file: {:?}", session_file.path);
+                continue;
+            }
+
             let cursor_key = format!("claude:{}", session_file.session_id);
 
             let byte_offset = {
@@ -395,8 +578,9 @@ impl Watcher {
 
             if is_new_session {
                 if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                    let session_id = session.id.to_string();
                     let _ = db.insert_session_with_events(&session, &events).await;
-                    let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                    Self::mark_dirty(&dirty_sessions, &session_id).await;
 
                     let file_len = tokio::fs::metadata(&session_file.path)
                         .await
@@ -424,9 +608,12 @@ impl Watcher {
                 match adapter.parse_session_incremental(&session_file, byte_offset).await {
                     Ok((new_events, new_offset)) => {
                         if !new_events.is_empty() {
-                            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
-                                let _ = db.insert_session_with_events(&session, &events).await;
-                                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                            if let Ok(Some(session_id)) =
+                                db.get_session_id_by_external("claude", &session_file.session_id).await
+                            {
+                                let _ = db.append_events(&session_id, &new_events).await;
+                                let _ = db.update_session_timestamp(&session_id, &chrono::Utc::now()).await;
+                                Self::mark_dirty(&dirty_sessions, &session_id).await;
                             }
 
                             if let Some(ref cb) = callback {
@@ -445,11 +632,15 @@ impl Watcher {
                             c.insert(cursor_key, SessionCursor::ByteOffset(new_offset));
                         }
                     }
-                    Err(e) => {
-                        log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e);
-                    }
+                    Err(e) => log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e),
                 }
             }
+
+            Self::update_mtime(&session_file.path, &mtimes).await;
+        }
+
+        if let Some(ref pcb) = progress {
+            pcb(IngestProgress { source: "claude".to_string(), phase: "Complete".to_string(), current: total, total });
         }
 
         Ok(())
@@ -458,11 +649,29 @@ impl Watcher {
     /// Ingest Codex sessions with incremental parsing and callback
     async fn ingest_codex_streaming(
         cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+        progress: Option<ProgressCallback>, mtimes: Arc<Mutex<HashMap<PathBuf, SystemTime>>>,
+        dirty_sessions: Arc<Mutex<HashSet<String>>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = CodexAdapter::new();
+        let session_files = adapter.discover_sessions().await;
+        let total = session_files.len();
 
-        for session_file in adapter.discover_sessions().await {
+        for (idx, session_file) in session_files.into_iter().enumerate() {
+            if let Some(ref pcb) = progress {
+                pcb(IngestProgress {
+                    source: "codex".to_string(),
+                    phase: "Ingesting sessions".to_string(),
+                    current: idx,
+                    total,
+                });
+            }
+
+            if !Self::file_changed(&session_file.path, &mtimes).await {
+                log::debug!("Skipping unchanged file: {:?}", session_file.path);
+                continue;
+            }
+
             let cursor_key = format!("codex:{}", session_file.session_id);
 
             let byte_offset = {
@@ -477,8 +686,9 @@ impl Watcher {
 
             if is_new_session {
                 if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                    let session_id = session.id.to_string();
                     let _ = db.insert_session_with_events(&session, &events).await;
-                    let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                    Self::mark_dirty(&dirty_sessions, &session_id).await;
 
                     let file_len = tokio::fs::metadata(&session_file.path)
                         .await
@@ -506,9 +716,12 @@ impl Watcher {
                 match adapter.parse_session_incremental(&session_file, byte_offset).await {
                     Ok((new_events, new_offset)) => {
                         if !new_events.is_empty() {
-                            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
-                                let _ = db.insert_session_with_events(&session, &events).await;
-                                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                            if let Ok(Some(session_id)) =
+                                db.get_session_id_by_external("codex", &session_file.session_id).await
+                            {
+                                let _ = db.append_events(&session_id, &new_events).await;
+                                let _ = db.update_session_timestamp(&session_id, &chrono::Utc::now()).await;
+                                Self::mark_dirty(&dirty_sessions, &session_id).await;
                             }
 
                             if let Some(ref cb) = callback {
@@ -527,11 +740,15 @@ impl Watcher {
                             c.insert(cursor_key, SessionCursor::ByteOffset(new_offset));
                         }
                     }
-                    Err(e) => {
-                        log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e);
-                    }
+                    Err(e) => log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e),
                 }
             }
+
+            Self::update_mtime(&session_file.path, &mtimes).await;
+        }
+
+        if let Some(ref pcb) = progress {
+            pcb(IngestProgress { source: "codex".to_string(), phase: "Complete".to_string(), current: total, total });
         }
 
         Ok(())
@@ -540,11 +757,24 @@ impl Watcher {
     /// Ingest OpenCode sessions with incremental parsing and callback
     async fn ingest_opencode_streaming(
         cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+        progress: Option<ProgressCallback>, _mtimes: Arc<Mutex<HashMap<PathBuf, SystemTime>>>,
+        dirty_sessions: Arc<Mutex<HashSet<String>>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = OpenCodeAdapter::new();
+        let sessions_list = adapter.discover_sessions().await;
+        let total = sessions_list.len();
 
-        for session in adapter.discover_sessions().await {
+        for (idx, session) in sessions_list.into_iter().enumerate() {
+            if let Some(ref pcb) = progress {
+                pcb(IngestProgress {
+                    source: "opencode".to_string(),
+                    phase: "Ingesting sessions".to_string(),
+                    current: idx,
+                    total,
+                });
+            }
+
             let cursor_key = format!("opencode:{}", session.id);
 
             let known_files = {
@@ -559,8 +789,9 @@ impl Watcher {
 
             if is_new_session {
                 if let Ok((session_obj, events)) = adapter.parse_session(&session).await {
+                    let session_id = session_obj.id.to_string();
                     let _ = db.insert_session_with_events(&session_obj, &events).await;
-                    let _ = db.compute_session_metrics(&session_obj.id.to_string()).await;
+                    Self::mark_dirty(&dirty_sessions, &session_id).await;
 
                     let msg_dir = adapter.storage_path().join("message").join(&session.id);
                     let mut files = HashSet::new();
@@ -593,9 +824,10 @@ impl Watcher {
                 match adapter.parse_session_incremental(&session, &known_files).await {
                     Ok((new_events, new_known)) => {
                         if !new_events.is_empty() {
-                            if let Ok((session_obj, events)) = adapter.parse_session(&session).await {
-                                let _ = db.insert_session_with_events(&session_obj, &events).await;
-                                let _ = db.compute_session_metrics(&session_obj.id.to_string()).await;
+                            if let Ok(Some(session_id)) = db.get_session_id_by_external("opencode", &session.id).await {
+                                let _ = db.append_events(&session_id, &new_events).await;
+                                let _ = db.update_session_timestamp(&session_id, &chrono::Utc::now()).await;
+                                Self::mark_dirty(&dirty_sessions, &session_id).await;
                             }
 
                             if let Some(ref cb) = callback {
@@ -614,11 +846,18 @@ impl Watcher {
                             c.insert(cursor_key, SessionCursor::KnownFiles(new_known));
                         }
                     }
-                    Err(e) => {
-                        log::warn!("Incremental parse failed for {}: {}", session.id, e);
-                    }
+                    Err(e) => log::warn!("Incremental parse failed for {}: {}", session.id, e),
                 }
             }
+        }
+
+        if let Some(ref pcb) = progress {
+            pcb(IngestProgress {
+                source: "opencode".to_string(),
+                phase: "Complete".to_string(),
+                current: total,
+                total,
+            });
         }
 
         Ok(())
@@ -627,11 +866,23 @@ impl Watcher {
     /// Ingest Crush sessions with incremental parsing and callback
     async fn ingest_crush_streaming(
         cursors: Arc<Mutex<HashMap<String, SessionCursor>>>, callback: Option<EventCallback>,
+        progress: Option<ProgressCallback>, dirty_sessions: Arc<Mutex<HashSet<String>>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let db = Self::open_db().await?;
         let adapter = CrushAdapter::new();
+        let session_files = adapter.discover_sessions().await;
+        let total = session_files.len();
 
-        for session_file in adapter.discover_sessions().await {
+        for (idx, session_file) in session_files.into_iter().enumerate() {
+            if let Some(ref pcb) = progress {
+                pcb(IngestProgress {
+                    source: "crush".to_string(),
+                    phase: "Ingesting sessions".to_string(),
+                    current: idx,
+                    total,
+                });
+            }
+
             let cursor_key = format!("crush:{}", session_file.session_id);
 
             let last_created_at = {
@@ -646,8 +897,9 @@ impl Watcher {
 
             if is_new_session {
                 if let Ok((session, events)) = adapter.parse_session(&session_file).await {
+                    let session_id = session.id.to_string();
                     let _ = db.insert_session_with_events(&session, &events).await;
-                    let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                    Self::mark_dirty(&dirty_sessions, &session_id).await;
 
                     let max_ts = events
                         .iter()
@@ -682,9 +934,12 @@ impl Watcher {
                 match adapter.parse_session_incremental(&session_file, last_created_at).await {
                     Ok((new_events, new_last)) => {
                         if !new_events.is_empty() {
-                            if let Ok((session, events)) = adapter.parse_session(&session_file).await {
-                                let _ = db.insert_session_with_events(&session, &events).await;
-                                let _ = db.compute_session_metrics(&session.id.to_string()).await;
+                            if let Ok(Some(session_id)) =
+                                db.get_session_id_by_external("crush", &session_file.session_id).await
+                            {
+                                let _ = db.append_events(&session_id, &new_events).await;
+                                let _ = db.update_session_timestamp(&session_id, &chrono::Utc::now()).await;
+                                Self::mark_dirty(&dirty_sessions, &session_id).await;
                             }
 
                             if let Some(ref cb) = callback {
@@ -709,11 +964,13 @@ impl Watcher {
                             c.insert(cursor_key, SessionCursor::LastCreatedAt(new_last));
                         }
                     }
-                    Err(e) => {
-                        log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e);
-                    }
+                    Err(e) => log::warn!("Incremental parse failed for {}: {}", session_file.session_id, e),
                 }
             }
+        }
+
+        if let Some(ref pcb) = progress {
+            pcb(IngestProgress { source: "crush".to_string(), phase: "Complete".to_string(), current: total, total });
         }
 
         Ok(())

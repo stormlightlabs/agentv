@@ -28,10 +28,10 @@
 
   function getSourceBadgeClass(source: string): string {
     const classes: Record<string, string> = {
-      claude: "bg-blue text-surface",
-      codex: "bg-green text-surface",
-      opencode: "bg-purple text-surface",
-      crush: "bg-yellow text-surface",
+      claude: "bg-orange text-surface",
+      codex: "bg-surface-hard text-fg-dim",
+      opencode: "bg-surface-hard text-fg-dim",
+      crush: "bg-purple-bright text-surface",
     };
     return classes[source.toLowerCase()] || "bg-surface-muted text-fg";
   }

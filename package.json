@@ -8,7 +8,8 @@
     "dev": "pnpm --filter agent-v-gui tauri dev",
     "build": "pnpm --filter agent-v-gui build",
     "check": "pnpm -r check",
-    "format": "pnpm -r format && cargo fmt --all"
+    "format": "pnpm -r format && cargo fmt --all",
+    "tauri": "pnpm --filter agent-v-gui tauri"
   },
   "devDependencies": {
     "prettier": "^3.8.1",
