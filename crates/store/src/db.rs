@@ -1,9 +1,9 @@
 use agent_v_core::{Event, EventKind, HealthStatus, ModelMetadata, Session, Source, SourceHealth};
 use chrono::{DateTime, NaiveDate, Utc};
+use log::{error, info};
 use rusqlite::OptionalExtension;
 use std::path::PathBuf;
 use tokio_rusqlite::Connection;
-use tracing::{error, info};
 
 use crate::migrations::MIGRATIONS;
 use crate::models::{EventRow, SessionMetricsRow, SessionRow};

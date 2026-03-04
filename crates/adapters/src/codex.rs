@@ -127,14 +127,14 @@ impl CodexAdapter {
         let mut sessions = Vec::new();
 
         if !self.sessions_dir.exists() {
-            tracing::warn!("Codex sessions directory not found: {:?}", self.sessions_dir);
+            log::warn!("Codex sessions directory not found: {:?}", self.sessions_dir);
             return sessions;
         }
 
         let mut year_entries = match tokio::fs::read_dir(&self.sessions_dir).await {
             Ok(e) => e,
             Err(e) => {
-                tracing::error!("Failed to read sessions directory: {}", e);
+                log::error!("Failed to read sessions directory: {}", e);
                 return sessions;
             }
         };
@@ -150,7 +150,7 @@ impl CodexAdapter {
             let mut month_entries = match tokio::fs::read_dir(&year_path).await {
                 Ok(e) => e,
                 Err(e) => {
-                    tracing::warn!("Failed to read year directory {:?}: {}", year_path, e);
+                    log::warn!("Failed to read year directory {:?}: {}", year_path, e);
                     continue;
                 }
             };
@@ -164,7 +164,7 @@ impl CodexAdapter {
                 let mut day_entries = match tokio::fs::read_dir(&month_path).await {
                     Ok(e) => e,
                     Err(e) => {
-                        tracing::warn!("Failed to read month directory {:?}: {}", month_path, e);
+                        log::warn!("Failed to read month directory {:?}: {}", month_path, e);
                         continue;
                     }
                 };
@@ -178,7 +178,7 @@ impl CodexAdapter {
                     let mut jsonl_files = match tokio::fs::read_dir(&day_path).await {
                         Ok(f) => f,
                         Err(e) => {
-                            tracing::warn!("Failed to read day directory {:?}: {}", day_path, e);
+                            log::warn!("Failed to read day directory {:?}: {}", day_path, e);
                             continue;
                         }
                     };
@@ -210,7 +210,7 @@ impl CodexAdapter {
             }
         }
 
-        tracing::info!("Discovered {} Codex sessions", sessions.len());
+        log::info!("Discovered {} Codex sessions", sessions.len());
         sessions
     }
 
@@ -218,7 +218,7 @@ impl CodexAdapter {
     pub async fn parse_session(
         &self, session_file: &CodexSessionFile,
     ) -> Result<(Session, Vec<Event>), Box<dyn std::error::Error + Send + Sync>> {
-        tracing::debug!("Parsing session file: {:?}", session_file.path);
+        log::debug!("Parsing session file: {:?}", session_file.path);
 
         let content = tokio::fs::read_to_string(&session_file.path).await?;
         let lines: Vec<&str> = content.lines().collect();
@@ -239,7 +239,7 @@ impl CodexAdapter {
             let codex_event: CodexEvent = match serde_json::from_str(line) {
                 Ok(e) => e,
                 Err(e) => {
-                    tracing::warn!("Failed to parse line {} in {:?}: {}", idx, session_file.path, e);
+                    log::warn!("Failed to parse line {} in {:?}: {}", idx, session_file.path, e);
                     continue;
                 }
             };
@@ -290,7 +290,7 @@ impl CodexAdapter {
                     }
                 }
                 _ => {
-                    tracing::trace!("Unknown Codex event type: {}", codex_event.event_type);
+                    log::trace!("Unknown Codex event type: {}", codex_event.event_type);
                 }
             }
         }
@@ -329,7 +329,7 @@ impl CodexAdapter {
             })
             .collect();
 
-        tracing::info!(
+        log::info!(
             "Parsed Codex session {} with {} events",
             session.external_id,
             events.len()

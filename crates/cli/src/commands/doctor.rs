@@ -12,7 +12,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             println!("  Database: {}", status);
         }
         Err(e) => {
-            tracing::error!("Database check failed: {}", e);
+            log::error!("Database check failed: {}", e);
             println!("  Database: {} - {}", "FAILED".red().bold(), e);
         }
     }

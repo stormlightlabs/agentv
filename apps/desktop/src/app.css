@@ -3,31 +3,31 @@
 @plugin "@egoist/tailwindcss-icons";
 
 @theme {
-  /* Gruvbox Dark Colors */
+  /* Spacemacs Base16 Dark Colors */
   --color-surface: #282828;
-  --color-surface-soft: #32302f;
-  --color-surface-muted: #3c3836;
-  --color-surface-hard: #1d2021;
+  --color-surface-soft: #444155;
+  --color-surface-muted: #585858;
+  --color-surface-hard: #1f2022;
 
-  --color-fg: #ebdbb2;
-  --color-fg-dim: #a89984;
-  --color-fg-muted: #928374;
+  --color-fg: #e8e8e8;
+  --color-fg-dim: #a3a3a3;
+  --color-fg-muted: #b8b8b8;
 
-  /* Gruvbox Accents */
-  --color-red: #cc241d;
-  --color-red-bright: #fb4934;
-  --color-green: #98971a;
-  --color-green-bright: #b8bb26;
-  --color-yellow: #d79921;
-  --color-yellow-bright: #fabd2f;
-  --color-blue: #458588;
-  --color-blue-bright: #83a598;
-  --color-purple: #b16286;
-  --color-purple-bright: #d3869b;
-  --color-aqua: #689d6a;
-  --color-aqua-bright: #8ec07c;
-  --color-orange: #d65d0e;
-  --color-orange-bright: #fe8019;
+  /* Spacemacs Base16 Accents */
+  --color-red: #f2241f;
+  --color-red-bright: #f2241f;
+  --color-green: #67b11d;
+  --color-green-bright: #67b11d;
+  --color-yellow: #b1951d;
+  --color-yellow-bright: #b1951d;
+  --color-blue: #4f97d7;
+  --color-blue-bright: #4f97d7;
+  --color-purple: #a31db1;
+  --color-purple-bright: #a31db1;
+  --color-aqua: #2d9574;
+  --color-aqua-bright: #2d9574;
+  --color-orange: #ffa500;
+  --color-orange-bright: #ffa500;
 
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 

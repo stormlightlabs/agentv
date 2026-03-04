@@ -207,7 +207,7 @@ impl OpenCodeAdapter {
     /// Discover all OpenCode sessions from storage
     pub async fn discover_sessions(&self) -> Vec<OpenCodeSession> {
         if !self.is_available() {
-            tracing::debug!("OpenCode storage not found at {:?}", self.storage_path);
+            log::debug!("OpenCode storage not found at {:?}", self.storage_path);
             return Vec::new();
         }
 
@@ -241,12 +241,12 @@ impl OpenCodeAdapter {
 
                 match self.parse_session_file(&path).await {
                     Ok(session) => sessions.push(session),
-                    Err(e) => tracing::warn!("Failed to parse session file {:?}: {}", path, e),
+                    Err(e) => log::warn!("Failed to parse session file {:?}: {}", path, e),
                 }
             }
         }
 
-        tracing::info!("Discovered {} OpenCode sessions", sessions.len());
+        log::info!("Discovered {} OpenCode sessions", sessions.len());
         sessions
     }
 
@@ -274,7 +274,7 @@ impl OpenCodeAdapter {
     pub async fn parse_session(
         &self, session: &OpenCodeSession,
     ) -> Result<(Session, Vec<Event>), Box<dyn std::error::Error + Send + Sync>> {
-        tracing::debug!("Parsing OpenCode session: {}", session.id);
+        log::debug!("Parsing OpenCode session: {}", session.id);
 
         let session_path = self.find_session_file(&session.id).await?;
         let session_content = tokio::fs::read_to_string(&session_path).await?;
@@ -352,7 +352,7 @@ impl OpenCodeAdapter {
             }
         }
 
-        tracing::info!(
+        log::info!(
             "Parsed session {} with {} events",
             session_obj.external_id,
             events.len()
@@ -413,7 +413,7 @@ impl OpenCodeAdapter {
                         messages.push(message);
                     }
                 }
-                Err(e) => tracing::warn!("Failed to read message file {:?}: {}", path, e),
+                Err(e) => log::warn!("Failed to read message file {:?}: {}", path, e),
             }
         }
 
@@ -451,7 +451,7 @@ impl OpenCodeAdapter {
                         parts.push(part);
                     }
                 }
-                Err(e) => tracing::warn!("Failed to read part file {:?}: {}", path, e),
+                Err(e) => log::warn!("Failed to read part file {:?}: {}", path, e),
             }
         }
 

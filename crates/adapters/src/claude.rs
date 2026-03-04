@@ -104,14 +104,14 @@ impl ClaudeAdapter {
         let mut sessions = Vec::new();
 
         if !self.projects_dir.exists() {
-            tracing::warn!("Claude projects directory not found: {:?}", self.projects_dir);
+            log::warn!("Claude projects directory not found: {:?}", self.projects_dir);
             return sessions;
         }
 
         let mut entries = match tokio::fs::read_dir(&self.projects_dir).await {
             Ok(e) => e,
             Err(e) => {
-                tracing::error!("Failed to read projects directory: {}", e);
+                log::error!("Failed to read projects directory: {}", e);
                 return sessions;
             }
         };
@@ -131,7 +131,7 @@ impl ClaudeAdapter {
             let mut jsonl_files = match tokio::fs::read_dir(&project_path).await {
                 Ok(f) => f,
                 Err(e) => {
-                    tracing::warn!("Failed to read project directory {:?}: {}", project_path, e);
+                    log::warn!("Failed to read project directory {:?}: {}", project_path, e);
                     continue;
                 }
             };
@@ -150,7 +150,7 @@ impl ClaudeAdapter {
             }
         }
 
-        tracing::info!("Discovered {} Claude Code sessions", sessions.len());
+        log::info!("Discovered {} Claude Code sessions", sessions.len());
         sessions
     }
 
@@ -158,7 +158,7 @@ impl ClaudeAdapter {
     pub async fn parse_session(
         &self, session_file: &ClaudeSessionFile,
     ) -> Result<(Session, Vec<Event>), Box<dyn std::error::Error + Send + Sync>> {
-        tracing::debug!("Parsing session file: {:?}", session_file.path);
+        log::debug!("Parsing session file: {:?}", session_file.path);
 
         let content = tokio::fs::read_to_string(&session_file.path).await?;
         let lines: Vec<&str> = content.lines().collect();
@@ -177,7 +177,7 @@ impl ClaudeAdapter {
             let value: serde_json::Value = match serde_json::from_str(line) {
                 Ok(v) => v,
                 Err(e) => {
-                    tracing::warn!("Failed to parse line {} in {:?}: {}", idx, session_file.path, e);
+                    log::warn!("Failed to parse line {} in {:?}: {}", idx, session_file.path, e);
                     continue;
                 }
             };
@@ -240,7 +240,7 @@ impl ClaudeAdapter {
             })
             .collect();
 
-        tracing::info!("Parsed session {} with {} events", session.external_id, events.len());
+        log::info!("Parsed session {} with {} events", session.external_id, events.len());
 
         Ok((session, events))
     }

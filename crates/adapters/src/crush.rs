@@ -219,12 +219,12 @@ impl CrushAdapter {
         let home_dir = match dirs::home_dir() {
             Some(home) => home,
             None => {
-                tracing::warn!("Could not determine home directory");
+                log::warn!("Could not determine home directory");
                 return sessions;
             }
         };
 
-        tracing::info!("Searching for Crush databases in: {:?}", home_dir);
+        log::info!("Searching for Crush databases in: {:?}", home_dir);
 
         let db_paths: Vec<PathBuf> = WalkDir::new(&home_dir)
             .max_depth(6)
@@ -250,26 +250,26 @@ impl CrushAdapter {
             .map(|e| e.path().to_path_buf())
             .collect();
 
-        tracing::info!("Found {} Crush database(s)", db_paths.len());
+        log::info!("Found {} Crush database(s)", db_paths.len());
 
         sessions = db_paths
             .into_par_iter()
             .flat_map(|db_path| {
-                tracing::debug!("Processing Crush database: {:?}", db_path);
+                log::debug!("Processing Crush database: {:?}", db_path);
                 match self.discover_sessions_in_db(&db_path) {
                     Ok(found) => {
-                        tracing::debug!("Found {} sessions in {:?}", found.len(), db_path);
+                        log::debug!("Found {} sessions in {:?}", found.len(), db_path);
                         found
                     }
                     Err(e) => {
-                        tracing::warn!("Failed to read database {:?}: {}", db_path, e);
+                        log::warn!("Failed to read database {:?}: {}", db_path, e);
                         Vec::new()
                     }
                 }
             })
             .collect();
 
-        tracing::info!("Discovered {} total Crush sessions", sessions.len());
+        log::info!("Discovered {} total Crush sessions", sessions.len());
         sessions
     }
 
@@ -284,7 +284,7 @@ impl CrushAdapter {
         let has_sessions: i64 = conn.query_row(CHECK_SESSIONS_TABLE, [], |row| row.get(0)).unwrap_or(0);
 
         if has_sessions == 0 {
-            tracing::warn!("No sessions table found in database: {:?}", db_path);
+            log::warn!("No sessions table found in database: {:?}", db_path);
             return Ok(sessions);
         }
 
@@ -304,7 +304,7 @@ impl CrushAdapter {
     pub async fn parse_session(
         &self, session_file: &CrushSessionFile,
     ) -> Result<(Session, Vec<Event>), Box<dyn std::error::Error + Send + Sync>> {
-        tracing::debug!(
+        log::debug!(
             "Parsing Crush session: {} from {:?}",
             session_file.session_id,
             session_file.path
@@ -360,7 +360,7 @@ impl CrushAdapter {
             })
             .collect();
 
-        tracing::info!(
+        log::info!(
             "Parsed Crush session {} with {} events",
             session.external_id,
             events.len()

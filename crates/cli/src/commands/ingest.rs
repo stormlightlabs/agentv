@@ -16,7 +16,7 @@ pub async fn run(source: Option<String>, watch: bool) -> Result<(), Box<dyn std:
     match source {
         Some(src) => {
             let source = Source::from_str(&src)?;
-            tracing::info!("Ingesting from source: {}", source);
+            log::info!("Ingesting from source: {}", source);
             println!("{} {}", "Ingesting from:".bold(), src.cyan());
 
             match source {
@@ -75,11 +75,11 @@ async fn run_watch_mode(source: Option<String>) -> Result<(), Box<dyn std::error
             println!("  {} Watch mode stopped", "✓".green());
         }
         Ok(Err(e)) => {
-            tracing::error!("Watch error: {}", e);
+            log::error!("Watch error: {}", e);
             println!("  {} Watch error: {}", "✗".red(), e);
         }
         Err(e) => {
-            tracing::error!("Task panicked: {}", e);
+            log::error!("Task panicked: {}", e);
             println!("  {} Watch task panicked: {}", "✗".red(), e);
         }
     }
@@ -121,13 +121,13 @@ async fn ingest_claude(db: &Database) -> Result<(), Box<dyn std::error::Error>> 
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    tracing::error!("Failed to insert session {}: {}", session.external_id, e);
+                    log::error!("Failed to insert session {}: {}", session.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                tracing::error!("Failed to parse session {:?}: {}", session_file.path, e);
+                log::error!("Failed to parse session {:?}: {}", session_file.path, e);
                 failed += 1;
             }
         }
@@ -181,13 +181,13 @@ async fn ingest_codex(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    tracing::error!("Failed to insert session {}: {}", session.external_id, e);
+                    log::error!("Failed to insert session {}: {}", session.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                tracing::error!("Failed to parse session {:?}: {}", session_file.path, e);
+                log::error!("Failed to parse session {:?}: {}", session_file.path, e);
                 failed += 1;
             }
         }
@@ -254,13 +254,13 @@ async fn ingest_opencode(db: &Database) -> Result<(), Box<dyn std::error::Error>
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    tracing::error!("Failed to insert session {}: {}", session_obj.external_id, e);
+                    log::error!("Failed to insert session {}: {}", session_obj.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                tracing::error!("Failed to parse session {}: {}", session.id, e);
+                log::error!("Failed to parse session {}: {}", session.id, e);
                 failed += 1;
             }
         }
@@ -310,13 +310,13 @@ async fn ingest_crush(db: &Database) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(e) => {
                     println!("{} {}", "✗".red(), e.to_string().dimmed());
-                    tracing::error!("Failed to insert session {}: {}", session.external_id, e);
+                    log::error!("Failed to insert session {}: {}", session.external_id, e);
                     failed += 1;
                 }
             },
             Err(e) => {
                 println!("{} {}", "✗".red(), e.to_string().dimmed());
-                tracing::error!("Failed to parse session {:?}: {}", session_file.path, e);
+                log::error!("Failed to parse session {:?}: {}", session_file.path, e);
                 failed += 1;
             }
         }

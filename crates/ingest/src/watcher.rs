@@ -71,27 +71,27 @@ impl Watcher {
 
         for path in &claude_paths {
             if path.exists() {
-                tracing::info!("Watching claude path: {:?}", path);
+                log::info!("Watching claude path: {:?}", path);
                 if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
-                    tracing::warn!("Failed to watch claude path {:?}: {}", path, e);
+                    log::warn!("Failed to watch claude path {:?}: {}", path, e);
                 }
             }
         }
 
         for path in &codex_paths {
             if path.exists() {
-                tracing::info!("Watching codex path: {:?}", path);
+                log::info!("Watching codex path: {:?}", path);
                 if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
-                    tracing::warn!("Failed to watch codex path {:?}: {}", path, e);
+                    log::warn!("Failed to watch codex path {:?}: {}", path, e);
                 }
             }
         }
 
         for path in &opencode_paths {
             if path.exists() {
-                tracing::info!("Watching opencode path: {:?}", path);
+                log::info!("Watching opencode path: {:?}", path);
                 if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
-                    tracing::warn!("Failed to watch opencode path {:?}: {}", path, e);
+                    log::warn!("Failed to watch opencode path {:?}: {}", path, e);
                 }
             }
         }
@@ -120,7 +120,7 @@ impl Watcher {
 
                         for source_str in ready {
                             pending_events.remove(&source_str);
-                            tracing::info!("Ingesting from {} due to file change", source_str);
+                            log::info!("Ingesting from {} due to file change", source_str);
 
                             let source = match source_str.as_str() {
                                 "claude" => Some(Source::Claude),
@@ -132,7 +132,7 @@ impl Watcher {
 
                             if let Some(src) = source {
                                 if let Err(e) = Self::ingest_source(src).await {
-                                    tracing::error!("Failed to ingest from {:?}: {}", src, e);
+                                    log::error!("Failed to ingest from {:?}: {}", src, e);
                                 } else {
                                     let mut s = stats.lock().await;
                                     s.push(IngestStats {
@@ -193,10 +193,10 @@ impl Watcher {
                     tokio::time::sleep(debounce_duration).await;
 
                     while rx.try_recv().is_ok() {
-                        tracing::debug!("Draining pending events");
+                        log::debug!("Draining pending events");
                     }
 
-                    tracing::info!("Ingesting from {:?} due to file change", source);
+                    log::info!("Ingesting from {:?} due to file change", source);
                     match Self::ingest_source(source).await {
                         Ok(_) => {
                             let mut s = stats.lock().await;
@@ -208,7 +208,7 @@ impl Watcher {
                             });
                         }
                         Err(e) => {
-                            tracing::error!("Failed to ingest from {:?}: {}", source, e);
+                            log::error!("Failed to ingest from {:?}: {}", source, e);
                         }
                     }
                 }
@@ -244,7 +244,7 @@ impl Watcher {
             }
 
             if needs_ingest {
-                tracing::info!("Crush database modified, re-ingesting");
+                log::info!("Crush database modified, re-ingesting");
                 match Self::ingest_crush().await {
                     Ok(_) => {
                         let mut s = stats.lock().await;
@@ -255,7 +255,7 @@ impl Watcher {
                             timestamp: SystemTime::now(),
                         });
                     }
-                    Err(e) => tracing::error!("Failed to ingest Crush: {}", e),
+                    Err(e) => log::error!("Failed to ingest Crush: {}", e),
                 }
             }
 
