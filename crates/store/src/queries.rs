@@ -1,33 +1,57 @@
 /// List all sessions ordered by updated_at desc
 pub const LIST_SESSIONS: &str = r#"
     SELECT
-        id,
-        source,
-        external_id,
-        project,
-        title,
-        created_at,
-        updated_at,
-        raw_payload
-    FROM sessions
-    ORDER BY updated_at DESC
+        s.id,
+        s.source,
+        s.external_id,
+        s.project,
+        COALESCE(
+            NULLIF(TRIM(s.title), ''),
+            (
+                SELECT NULLIF(TRIM(REPLACE(REPLACE(e.content, char(10), ' '), char(13), ' ')), '')
+                FROM events e
+                WHERE e.session_id = s.id
+                    AND LOWER(COALESCE(e.role, '')) = 'user'
+                    AND COALESCE(TRIM(e.content), '') <> ''
+                    AND e.content NOT LIKE '# AGENTS.md instructions for %'
+                ORDER BY e.timestamp
+                LIMIT 1
+            )
+        ) AS title,
+        s.created_at,
+        s.updated_at,
+        s.raw_payload
+    FROM sessions s
+    ORDER BY s.updated_at DESC
     LIMIT ?1 OFFSET ?2
 "#;
 
 /// List sessions with optional source filter
 pub const LIST_SESSIONS_FILTERED: &str = r#"
     SELECT
-        id,
-        source,
-        external_id,
-        project,
-        title,
-        created_at,
-        updated_at,
-        raw_payload
-    FROM sessions
-    WHERE (?1 = '' OR source = ?1)
-    ORDER BY updated_at DESC
+        s.id,
+        s.source,
+        s.external_id,
+        s.project,
+        COALESCE(
+            NULLIF(TRIM(s.title), ''),
+            (
+                SELECT NULLIF(TRIM(REPLACE(REPLACE(e.content, char(10), ' '), char(13), ' ')), '')
+                FROM events e
+                WHERE e.session_id = s.id
+                    AND LOWER(COALESCE(e.role, '')) = 'user'
+                    AND COALESCE(TRIM(e.content), '') <> ''
+                    AND e.content NOT LIKE '# AGENTS.md instructions for %'
+                ORDER BY e.timestamp
+                LIMIT 1
+            )
+        ) AS title,
+        s.created_at,
+        s.updated_at,
+        s.raw_payload
+    FROM sessions s
+    WHERE (?1 = '' OR s.source = ?1)
+    ORDER BY s.updated_at DESC
     LIMIT ?2 OFFSET ?3
 "#;
 

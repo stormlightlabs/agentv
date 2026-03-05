@@ -2,6 +2,7 @@
   import Modal from "$lib/components/Modal.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
   import type { SessionData } from "$lib/types";
+  import { getDisplayExternalId, getDisplayProject, getDisplaySessionTitle } from "$lib/utils/sessionDisplay";
 
   type Props = {
     open: boolean;
@@ -24,14 +25,20 @@
       toast.error("Failed to copy");
     }
   }
+
+  const displayTitle = $derived(selectedSession ? getDisplaySessionTitle(selectedSession) : "Untitled Session");
+  const displayProject = $derived(selectedSession ? getDisplayProject(selectedSession.project) : "No project");
+  const displayExternalId = $derived(
+    selectedSession ? getDisplayExternalId(selectedSession.source, selectedSession.external_id) : "unknown",
+  );
 </script>
 
 {#if selectedSession}
-  <Modal open={open} {onOpenChange} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
+  <Modal {open} {onOpenChange} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
     <div class="border-surface-muted bg-surface-soft flex items-center justify-between border-b px-6 py-4">
       <div class="flex items-center gap-3">
         <h2 class="text-fg m-0 text-xl font-semibold">
-          {selectedSession.title || "Untitled Session"}
+          {displayTitle}
         </h2>
         <span class="bg-surface-muted text-2xs text-fg-dim rounded px-2 py-0.5 uppercase">
           {selectedSession.source}
@@ -62,11 +69,11 @@
         </div>
         <div class="bg-surface-soft border-surface-muted rounded border p-3">
           <div class="text-fg-muted mb-1 text-xs">External ID</div>
-          <div class="text-fg font-mono text-xs">{selectedSession.external_id}</div>
+          <div class="text-fg font-mono text-xs">{displayExternalId}</div>
         </div>
         <div class="bg-surface-soft border-surface-muted rounded border p-3">
           <div class="text-fg-muted mb-1 text-xs">Project</div>
-          <div class="text-fg">{selectedSession.project || "No project"}</div>
+          <div class="text-fg">{displayProject}</div>
         </div>
         <div class="bg-surface-soft border-surface-muted rounded border p-3">
           <div class="text-fg-muted mb-1 text-xs">Created</div>

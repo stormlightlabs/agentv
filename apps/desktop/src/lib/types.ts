@@ -120,6 +120,7 @@ export type DataTableColumn<T = Record<string, unknown>> = {
   sortable?: boolean;
   filterable?: boolean;
   width?: string;
+  // TODO: support rendering a snippet instead of a string
   render?: (row: T) => string | { text: string; className?: string };
 };
 

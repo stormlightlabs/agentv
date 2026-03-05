@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ActivityStats, SearchFacets, SearchResult } from "$lib/types";
+  import { getDisplayProject } from "$lib/utils/sessionDisplay";
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
 
@@ -180,7 +181,7 @@
           }}>
           <option value="">All projects</option>
           {#each availableProjects as project (project)}
-            <option value={project}>{project}</option>
+            <option value={project}>{getDisplayProject(project)}</option>
           {/each}
         </select>
       </div>

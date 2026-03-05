@@ -10,6 +10,7 @@
     PatchChurnStats,
     ToolFrequencyStats,
   } from "$lib/types";
+  import { getDisplayExternalId, getDisplayProject } from "$lib/utils/sessionDisplay";
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
@@ -335,8 +336,10 @@
                 <td class="text-fg px-4 py-3 font-medium">{tool.tool_name}</td>
                 <td class="px-4 py-3 text-right">{formatDuration(tool.duration_ms)}</td>
                 <td class="text-fg-dim px-4 py-3 text-xs">{tool.started_at}</td>
-                <td class="text-fg-dim px-4 py-3 font-mono text-xs">{tool.session_external_id.slice(0, 8)}...</td>
-                <td class="text-fg-dim px-4 py-3 text-xs">{tool.project || "-"}</td>
+                <td class="text-fg-dim px-4 py-3 font-mono text-xs">
+                  {getDisplayExternalId("unknown", tool.session_external_id)}
+                </td>
+                <td class="text-fg-dim px-4 py-3 text-xs">{getDisplayProject(tool.project)}</td>
                 <td class="px-4 py-3">
                   {#if tool.error_message}
                     <span class="bg-red text-surface rounded px-2 py-0.5 text-xs">ERROR</span>

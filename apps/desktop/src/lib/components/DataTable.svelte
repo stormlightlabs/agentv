@@ -288,7 +288,7 @@
                   {/if}
                 </div>
                 <button
-                  class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                  class="hover:bg-surface-muted absolute top-0 right-0 h-full w-0.5 cursor-col-resize select-none"
                   type="button"
                   aria-label="Resize {column.header} column"
                   onclick={(event) => event.stopPropagation()}

@@ -915,7 +915,6 @@ impl OpenCodeAdapter {
             }
         }
 
-        // Track session_diff changes separately from message files.
         if let Some(diff_signature) = self.session_diff_signature(&session.id).await {
             let known_diff = known_files.iter().any(|key| Self::is_diff_key(key));
             let diff_changed = !known_files.contains(&diff_signature) || !known_diff;

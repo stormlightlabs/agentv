@@ -16,12 +16,7 @@
   import SearchPanel from "$lib/components/SearchPanel.svelte";
   import SupportPanel from "$lib/components/SupportPanel.svelte";
   import Toast from "$lib/components/Toast.svelte";
-  import {
-    bookmarkStore,
-    getBookmarkDescription,
-    getBookmarkIcon,
-    type Bookmark,
-  } from "$lib/stores/bookmarks.svelte";
+  import { bookmarkStore, getBookmarkDescription, getBookmarkIcon, type Bookmark } from "$lib/stores/bookmarks.svelte";
   import { filterStore, syncFiltersFromURL } from "$lib/stores/filters.svelte";
   import {
     handleKeyboardEvent,
@@ -33,6 +28,7 @@
   import { supportNudgeStore } from "$lib/stores/supportNudge.svelte";
   import { useNotifications } from "$lib/stores/notifications.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
+  import { getDisplayProject, getDisplaySessionTitle, getSessionSlug } from "$lib/utils/sessionDisplay";
   import type {
     EventData,
     ExportFormat,
@@ -54,8 +50,10 @@
   const notifications = useNotifications();
 
   const minSidebarWidth = 350;
-  const maxSidebarWidth = 800;
+  const maxSidebarWidth = 1200;
+  const defaultSidebarWidth = 1040;
   const minSessionViewerWidth = 520;
+  const minSessionViewerWidthEmpty = 380;
   const narrowLayoutBreakpoint = 1180;
 
   let unlistenAgentEvents: UnlistenFn | null = null;
@@ -68,7 +66,7 @@
   let showSessionListDrawer = $state(false);
   let showTopFilters = $state(false);
 
-  let sidebarWidth = $state(500);
+  let sidebarWidth = $state(defaultSidebarWidth);
   let isResizing = $state(false);
   let isNarrowLayout = $state(false);
 
@@ -274,7 +272,11 @@
 
   function handleWindowResize() {
     isNarrowLayout = window.innerWidth < narrowLayoutBreakpoint;
-    const sidebarMaxForViewport = Math.max(minSidebarWidth, Math.min(maxSidebarWidth, window.innerWidth - minSessionViewerWidth));
+    const minViewerWidth = selectedSession ? minSessionViewerWidth : minSessionViewerWidthEmpty;
+    const sidebarMaxForViewport = Math.max(
+      minSidebarWidth,
+      Math.min(maxSidebarWidth, window.innerWidth - minViewerWidth),
+    );
     sidebarWidth = Math.min(sidebarWidth, sidebarMaxForViewport);
     if (!isNarrowLayout) {
       showSessionListDrawer = false;
@@ -294,7 +296,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `session-${selectedSession.external_id.slice(0, 8)}.${format}`;
+      a.download = `session-${getSessionSlug(selectedSession.source, selectedSession.external_id)}.${format}`;
       document.body.append(a);
       a.click();
       a.remove();
@@ -307,6 +309,11 @@
 
   async function selectSession(session: SessionData) {
     selectedSession = session;
+    const sidebarMaxForViewport = Math.max(
+      minSidebarWidth,
+      Math.min(maxSidebarWidth, window.innerWidth - minSessionViewerWidth),
+    );
+    sidebarWidth = Math.min(sidebarWidth, sidebarMaxForViewport);
     filterStore.setFilter("sessionId", session.id);
     showSessionListDrawer = false;
     try {
@@ -328,7 +335,11 @@
   function handleResize(e: MouseEvent) {
     if (!isResizing || isNarrowLayout) return;
     const newWidth = e.clientX;
-    const sidebarMaxForViewport = Math.max(minSidebarWidth, Math.min(maxSidebarWidth, window.innerWidth - minSessionViewerWidth));
+    const minViewerWidth = selectedSession ? minSessionViewerWidth : minSessionViewerWidthEmpty;
+    const sidebarMaxForViewport = Math.max(
+      minSidebarWidth,
+      Math.min(maxSidebarWidth, window.innerWidth - minViewerWidth),
+    );
     if (newWidth >= minSidebarWidth && newWidth <= sidebarMaxForViewport) {
       sidebarWidth = newWidth;
     }
@@ -351,7 +362,14 @@
       }
       case "ArrowRight": {
         event.preventDefault();
-        sidebarWidth = Math.min(maxSidebarWidth, sidebarWidth + step);
+        {
+          const minViewerWidth = selectedSession ? minSessionViewerWidth : minSessionViewerWidthEmpty;
+          const sidebarMaxForViewport = Math.max(
+            minSidebarWidth,
+            Math.min(maxSidebarWidth, window.innerWidth - minViewerWidth),
+          );
+          sidebarWidth = Math.min(sidebarMaxForViewport, sidebarWidth + step);
+        }
 
         break;
       }
@@ -363,11 +381,17 @@
       }
       case "End": {
         event.preventDefault();
-        sidebarWidth = maxSidebarWidth;
+        {
+          const minViewerWidth = selectedSession ? minSessionViewerWidth : minSessionViewerWidthEmpty;
+          const sidebarMaxForViewport = Math.max(
+            minSidebarWidth,
+            Math.min(maxSidebarWidth, window.innerWidth - minViewerWidth),
+          );
+          sidebarWidth = sidebarMaxForViewport;
+        }
 
         break;
       }
-      // No default
     }
   }
 
@@ -477,9 +501,9 @@
   function bookmarkCurrentSession() {
     if (selectedSession) {
       bookmarkStore.add({
-        name: selectedSession.title || selectedSession.external_id.slice(0, 8),
+        name: getDisplaySessionTitle(selectedSession),
         type: "session",
-        description: selectedSession.project || undefined,
+        description: selectedSession.project ? getDisplayProject(selectedSession.project) : undefined,
         data: { sessionId: selectedSession.id },
       });
       toast.success("Session bookmarked");
@@ -782,8 +806,8 @@
         events = [...events, ...payload.events];
       }
 
-      // Avoid spamming toasts for the exact session the user is actively viewing.
-      const shouldNotifyEvent = !payload.is_new_session && payload.events.length > 0 && (!isCurrentSession || !notifications.windowFocused);
+      const shouldNotifyEvent =
+        !payload.is_new_session && payload.events.length > 0 && (!isCurrentSession || !notifications.windowFocused);
       if (shouldNotifyEvent) {
         const lastEvent = payload.events.at(-1)!;
         const summary = (lastEvent.content ?? lastEvent.kind).slice(0, 80);

@@ -2,6 +2,7 @@
   import DataTable from "$lib/components/DataTable.svelte";
   import { bookmarkStore } from "$lib/stores/bookmarks.svelte";
   import type { DataTableColumn, DataTableRowAction, SessionData } from "$lib/types";
+  import { getDisplayProject, getDisplaySessionTitle } from "$lib/utils/sessionDisplay";
   import { SvelteSet } from "svelte/reactivity";
   import { fly } from "svelte/transition";
 
@@ -23,23 +24,31 @@
   }
 
   function getSessionTitle(session: SessionData): string {
-    return session.title || session.external_id.slice(0, 8) || "Untitled";
+    return getDisplaySessionTitle(session);
   }
 
   function getProjectName(session: SessionData): string {
-    if (!session.project) return "No project";
-    const parts = session.project.split("-");
-    return parts.at(-1) ?? session.project;
+    return getDisplayProject(session.project);
   }
 
   function getSourceBadgeClass(source: string): string {
-    const classes: Record<string, string> = {
-      claude: "bg-orange-bright text-white",
-      codex: "bg-surface-hard text-fg-dim",
-      opencode: "bg-surface-hard text-fg-dim",
-      crush: "bg-purple-bright text-surface",
-    };
-    return classes[source.toLowerCase()] || "bg-surface-muted text-fg";
+    switch (source.toLowerCase()) {
+      case "claude": {
+        return "font-mono bg-orange-bright text-white";
+      }
+      case "codex": {
+        return "font-mono bg-surface-hard text-fg-dim";
+      }
+      case "opencode": {
+        return "font-mono bg-surface-hard text-fg-dim";
+      }
+      case "crush": {
+        return "font-mono bg-purple-bright text-surface";
+      }
+      default: {
+        return "font-mono bg-surface-muted text-fg";
+      }
+    }
   }
 
   let pinnedSessionIds = $derived.by(() => {
@@ -86,7 +95,7 @@
       width: "100px",
       render: (row) => ({
         text: row.source,
-        className: `text-2xs uppercase px-1.5 py-0.5 rounded shrink-0 ${getSourceBadgeClass(row.source)}`,
+        className: `text-center text-2xs uppercase px-1.5 py-0.5 rounded shrink-0 ${getSourceBadgeClass(row.source)}`,
       }),
     },
     { key: "project", header: "Project", filterable: true, render: (row) => getProjectName(row) },
