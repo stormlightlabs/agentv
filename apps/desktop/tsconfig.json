@@ -10,5 +10,15 @@
     "sourceMap": true,
     "strict": true,
     "moduleResolution": "bundler"
-  }
+  },
+  "include": [
+    "./eslint.config.js",
+    "./src/**/*.svelte",
+    "./src/**/*.ts",
+    "./src/**/*.js",
+    "./src/**/*.svelte.ts",
+    "./src/**/*.svelte.js",
+    "./vite.config.ts",
+    "./svelte.config.js"
+  ]
 }

@@ -459,6 +459,27 @@ pub async fn get_session_metrics(
     }))
 }
 
+/// Get lightweight metrics for session-list filtering
+#[tauri::command]
+pub async fn list_session_metrics(
+    db: State<'_, Database>, limit: Option<i64>, offset: Option<i64>,
+) -> Result<Vec<models::SessionListMetricsData>, String> {
+    let rows = db
+        .get_sessions_with_metrics(limit.unwrap_or(2000), offset.unwrap_or(0))
+        .await
+        .map_err(|e| format!("Failed to list session metrics: {}", e))?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(session, metrics)| models::SessionListMetricsData {
+            session_id: session.id,
+            error_count: metrics.as_ref().map_or(0, |m| m.error_count),
+            lines_added: metrics.as_ref().map_or(0, |m| m.lines_added),
+            lines_removed: metrics.as_ref().map_or(0, |m| m.lines_removed),
+        })
+        .collect())
+}
+
 /// Get cost stats by source
 #[tauri::command]
 pub async fn get_cost_stats_by_source(

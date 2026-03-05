@@ -197,7 +197,7 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden">
-  <header class="px-6 py-4 bg-surface-soft border-b border-surface-muted flex justify-between items-start gap-4">
+  <header class="sticky top-0 z-20 px-6 py-4 bg-surface-soft border-b border-surface-muted flex justify-between items-start gap-4">
     <div class="flex-1 min-w-0">
       <h2 class="m-0 mb-2 text-xl font-semibold text-fg overflow-hidden text-ellipsis whitespace-nowrap">
         {session.title || "Untitled Session"}

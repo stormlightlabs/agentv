@@ -317,17 +317,17 @@ just list
 
 **Tasks:**
 
-- [ ] Move mode tabs (Sessions/Search/Analytics/Status/Support) from sidebar to top app bar as primary navigation
-- [ ] Move source toggles (All/Claude/Codex/OpenCode/Crush) to top bar as a segmented scope control
-- [ ] Move refresh/auto-refresh, export, and command palette entrypoint to top bar
-- [ ] Move global search and filter chips (date, has-diff, errors) to top bar
-- [ ] Simplify sidebar filters to list-level only: title, project, sort/pin, pagination (remove source filter from sidebar)
-- [ ] Make Search and Analytics full-screen top-level modes (cross-session operations)
-- [ ] Add collapsible top filter panel so filters/facets can expand on demand without overwhelming the main view
-- [ ] Make session detail right-pane header sticky (Live/Details/.md/.json/.jsonl toggles) with scrolling timeline beneath
-- [ ] Add empty-state guidance for detail pane: keyboard hints (Cmd+K), search prompt, "Live" follow link
-- [ ] Add responsive collapse behavior: narrow window collapses session list into overlay drawer
-- [ ] Verify layout against Apple HIG toolbar/sidebar/split-view and Material responsive navigation patterns
+- [x] Move mode tabs (Sessions/Search/Analytics/Status/Support) from sidebar to top app bar as primary navigation
+- [x] Move source toggles (All/Claude/Codex/OpenCode/Crush) to top bar as a segmented scope control
+- [x] Move refresh/auto-refresh, export, and command palette entrypoint to top bar
+- [x] Move global search and filter chips (date, has-diff, errors) to top bar
+- [x] Simplify sidebar filters to list-level only: title, project, sort/pin, pagination (remove source filter from sidebar)
+- [x] Make Search and Analytics full-screen top-level modes (cross-session operations)
+- [x] Add collapsible top filter panel so filters/facets can expand on demand without overwhelming the main view
+- [x] Make session detail right-pane header sticky (Live/Details/.md/.json/.jsonl toggles) with scrolling timeline beneath
+- [x] Add empty-state guidance for detail pane: keyboard hints (Cmd+K), search prompt, "Live" follow link
+- [x] Add responsive collapse behavior: narrow window collapses session list into overlay drawer
+- [x] Verify layout against Apple HIG toolbar/sidebar/split-view and Material responsive navigation patterns
 
 **References:**
 

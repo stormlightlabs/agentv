@@ -1,6 +1,8 @@
 <script lang="ts">
   import DataTable from "$lib/components/DataTable.svelte";
+  import { bookmarkStore } from "$lib/stores/bookmarks.svelte";
   import type { DataTableColumn, SessionData } from "$lib/types";
+  import { SvelteSet } from "svelte/reactivity";
   import { fly } from "svelte/transition";
 
   type Props = {
@@ -10,6 +12,10 @@
   };
 
   let { sessions, selectedSession, onSelect }: Props = $props();
+  let sortBy = $state<"updated_at" | "created_at" | "title">("updated_at");
+  let sortDirection = $state<"asc" | "desc">("desc");
+  let pinnedFirst = $state(true);
+  let pinnedOnly = $state(false);
 
   function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
@@ -23,7 +29,7 @@
   function getProjectName(session: SessionData): string {
     if (!session.project) return "No project";
     const parts = session.project.split("-");
-    return parts[parts.length - 1] || session.project;
+    return parts.at(-1) ?? session.project;
   }
 
   function getSourceBadgeClass(source: string): string {
@@ -36,37 +42,101 @@
     return classes[source.toLowerCase()] || "bg-surface-muted text-fg";
   }
 
+  let pinnedSessionIds = $derived.by(() => {
+    const ids = new SvelteSet<string>();
+    for (const bookmark of bookmarkStore.bookmarks) {
+      if (bookmark.type === "session" && bookmark.data.sessionId) {
+        ids.add(bookmark.data.sessionId);
+      }
+    }
+    return ids;
+  });
+
+  let sortedSessions = $derived.by(() => {
+    const rows = pinnedOnly ? sessions.filter((session) => pinnedSessionIds.has(session.id)) : [...sessions];
+
+    rows.sort((a, b) => {
+      let aValue: string;
+      let bValue: string;
+
+      if (sortBy === "title") {
+        aValue = getSessionTitle(a).toLowerCase();
+        bValue = getSessionTitle(b).toLowerCase();
+      } else {
+        aValue = a[sortBy];
+        bValue = b[sortBy];
+      }
+
+      const comparison = aValue.localeCompare(bValue);
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    if (pinnedFirst) {
+      rows.sort((a, b) => Number(pinnedSessionIds.has(b.id)) - Number(pinnedSessionIds.has(a.id)));
+    }
+
+    return rows;
+  });
+
   const columns: DataTableColumn<SessionData>[] = [
-    { key: "title", header: "Title", sortable: true, filterable: true, render: (row) => getSessionTitle(row) },
+    { key: "title", header: "Title", filterable: true, render: (row) => getSessionTitle(row) },
     {
       key: "source",
       header: "Source",
-      sortable: true,
-      filterable: true,
       width: "100px",
       render: (row) => ({
         text: row.source,
         className: `text-2xs uppercase px-1.5 py-0.5 rounded shrink-0 ${getSourceBadgeClass(row.source)}`,
       }),
     },
-    { key: "project", header: "Project", sortable: true, filterable: true, render: (row) => getProjectName(row) },
-    {
-      key: "updated_at",
-      header: "Updated",
-      sortable: true,
-      width: "120px",
-      render: (row) => formatDate(row.updated_at),
-    },
+    { key: "project", header: "Project", filterable: true, render: (row) => getProjectName(row) },
+    { key: "updated_at", header: "Updated", width: "120px", render: (row) => formatDate(row.updated_at) },
   ];
 </script>
 
-<div class="flex flex-col h-full overflow-hidden" in:fly={{ y: 10, duration: 200 }}>
-  <div class="px-4 py-2 border-b border-surface-muted flex justify-between items-center bg-surface-soft">
-    <span class="text-xs text-fg-muted">{sessions.length} sessions</span>
+<div class="flex h-full flex-col overflow-hidden" in:fly={{ y: 10, duration: 200 }}>
+  <div class="border-surface-muted bg-surface-soft space-y-2 border-b px-4 py-3">
+    <div class="flex items-center justify-between">
+      <span class="text-fg-muted text-xs">{sortedSessions.length} sessions</span>
+      <span class="text-fg-dim text-xs">{pinnedSessionIds.size} pinned</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <label class="text-fg-dim flex items-center gap-1 text-xs">
+        <span>Sort</span>
+        <select class="bg-surface border-surface-muted text-fg rounded border px-2 py-1 text-xs" bind:value={sortBy}>
+          <option value="updated_at">Updated</option>
+          <option value="created_at">Created</option>
+          <option value="title">Title</option>
+        </select>
+      </label>
+      <button
+        class="bg-surface border-surface-muted text-fg-dim hover:text-fg rounded border px-2 py-1 text-xs"
+        onclick={() => (sortDirection = sortDirection === "asc" ? "desc" : "asc")}
+        type="button"
+        title="Toggle sort direction">
+        {sortDirection === "asc" ? "Asc" : "Desc"}
+      </button>
+      <button
+        class="rounded border px-2 py-1 text-xs transition-colors {pinnedFirst
+          ? 'bg-blue/15 border-blue text-blue'
+          : 'bg-surface border-surface-muted text-fg-dim hover:text-fg'}"
+        onclick={() => (pinnedFirst = !pinnedFirst)}
+        type="button">
+        Pinned first
+      </button>
+      <button
+        class="rounded border px-2 py-1 text-xs transition-colors {pinnedOnly
+          ? 'bg-blue/15 border-blue text-blue'
+          : 'bg-surface border-surface-muted text-fg-dim hover:text-fg'}"
+        onclick={() => (pinnedOnly = !pinnedOnly)}
+        type="button">
+        Pinned only
+      </button>
+    </div>
   </div>
 
   <DataTable
-    data={sessions}
+    data={sortedSessions}
     {columns}
     keyExtractor={(row) => row.id}
     pageSize={100}

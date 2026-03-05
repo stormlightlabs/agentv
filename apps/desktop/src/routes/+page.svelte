@@ -5,6 +5,7 @@
   import AnalyticsPanel from "$lib/components/AnalyticsPanel.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
   import Dialog from "$lib/components/Dialog.svelte";
+  import Drawer from "$lib/components/Drawer.svelte";
   import EventInspector from "$lib/components/EventInspector.svelte";
   import IngestStatusPanel from "$lib/components/IngestStatusPanel.svelte";
   import Modal from "$lib/components/Modal.svelte";
@@ -22,7 +23,7 @@
     getBookmarkIcon,
     type Bookmark,
   } from "$lib/stores/bookmarks.svelte";
-  import { filterStore, syncFiltersFromURL, updateURLFromFilters } from "$lib/stores/filters.svelte";
+  import { filterStore, syncFiltersFromURL } from "$lib/stores/filters.svelte";
   import {
     handleKeyboardEvent,
     keyboardStore,
@@ -33,31 +34,71 @@
   import { supportNudgeStore } from "$lib/stores/supportNudge.svelte";
   import { useNotifications } from "$lib/stores/notifications.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
-  import type { EventData, IngestProgress, IngestResult, SessionData, StreamingEventPayload } from "$lib/types";
+  import type {
+    EventData,
+    ExportFormat,
+    IngestProgress,
+    IngestResult,
+    SessionData,
+    SessionListMetricsData,
+    StreamingEventPayload,
+  } from "$lib/types";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { onDestroy, onMount } from "svelte";
   import { fade, slide } from "svelte/transition";
 
   type Tab = "sessions" | "search" | "analytics" | "status" | "support";
+
   const toast = useToast();
   const notifications = useNotifications();
+
+  const tabs: Array<{ id: Tab; label: string; icon: string }> = [
+    { id: "sessions", label: "Sessions", icon: "i-ri-chat-3-line" },
+    { id: "search", label: "Search", icon: "i-ri-search-line" },
+    { id: "analytics", label: "Analytics", icon: "i-ri-bar-chart-line" },
+    { id: "status", label: "Status", icon: "i-ri-heart-pulse-line" },
+    { id: "support", label: "Support", icon: "i-ri-heart-line" },
+  ];
+
+  const dateRanges = [
+    { label: "All time", value: "" },
+    { label: "Last 24h", value: "1d" },
+    { label: "Last 7d", value: "7d" },
+    { label: "Last 30d", value: "30d" },
+    { label: "Last 90d", value: "90d" },
+  ];
+
+  const sources = [
+    { id: "claude", name: "Claude" },
+    { id: "codex", name: "Codex" },
+    { id: "opencode", name: "OpenCode" },
+    { id: "crush", name: "Crush" },
+  ];
+
+  const minSidebarWidth = 350;
+  const maxSidebarWidth = 800;
+  const narrowLayoutBreakpoint = 1180;
+
   let unlistenAgentEvents: UnlistenFn | null = null;
   let unlistenIngestProgress: UnlistenFn | null = null;
 
   let bookmarksOpen = $state(false);
   let selectedEvent = $state<EventData | null>(null);
   let showEventInspector = $state(false);
-  let showSessionDrawer = $state(false);
+  let showSessionMetaModal = $state(false);
+  let showSessionListDrawer = $state(false);
+  let showTopFilters = $state(false);
 
   let sidebarWidth = $state(500);
   let isResizing = $state(false);
-  let minSidebarWidth = 350;
-  let maxSidebarWidth = 800;
+  let isNarrowLayout = $state(false);
 
   let sessions = $state<SessionData[]>([]);
   let selectedSession = $state<SessionData | null>(null);
   let events = $state<EventData[]>([]);
+  let sessionMetricsById = $state<Record<string, SessionListMetricsData>>({});
+
   let loading = $state(true);
   let error = $state<string | null>(null);
   let activeTab = $state<Tab>("sessions");
@@ -65,17 +106,90 @@
   let lastIngestTime = $state<Date | null>(null);
   let newSessionsAvailable = $state(false);
   let autoRefreshEnabled = $state(true);
+  let hasDiffOnly = $state(false);
+  let errorsOnly = $state(false);
+
   let refreshInterval: number | null = null;
   let showSupportNudge = $state(false);
   let ingestProgress = $state<IngestProgress | null>(null);
   let progressHideTimeout: number | null = null;
 
-  const sources = [
-    { id: "claude", name: "Claude", color: "blue" },
-    { id: "codex", name: "Codex", color: "green" },
-    { id: "opencode", name: "OpenCode", color: "purple" },
-    { id: "crush", name: "Crush", color: "yellow" },
-  ];
+  function parseRangeToMs(range: string | null): number | null {
+    if (!range) return null;
+    const value = Number.parseInt(range.slice(0, -1), 10);
+    if (Number.isNaN(value) || value <= 0) return null;
+
+    const suffix = range.slice(-1);
+    if (suffix === "h") return value * 60 * 60 * 1000;
+    if (suffix === "d") return value * 24 * 60 * 60 * 1000;
+    if (suffix === "w") return value * 7 * 24 * 60 * 60 * 1000;
+    if (suffix === "m") return value * 30 * 24 * 60 * 60 * 1000;
+    return null;
+  }
+
+  let filteredSessions = $derived.by(() => {
+    let rows = [...sessions];
+
+    if (filterStore.state.source) {
+      rows = rows.filter((session) => session.source === filterStore.state.source);
+    }
+
+    if (filterStore.state.project) {
+      const projectQuery = filterStore.state.project.toLowerCase();
+      rows = rows.filter((session) => (session.project ?? "").toLowerCase().includes(projectQuery));
+    }
+
+    if (filterStore.state.query.trim()) {
+      const query = filterStore.state.query.trim().toLowerCase();
+      rows = rows.filter((session) => {
+        return (
+          (session.title ?? "").toLowerCase().includes(query) ||
+          session.external_id.toLowerCase().includes(query) ||
+          (session.project ?? "").toLowerCase().includes(query)
+        );
+      });
+    }
+
+    const rangeMs = parseRangeToMs(filterStore.state.since);
+    if (rangeMs) {
+      const cutoff = Date.now() - rangeMs;
+      rows = rows.filter((session) => new Date(session.updated_at).getTime() >= cutoff);
+    }
+
+    if (hasDiffOnly) {
+      rows = rows.filter((session) => {
+        const metrics = sessionMetricsById[session.id];
+        return Boolean(metrics && (metrics.lines_added > 0 || metrics.lines_removed > 0));
+      });
+    }
+
+    if (errorsOnly) {
+      rows = rows.filter((session) => {
+        const metrics = sessionMetricsById[session.id];
+        return Boolean(metrics && metrics.error_count > 0);
+      });
+    }
+
+    return rows;
+  });
+
+  let latestVisibleSession = $derived.by(() => {
+    if (filteredSessions.length === 0) return null;
+    return [...filteredSessions].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null;
+  });
+
+  async function loadSessionMetrics() {
+    try {
+      const metrics = await invoke<SessionListMetricsData[]>("list_session_metrics", {
+        limit: Math.max(2000, sessions.length + 100),
+        offset: 0,
+      });
+      sessionMetricsById = Object.fromEntries(metrics.map((metric) => [metric.session_id, metric]));
+    } catch (e) {
+      console.error("Failed to load session metrics:", e);
+      sessionMetricsById = {};
+    }
+  }
 
   async function loadSessions() {
     try {
@@ -83,6 +197,7 @@
       error = null;
       sessions = await invoke<SessionData[]>("list_sessions");
       newSessionsAvailable = false;
+      await loadSessionMetrics();
     } catch (e) {
       error = String(e);
       toast.error(`Failed to load sessions: ${e}`);
@@ -131,10 +246,52 @@
     }
   }
 
+  function setSourceScope(source: string | null) {
+    filterStore.setFilter("source", source);
+  }
+
+  function clearTopFilters() {
+    filterStore.setFilter("query", "");
+    filterStore.setFilter("since", null);
+    hasDiffOnly = false;
+    errorsOnly = false;
+  }
+
+  function handleWindowResize() {
+    isNarrowLayout = window.innerWidth < narrowLayoutBreakpoint;
+    if (!isNarrowLayout) {
+      showSessionListDrawer = false;
+    }
+  }
+
+  async function exportSelectedSession(format: ExportFormat) {
+    if (!selectedSession) {
+      toast.info("Select a session before exporting");
+      return;
+    }
+
+    try {
+      const content = await invoke<string>("export_session", { sessionId: selectedSession.id, format });
+      const mime = format === "md" ? "text/markdown" : "application/json";
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `session-${selectedSession.external_id.slice(0, 8)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${format.toUpperCase()}`);
+    } catch (e) {
+      toast.error(`Failed to export session: ${e}`);
+    }
+  }
+
   async function selectSession(session: SessionData) {
     selectedSession = session;
     filterStore.setFilter("sessionId", session.id);
-    showSessionDrawer = false;
+    showSessionListDrawer = false;
     try {
       events = await invoke<EventData[]>("get_session_events", { sessionId: session.id });
       logInfo("Session selected", { sessionId: session.id, eventCount: events.length });
@@ -146,12 +303,13 @@
   }
 
   function startResizing(e: MouseEvent) {
+    if (isNarrowLayout) return;
     isResizing = true;
     e.preventDefault();
   }
 
   function handleResize(e: MouseEvent) {
-    if (!isResizing) return;
+    if (!isResizing || isNarrowLayout) return;
     const newWidth = e.clientX;
     if (newWidth >= minSidebarWidth && newWidth <= maxSidebarWidth) {
       sidebarWidth = newWidth;
@@ -163,6 +321,8 @@
   }
 
   function handleResizerKeydown(event: KeyboardEvent) {
+    if (isNarrowLayout) return;
+
     const step = 20;
     if (event.key === "ArrowLeft") {
       event.preventDefault();
@@ -183,7 +343,7 @@
     try {
       await navigator.clipboard.writeText(text);
       toast.success("Copied to clipboard");
-    } catch (e) {
+    } catch {
       toast.error("Failed to copy");
     }
   }
@@ -194,6 +354,14 @@
       await selectSession(session);
       activeTab = "sessions";
     }
+  }
+
+  async function followLatestSession() {
+    if (!latestVisibleSession) {
+      toast.info("No sessions available to follow");
+      return;
+    }
+    await selectSession(latestVisibleSession);
   }
 
   function selectEvent(event: EventData) {
@@ -414,6 +582,14 @@
         handler: bookmarkCurrentSession,
       });
     }
+
+    registerShortcut({
+      key: "f",
+      modifiers: { meta: true },
+      description: "Toggle top filters",
+      scope: "global",
+      handler: () => (showTopFilters = !showTopFilters),
+    });
   }
 
   function updateCommandPalette() {
@@ -489,6 +665,23 @@
         shortcut: "Cmd+B",
         action: () => (bookmarksOpen = !bookmarksOpen),
       },
+      {
+        id: "toggle-filters",
+        title: "Toggle Top Filters",
+        subtitle: "Show/hide global filter panel",
+        icon: "i-ri-filter-3-line",
+        category: "action",
+        shortcut: "Cmd+F",
+        action: () => (showTopFilters = !showTopFilters),
+      },
+      {
+        id: "bookmark-filters",
+        title: "Bookmark Current Filters",
+        subtitle: "Save current source/date/chips",
+        icon: "i-ri-bookmark-3-line",
+        category: "action",
+        action: bookmarkCurrentFilters,
+      },
       ...bookmarkStore.bookmarks.map((bookmark: Bookmark) => ({
         id: `bookmark-${bookmark.id}`,
         title: bookmark.name,
@@ -506,6 +699,8 @@
     if (!browser) return;
 
     syncFiltersFromURL(page.url.searchParams);
+    hasDiffOnly = page.url.searchParams.get("hasDiff") === "1";
+    errorsOnly = page.url.searchParams.get("errors") === "1";
 
     const sessionId = page.url.searchParams.get("session");
     if (sessionId) {
@@ -515,6 +710,10 @@
     const tab = page.url.searchParams.get("tab");
     if (tab && ["sessions", "search", "analytics", "status", "support"].includes(tab)) {
       activeTab = tab as Tab;
+    }
+
+    if (filterStore.activeCount > 0 || hasDiffOnly || errorsOnly) {
+      showTopFilters = true;
     }
   }
 
@@ -572,10 +771,12 @@
     handleUrlParams();
     setupAgentEventListener();
     setupIngestProgressListener();
+    handleWindowResize();
 
     window.addEventListener("keydown", handleKeydown);
     window.addEventListener("mousemove", handleResize);
     window.addEventListener("mouseup", stopResizing);
+    window.addEventListener("resize", handleWindowResize);
 
     return () => {
       stopAutoRefresh();
@@ -584,6 +785,7 @@
       window.removeEventListener("keydown", handleKeydown);
       window.removeEventListener("mousemove", handleResize);
       window.removeEventListener("mouseup", stopResizing);
+      window.removeEventListener("resize", handleWindowResize);
     };
   });
 
@@ -608,9 +810,17 @@
       if (filterStore.state.kind) params.set("kind", filterStore.state.kind);
       if (filterStore.state.role) params.set("role", filterStore.state.role);
       if (filterStore.state.since) params.set("since", filterStore.state.since);
+      if (hasDiffOnly) params.set("hasDiff", "1");
+      if (errorsOnly) params.set("errors", "1");
 
       const url = params.toString() ? `?${params.toString()}` : "/";
       goto(url, { replaceState: true, keepFocus: true });
+    }
+  });
+
+  $effect(() => {
+    if (activeTab !== "sessions") {
+      showSessionListDrawer = false;
     }
   });
 </script>
@@ -697,8 +907,8 @@
   </Modal>
 {/if}
 
-{#if showSessionDrawer && selectedSession}
-  <Modal bind:open={showSessionDrawer} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
+{#if showSessionMetaModal && selectedSession}
+  <Modal bind:open={showSessionMetaModal} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
     <div class="flex items-center justify-between px-6 py-4 border-b border-surface-muted bg-surface-soft">
       <div class="flex items-center gap-3">
         <h2 class="text-xl font-semibold text-fg m-0">
@@ -718,7 +928,7 @@
         </button>
         <button
           class="p-2 text-fg-dim hover:text-fg transition-colors"
-          onclick={() => (showSessionDrawer = false)}
+          onclick={() => (showSessionMetaModal = false)}
           type="button"
           aria-label="Close session details">
           <span class="i-ri-close-line text-xl"></span>
@@ -757,34 +967,104 @@
           <span class="text-sm font-semibold text-fg">Full Session Data</span>
           <span class="text-2xs text-fg-dim">JSON</span>
         </div>
-        <pre class="p-4 text-sm text-fg-dim overflow-x-auto max-h-[50vh]"><code
-            >{JSON.stringify(selectedSession, null, 2)}</code></pre>
+        <pre class="p-4 text-sm text-fg-dim overflow-x-auto max-h-[50vh]"><code>{JSON.stringify(selectedSession, null, 2)}</code></pre>
       </div>
     </div>
   </Modal>
 {/if}
 
-<div class="flex h-screen overflow-hidden">
-  <aside
-    class="bg-surface-soft border-r border-surface-muted flex flex-col overflow-hidden relative"
-    style="width: {sidebarWidth}px; min-width: {minSidebarWidth}px;">
-    <!-- TODO: address these -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div
-      class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue/50 transition-colors z-10"
-      onmousedown={startResizing}
-      onkeydown={handleResizerKeydown}
-      role="separator"
-      aria-label="Resize sidebar"
-      aria-valuenow={sidebarWidth}
-      aria-valuemin={minSidebarWidth}
-      aria-valuemax={maxSidebarWidth}
-      tabindex="0">
+{#if activeTab === "sessions" && isNarrowLayout}
+  <Drawer bind:open={showSessionListDrawer} direction="left" size="lg" aria-label="Session list drawer">
+    <div class="h-full flex flex-col bg-surface-soft">
+      <div class="px-4 py-3 border-b border-surface-muted flex items-center justify-between">
+        <h2 class="m-0 text-sm font-semibold text-fg">Sessions</h2>
+        <span class="text-2xs text-fg-dim">{filteredSessions.length}</span>
+      </div>
+      <div class="flex-1 overflow-hidden">
+        <SessionList sessions={filteredSessions} {selectedSession} onSelect={selectSession} />
+      </div>
     </div>
-    <div class="p-4 border-b border-surface-muted flex flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <h1 class="m-0 text-xl font-semibold text-fg">Agent V</h1>
+  </Drawer>
+{/if}
+
+<div class="flex h-screen overflow-hidden flex-col">
+  <header class="border-b border-surface-muted bg-surface">
+    <div class="px-4 py-3 flex items-center gap-3 flex-wrap">
+      <div class="flex items-center gap-2">
+        {#if activeTab === "sessions" && isNarrowLayout}
+          <button
+            class="p-2 border border-surface-muted rounded bg-surface-soft text-fg-dim hover:text-fg"
+            onclick={() => (showSessionListDrawer = true)}
+            type="button"
+            title="Open sessions list">
+            <span class="i-ri-menu-line"></span>
+          </button>
+        {/if}
+        <h1 class="m-0 text-lg font-semibold text-fg">Agent V</h1>
+      </div>
+
+      <nav class="flex items-center gap-1 rounded border border-surface-muted bg-surface-soft p-1">
+        {#each tabs as tab}
+          <button
+            class="px-3 py-1.5 rounded text-xs transition-colors border border-transparent flex items-center gap-1.5 {activeTab ===
+            tab.id
+              ? 'bg-surface border-surface-muted text-blue'
+              : 'bg-transparent text-fg-dim hover:text-fg'}"
+            onclick={() => (activeTab = tab.id)}
+            type="button">
+            <span class={tab.icon}></span>
+            <span>{tab.label}</span>
+          </button>
+        {/each}
+      </nav>
+
+      <div class="ml-auto flex items-center gap-2 flex-wrap">
+        <button
+          class="px-2.5 py-1.5 border rounded text-xs bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5"
+          onclick={toggleAutoRefresh}
+          type="button">
+          <span class={autoRefreshEnabled ? "i-ri-checkbox-circle-line text-green" : "i-ri-checkbox-blank-circle-line"}></span>
+          <span>{autoRefreshEnabled ? "Auto" : "Manual"}</span>
+        </button>
+
+        <button
+          class="px-2.5 py-1.5 border rounded text-xs bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5"
+          onclick={loadSessions}
+          type="button">
+          <span class="i-ri-refresh-line"></span>
+          <span>Refresh</span>
+        </button>
+
+        <button
+          class="px-2.5 py-1.5 border rounded text-xs bg-blue text-surface border-blue hover:bg-blue-bright disabled:opacity-50"
+          onclick={ingestAllSources}
+          disabled={ingestLoading}
+          type="button">
+          {ingestLoading ? "Ingesting..." : "Ingest All"}
+        </button>
+
+        <div class="hidden sm:flex items-center gap-1 rounded border border-surface-muted bg-surface-soft p-1">
+          <span class="text-2xs text-fg-dim px-1">Export</span>
+          <button
+            class="px-2 py-1 rounded text-2xs text-fg-dim hover:text-fg"
+            onclick={() => exportSelectedSession("md")}
+            type="button">
+            .md
+          </button>
+          <button
+            class="px-2 py-1 rounded text-2xs text-fg-dim hover:text-fg"
+            onclick={() => exportSelectedSession("json")}
+            type="button">
+            .json
+          </button>
+          <button
+            class="px-2 py-1 rounded text-2xs text-fg-dim hover:text-fg"
+            onclick={() => exportSelectedSession("jsonl")}
+            type="button">
+            .jsonl
+          </button>
+        </div>
+
         <button
           class="p-2 text-fg-dim hover:text-fg transition-colors relative"
           onclick={() => (bookmarksOpen = !bookmarksOpen)}
@@ -794,167 +1074,230 @@
             <span class="absolute top-1 right-1 w-2 h-2 bg-blue rounded-full" aria-hidden="true"> </span>
           {/if}
         </button>
-      </div>
 
-      {#if newSessionsAvailable}
-        <div
-          class="px-3 py-2 bg-yellow/20 border border-yellow rounded text-xs text-yellow flex items-center justify-between"
-          transition:slide>
-          <div class="flex items-center gap-2">
-            <span class="i-ri-notification-3-line animate-pulse"></span>
-            <span>New sessions available</span>
-          </div>
-          <button
-            class="bg-transparent border-none p-0 text-yellow font-semibold cursor-pointer hover:underline"
-            onclick={ingestAllSources}>
-            Refresh
-          </button>
-        </div>
-      {/if}
-
-      <button
-        class="px-4 py-2 bg-blue text-surface border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
-        onclick={ingestAllSources}
-        disabled={ingestLoading}>
-        {#if ingestLoading}
-          <span class="i-ri-loader-4-line animate-spin mr-1"></span>
-          Ingesting...
-        {:else}
-          <span class="i-ri-refresh-line mr-1"></span>
-          Refresh All
-        {/if}
-      </button>
-
-      <div class="flex flex-wrap gap-1">
-        {#each sources as source}
-          <button
-            class="px-2 py-1 bg-surface border border-surface-muted rounded text-2xs text-fg cursor-pointer transition-all hover:border-{source.color} hover:text-{source.color} disabled:opacity-50"
-            onclick={() => ingestSource(source.id)}
-            disabled={ingestLoading}
-            title="Refresh {source.name}">
-            {source.name}
-          </button>
-        {/each}
-      </div>
-
-      <div class="flex items-center justify-between text-2xs text-fg-dim">
         <button
-          class="flex items-center gap-1.5 cursor-pointer bg-transparent border-none p-0 text-inherit hover:text-fg"
-          onclick={toggleAutoRefresh}>
-          {#if autoRefreshEnabled}
-            <span class="i-ri-checkbox-circle-line text-green"></span>
-            <span>Auto-refresh on</span>
-          {:else}
-            <span class="i-ri-checkbox-blank-circle-line"></span>
-            <span>Auto-refresh off</span>
-          {/if}
-        </button>
-        <button
-          class="cursor-pointer bg-transparent border-none p-0 text-inherit hover:text-fg flex items-center gap-1"
-          onclick={keyboardStore.openCommandPalette}>
+          class="px-2.5 py-1.5 border rounded text-xs bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5"
+          onclick={keyboardStore.openCommandPalette}
+          type="button">
           <span class="i-ri-command-line"></span>
           <span>Cmd+K</span>
         </button>
       </div>
     </div>
 
-    <div class="flex border-b border-surface-muted bg-surface">
+    <div class="px-4 py-2 border-t border-surface-muted bg-surface-soft flex items-center gap-2 flex-wrap">
+      <span class="text-2xs text-fg-dim uppercase tracking-wide">Sources</span>
+      <div class="flex items-center gap-1 rounded border border-surface-muted p-1 bg-surface">
+        <button
+          class="px-2 py-1 rounded text-2xs border border-transparent {filterStore.state.source === null
+            ? 'bg-surface-soft border-surface-muted text-blue'
+            : 'text-fg-dim hover:text-fg'}"
+          onclick={() => setSourceScope(null)}
+          type="button">
+          All
+        </button>
+        {#each sources as source}
+          <button
+            class="px-2 py-1 rounded text-2xs border border-transparent {filterStore.state.source === source.id
+              ? 'bg-surface-soft border-surface-muted text-blue'
+              : 'text-fg-dim hover:text-fg'}"
+            onclick={() => setSourceScope(source.id)}
+            type="button">
+            {source.name}
+          </button>
+        {/each}
+      </div>
+
       <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
-        class:active={activeTab === "sessions"}
-        class:text-blue={activeTab === "sessions"}
-        class:border-b-blue={activeTab === "sessions"}
-        class:bg-surface-soft={activeTab === "sessions"}
-        onclick={() => (activeTab = "sessions")}>
-        Sessions
+        class="px-2.5 py-1.5 border rounded text-xs bg-surface border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1"
+        onclick={() => (showTopFilters = !showTopFilters)}
+        type="button">
+        <span class="i-ri-filter-3-line"></span>
+        <span>{showTopFilters ? "Hide Filters" : "Filters"}</span>
       </button>
-      <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
-        class:active={activeTab === "search"}
-        class:text-blue={activeTab === "search"}
-        class:border-b-blue={activeTab === "search"}
-        class:bg-surface-soft={activeTab === "search"}
-        onclick={() => (activeTab = "search")}>
-        Search
-      </button>
-      <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
-        class:active={activeTab === "analytics"}
-        class:text-blue={activeTab === "analytics"}
-        class:border-b-blue={activeTab === "analytics"}
-        class:bg-surface-soft={activeTab === "analytics"}
-        onclick={() => (activeTab = "analytics")}>
-        Analytics
-      </button>
-      <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
-        class:active={activeTab === "status"}
-        class:text-blue={activeTab === "status"}
-        class:border-b-blue={activeTab === "status"}
-        class:bg-surface-soft={activeTab === "status"}
-        onclick={() => (activeTab = "status")}>
-        Status
-      </button>
-      <button
-        class="flex-1 px-3 py-3 bg-transparent border-none border-b-2 border-transparent text-fg-dim font-inherit text-sm cursor-pointer transition-all hover:text-fg hover:bg-surface-soft"
-        class:active={activeTab === "support"}
-        class:text-blue={activeTab === "support"}
-        class:border-b-blue={activeTab === "support"}
-        class:bg-surface-soft={activeTab === "support"}
-        onclick={() => (activeTab = "support")}>
-        Support
-      </button>
+
+      {#if filterStore.state.source}
+        <button
+          class="px-2.5 py-1.5 border rounded text-xs bg-surface border-surface-muted text-fg-dim hover:text-fg"
+          onclick={() => ingestSource(filterStore.state.source!)}
+          disabled={ingestLoading}
+          type="button">
+          Refresh {filterStore.state.source}
+        </button>
+      {/if}
+
+      {#if newSessionsAvailable}
+        <div class="ml-auto px-3 py-1.5 bg-yellow/20 border border-yellow rounded text-xs text-yellow flex items-center gap-2" transition:slide>
+          <span class="i-ri-notification-3-line animate-pulse"></span>
+          <span>New sessions available</span>
+          <button
+            class="bg-transparent border-none p-0 text-yellow font-semibold cursor-pointer hover:underline"
+            onclick={loadSessions}
+            type="button">
+            Load
+          </button>
+        </div>
+      {/if}
     </div>
+
+    {#if showTopFilters}
+      <div class="px-4 py-3 border-t border-surface-muted bg-surface" transition:slide>
+        <div class="grid gap-3 lg:grid-cols-[minmax(0,2fr)_180px_auto_auto_auto] items-center">
+          <div class="relative">
+            <input
+              type="text"
+              class="w-full px-3 py-2 pl-9 bg-surface-soft border border-surface-muted rounded text-fg text-sm focus:outline-none focus:border-blue"
+              placeholder="Search sessions..."
+              bind:value={filterStore.state.query} />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 i-ri-search-line text-fg-muted"></span>
+          </div>
+
+          <label class="flex items-center gap-2 text-xs text-fg-dim">
+            <span>Date</span>
+            <select
+              class="px-2 py-2 bg-surface-soft border border-surface-muted rounded text-sm text-fg"
+              value={filterStore.state.since || ""}
+              onchange={(e) => filterStore.setFilter("since", e.currentTarget.value || null)}>
+              {#each dateRanges as range}
+                <option value={range.value}>{range.label}</option>
+              {/each}
+            </select>
+          </label>
+
+          <button
+            class="px-3 py-2 border rounded text-xs transition-colors {hasDiffOnly
+              ? 'bg-blue/15 border-blue text-blue'
+              : 'bg-surface-soft border-surface-muted text-fg-dim hover:text-fg'}"
+            onclick={() => (hasDiffOnly = !hasDiffOnly)}
+            type="button">
+            Has diff
+          </button>
+
+          <button
+            class="px-3 py-2 border rounded text-xs transition-colors {errorsOnly
+              ? 'bg-blue/15 border-blue text-blue'
+              : 'bg-surface-soft border-surface-muted text-fg-dim hover:text-fg'}"
+            onclick={() => (errorsOnly = !errorsOnly)}
+            type="button">
+            Errors
+          </button>
+
+          <div class="flex items-center gap-2 justify-end">
+            <button
+              class="px-3 py-2 bg-surface-soft border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
+              onclick={() => (activeTab = "search")}
+              type="button">
+              Open Search
+            </button>
+            <button
+              class="px-3 py-2 bg-transparent border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
+              onclick={clearTopFilters}
+              type="button">
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
 
     {#if error}
       <div class="mx-4 my-2 p-2 bg-red text-surface rounded text-xs" transition:fade>
         {error}
       </div>
     {/if}
+  </header>
 
-    <div class="flex-1 overflow-hidden">
-      {#if activeTab === "sessions"}
-        <SessionList {sessions} {selectedSession} onSelect={selectSession} />
-      {:else if activeTab === "search"}
-        <SearchPanel onSelectSession={selectSessionById} onSelectEvent={selectEvent} />
-      {:else if activeTab === "analytics"}
-        <AnalyticsPanel />
-      {:else if activeTab === "support"}
-        <SupportPanel />
-      {:else}
-        <IngestStatusPanel onRefresh={loadSessions} />
-      {/if}
-    </div>
+  <div class="flex-1 overflow-hidden">
+    {#if activeTab === "sessions"}
+      <div class="flex h-full overflow-hidden">
+        {#if !isNarrowLayout}
+          <aside
+            class="bg-surface-soft border-r border-surface-muted flex flex-col overflow-hidden relative"
+            style="width: {sidebarWidth}px; min-width: {minSidebarWidth}px;">
+            <!-- TODO: address these -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <div
+              class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue/50 transition-colors z-10"
+              onmousedown={startResizing}
+              onkeydown={handleResizerKeydown}
+              role="separator"
+              aria-label="Resize sidebar"
+              aria-valuenow={sidebarWidth}
+              aria-valuemin={minSidebarWidth}
+              aria-valuemax={maxSidebarWidth}
+              tabindex="0">
+            </div>
 
-    <div class="p-2 border-t border-surface-muted bg-surface text-xs text-fg-dim">
-      <div class="flex justify-between items-center">
-        <span>{sessions.length} sessions</span>
-        {#if lastIngestTime}
-          <span>Last update: {lastIngestTime.toLocaleTimeString()}</span>
+            <div class="flex-1 overflow-hidden">
+              <SessionList sessions={filteredSessions} {selectedSession} onSelect={selectSession} />
+            </div>
+
+            <div class="p-2 border-t border-surface-muted bg-surface text-xs text-fg-dim">
+              <div class="flex justify-between items-center">
+                <span>{filteredSessions.length} shown</span>
+                <span>{sessions.length} total</span>
+              </div>
+              {#if lastIngestTime}
+                <div class="mt-1">Last update: {lastIngestTime.toLocaleTimeString()}</div>
+              {/if}
+            </div>
+          </aside>
         {/if}
-      </div>
-    </div>
-  </aside>
 
-  <main class="flex-1 overflow-hidden flex flex-col">
-    {#if sessions.length === 0 && !loading}
-      <WelcomeScreen onGetStarted={ingestAllSources} />
-    {:else if selectedSession}
-      <SessionViewer
-        session={selectedSession}
-        {events}
-        onSelectEvent={selectEvent}
-        onOpenDrawer={() => (showSessionDrawer = true)} />
-    {:else}
-      <div class="flex-1 flex items-center justify-center text-fg-dim" in:fade>
-        <div class="text-center">
-          <div class="i-ri-chat-3-line text-4xl mb-3 opacity-50"></div>
-          <p>Select a session to view details</p>
-          <p class="text-sm text-fg-muted mt-2">Use Cmd+K for quick actions</p>
-        </div>
+        <main class="flex-1 overflow-hidden flex flex-col">
+          {#if sessions.length === 0 && !loading}
+            <WelcomeScreen onGetStarted={ingestAllSources} />
+          {:else if selectedSession}
+            <SessionViewer
+              session={selectedSession}
+              {events}
+              onSelectEvent={selectEvent}
+              onOpenDrawer={() => (showSessionMetaModal = true)} />
+          {:else}
+            <div class="flex-1 flex items-center justify-center text-fg-dim px-6" in:fade>
+              <div class="text-center max-w-lg">
+                <div class="i-ri-chat-3-line text-4xl mb-3 opacity-50"></div>
+                <p class="m-0 text-base text-fg">Select a session</p>
+                <p class="text-sm text-fg-muted mt-2 mb-4">Choose a session from the left pane to inspect timeline details.</p>
+                <div class="text-sm text-fg-dim space-y-1">
+                  <p class="m-0">Press Cmd+K to jump to a command or session.</p>
+                  <p class="m-0">Use the top search and filter chips to narrow results.</p>
+                  <p class="m-0">Use Live after opening a session to follow new events.</p>
+                </div>
+                <div class="mt-4 flex items-center justify-center gap-2 flex-wrap">
+                  <button
+                    class="px-3 py-2 bg-surface-soft border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
+                    onclick={keyboardStore.openCommandPalette}
+                    type="button">
+                    Cmd+K Command Palette
+                  </button>
+                  <button
+                    class="px-3 py-2 bg-surface-soft border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
+                    onclick={followLatestSession}
+                    type="button">
+                    Open Latest Session
+                  </button>
+                </div>
+              </div>
+            </div>
+          {/if}
+        </main>
       </div>
+    {:else}
+      <main class="h-full overflow-hidden">
+        {#if activeTab === "search"}
+          <SearchPanel onSelectSession={selectSessionById} onSelectEvent={selectEvent} />
+        {:else if activeTab === "analytics"}
+          <AnalyticsPanel />
+        {:else if activeTab === "support"}
+          <SupportPanel />
+        {:else}
+          <IngestStatusPanel onRefresh={loadSessions} />
+        {/if}
+      </main>
     {/if}
-  </main>
+  </div>
 </div>
 
 <Dialog bind:open={showSupportNudge} closeOnOutsideClick={false} role="dialog" aria-label="Support Agent V">

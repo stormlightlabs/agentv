@@ -147,6 +147,13 @@ export type SessionMetricsData = {
   p95_latency_ms: number | null;
 };
 
+export type SessionListMetricsData = {
+  session_id: string;
+  error_count: number;
+  lines_added: number;
+  lines_removed: number;
+};
+
 export type CostStats = {
   dimension: string;
   session_count: number;

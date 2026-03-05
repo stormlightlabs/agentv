@@ -150,6 +150,15 @@ pub struct SessionMetricsData {
     pub p95_latency_ms: Option<i64>,
 }
 
+/// Lightweight session metrics for list-level filtering
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionListMetricsData {
+    pub session_id: String,
+    pub error_count: i64,
+    pub lines_added: i64,
+    pub lines_removed: i64,
+}
+
 /// Cost stats for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CostStats {
