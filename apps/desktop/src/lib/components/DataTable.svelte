@@ -1,5 +1,5 @@
-<script lang="ts" generics="T extends Record<string, any>">
-  import type { DataTableColumn } from "$lib/types";
+<script lang="ts" generics="T extends Record<string, unknown>">
+  import type { DataTableColumn, DataTableRowAction } from "$lib/types";
   import { fade, fly } from "svelte/transition";
 
   type Props = {
@@ -11,6 +11,8 @@
     pageSize?: number;
     onSelect?: (row: T) => void;
     selectedId?: string | null;
+    rowActions?: DataTableRowAction<T>[];
+    expandableRows?: boolean;
   };
 
   let {
@@ -22,12 +24,15 @@
     pageSize = 50,
     onSelect,
     selectedId = null,
+    rowActions = [],
+    expandableRows = false,
   }: Props = $props();
 
   let sortKey = $state<string | null>(null);
   let sortDirection = $state<"asc" | "desc">("asc");
   let filters = $state<Record<string, string>>({});
   let currentPage = $state(1);
+  let expandedRowIds = $state<string[]>([]);
 
   function handleSort(column: DataTableColumn<T>) {
     if (!column.sortable) return;
@@ -91,6 +96,8 @@
 
   let totalPages = $derived(Math.ceil(filteredData.length / pageSize));
   let paginatedData = $derived(filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize));
+  let hasRowActions = $derived(rowActions.length > 0 || expandableRows);
+  let totalColumns = $derived(columns.length + (hasRowActions ? 1 : 0));
 
   function handlePageChange(page: number) {
     if (page >= 1 && page <= totalPages) {
@@ -101,6 +108,14 @@
   function getSortIcon(column: DataTableColumn<T>): string {
     if (sortKey !== String(column.key)) return "i-ri-arrow-up-down-line";
     return sortDirection === "asc" ? "i-ri-arrow-up-line" : "i-ri-arrow-down-line";
+  }
+
+  function isRowExpanded(rowId: string): boolean {
+    return expandedRowIds.includes(rowId);
+  }
+
+  function toggleRowExpansion(rowId: string): void {
+    expandedRowIds = isRowExpanded(rowId) ? expandedRowIds.filter((id) => id !== rowId) : [...expandedRowIds, rowId];
   }
 
   function formatColumnValue(row: T, column: DataTableColumn<T>): string {
@@ -128,12 +143,17 @@
       currentPage = 1;
     }
   });
+
+  $effect(() => {
+    const validIds = new Set(filteredData.map((row) => keyExtractor(row)));
+    expandedRowIds = expandedRowIds.filter((id) => validIds.has(id));
+  });
 </script>
 
 <div class="flex flex-col h-full overflow-hidden">
   {#if columns.some((c) => c.filterable)}
     <div class="p-2 border-b border-surface-muted bg-surface-soft flex flex-wrap gap-2">
-      {#each columns.filter((c) => c.filterable) as column}
+      {#each columns.filter((c) => c.filterable) as column (String(column.key))}
         <div class="flex items-center gap-1">
           <input
             type="text"
@@ -156,7 +176,7 @@
   <div class="flex-1 overflow-auto">
     {#if loading}
       <div class="p-4 space-y-2">
-        {#each Array(5) as _, i}
+        {#each Array.from({ length: 5 }) as _, i (i)}
           <div class="h-12 bg-surface-muted rounded animate-pulse" in:fade={{ delay: i * 50 }}></div>
         {/each}
       </div>
@@ -171,7 +191,7 @@
       <table class="w-full text-sm">
         <thead class="sticky top-0 bg-surface-soft z-10">
           <tr class="border-b border-surface-muted">
-            {#each columns as column}
+            {#each columns as column (String(column.key))}
               <th
                 class="px-4 py-2 text-left text-xs font-semibold text-fg-dim uppercase tracking-wide whitespace-nowrap {column.sortable
                   ? 'cursor-pointer hover:text-fg select-none'
@@ -186,22 +206,78 @@
                 </div>
               </th>
             {/each}
+            {#if hasRowActions}
+              <th class="px-4 py-2 text-right text-xs font-semibold text-fg-dim uppercase tracking-wide whitespace-nowrap">
+                Actions
+              </th>
+            {/if}
           </tr>
         </thead>
         <tbody>
           {#each paginatedData as row, index (keyExtractor(row))}
+            {@const rowId = keyExtractor(row)}
             <tr
               class="border-b border-surface-muted last:border-b-0 transition-colors {selectable
                 ? 'cursor-pointer hover:bg-surface-muted'
-                : ''} {selectedId === keyExtractor(row) ? 'bg-surface-muted' : ''}"
+                : ''} {selectedId === rowId ? 'bg-surface-muted' : ''}"
               in:fly={{ y: 10, duration: 200, delay: index * 30 }}
               onclick={() => selectable && onSelect?.(row)}>
-              {#each columns as column}
+              {#each columns as column (String(column.key))}
                 <td class="px-4 py-3 {getColumnClass(row, column)}">
-                  {formatColumnValue(row, column)}
+                  <div class="max-w-[320px] truncate whitespace-nowrap" title={formatColumnValue(row, column)}>
+                    {formatColumnValue(row, column)}
+                  </div>
                 </td>
               {/each}
+              {#if hasRowActions}
+                <td class="px-4 py-3">
+                  <div class="flex justify-end gap-1">
+                    {#each rowActions as action (action.id)}
+                      <button
+                        class="bg-surface border-surface-muted text-fg-dim hover:text-fg rounded border px-2 py-1 text-xs"
+                        title={action.title ?? action.label}
+                        type="button"
+                        onclick={(event) => {
+                          event.stopPropagation();
+                          action.onClick(row);
+                        }}>
+                        {#if action.icon}
+                          <span class={action.icon}></span>
+                        {/if}
+                        <span>{action.label}</span>
+                      </button>
+                    {/each}
+                    {#if expandableRows}
+                      <button
+                        class="bg-surface border-surface-muted text-fg-dim hover:text-fg rounded border px-2 py-1 text-xs"
+                        title={isRowExpanded(rowId) ? "Collapse row details" : "Expand row details"}
+                        type="button"
+                        onclick={(event) => {
+                          event.stopPropagation();
+                          toggleRowExpansion(rowId);
+                        }}>
+                        <span class={isRowExpanded(rowId) ? "i-ri-arrow-up-s-line" : "i-ri-arrow-down-s-line"}></span>
+                        <span>{isRowExpanded(rowId) ? "Collapse" : "Expand"}</span>
+                      </button>
+                    {/if}
+                  </div>
+                </td>
+              {/if}
             </tr>
+            {#if expandableRows && isRowExpanded(rowId)}
+              <tr class="border-b border-surface-muted bg-surface/50">
+                <td class="px-4 py-3" colspan={totalColumns}>
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    {#each columns as column (String(column.key))}
+                      <div class="min-w-0">
+                        <div class="text-fg-dim text-2xs uppercase tracking-wide">{column.header}</div>
+                        <div class="text-fg mt-1 break-words whitespace-pre-wrap">{formatColumnValue(row, column)}</div>
+                      </div>
+                    {/each}
+                  </div>
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>

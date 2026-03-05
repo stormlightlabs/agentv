@@ -14,7 +14,7 @@ function getToastStore(): ToastStore {
   let notifications = $state<ToastNotification[]>([]);
 
   function addToast(message: string, type: ToastNotification["type"] = "info", duration = 5000) {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = Math.random().toString(36).slice(2, 9);
     const notification: ToastNotification = { id, type, message, duration };
     notifications = [...notifications, notification];
 

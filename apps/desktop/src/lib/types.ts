@@ -123,6 +123,14 @@ export type DataTableColumn<T = Record<string, unknown>> = {
   render?: (row: T) => string | { text: string; className?: string };
 };
 
+export type DataTableRowAction<T = Record<string, unknown>> = {
+  id: string;
+  label: string;
+  icon?: string;
+  title?: string;
+  onClick: (row: T) => void;
+};
+
 export type SessionMetricsData = {
   session_id: string;
   total_events: number;

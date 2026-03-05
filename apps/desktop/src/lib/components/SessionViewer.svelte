@@ -32,31 +32,41 @@
 
   function getEventIcon(kind: string): string {
     switch (kind) {
-      case "message":
+      case "message": {
         return "i-ri-chat-1-line";
-      case "tool_call":
+      }
+      case "tool_call": {
         return "i-ri-tools-line";
-      case "tool_result":
+      }
+      case "tool_result": {
         return "i-ri-check-line";
-      case "error":
+      }
+      case "error": {
         return "i-ri-error-warning-line";
-      case "system":
+      }
+      case "system": {
         return "i-ri-settings-3-line";
-      default:
+      }
+      default: {
         return "i-ri-circle-fill";
+      }
     }
   }
 
   function getRoleColor(role: string | null): string {
     switch (role) {
-      case "user":
+      case "user": {
         return "var(--color-green-bright)";
-      case "assistant":
+      }
+      case "assistant": {
         return "var(--color-blue-bright)";
-      case "system":
+      }
+      case "system": {
         return "var(--color-fg-dim)";
-      default:
+      }
+      default: {
         return "var(--color-fg-muted)";
+      }
     }
   }
 
@@ -122,12 +132,12 @@
 
   function getContentPreview(event: EventData): string {
     if (event.content) {
-      return event.content.slice(0, 150).replace(/\n/g, " ");
+      return event.content.slice(0, 150).replaceAll('\n', " ");
     }
 
     const payloadContent = extractContentFromPayload(event.raw_payload);
     if (payloadContent) {
-      return payloadContent.slice(0, 150).replace(/\n/g, " ");
+      return payloadContent.slice(0, 150).replaceAll('\n', " ");
     }
 
     const toolCalls = extractToolCalls(event.raw_payload);
@@ -143,20 +153,23 @@
     return "";
   }
 
-  function groupEventsByDate(events: EventData[]): Map<string, EventData[]> {
-    const groups = new Map<string, EventData[]>();
+  type GroupedEvents = {
+    date: string;
+    events: EventData[];
+  };
+
+  function groupEventsByDate(events: EventData[]): GroupedEvents[] {
+    const groups: Record<string, EventData[]> = {};
     for (const event of events) {
       const date = new Date(event.timestamp).toLocaleDateString("en-US", {
         month: "long",
         day: "numeric",
         year: "numeric",
       });
-      if (!groups.has(date)) {
-        groups.set(date, []);
-      }
-      groups.get(date)!.push(event);
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(event);
     }
-    return groups;
+    return Object.entries(groups).map(([date, dateEvents]) => ({ date, events: dateEvents }));
   }
 
   async function exportSession(format: ExportFormat) {
@@ -169,30 +182,24 @@
       const a = document.createElement("a");
       a.href = url;
       a.download = `session-${session.external_id.slice(0, 8)}.${format}`;
-      document.body.appendChild(a);
+      document.body.append(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
 
       toast.success(`Exported session as ${format.toUpperCase()}`);
-    } catch (e) {
-      toast.error(`Failed to export: ${e}`);
+    } catch (error) {
+      toast.error(`Failed to export: ${error}`);
     } finally {
       exporting = false;
     }
   }
 
   let groupedEvents = $derived(groupEventsByDate(events));
-  let expandedEvents = $state<Set<string>>(new Set());
+  let expandedEvents = $state<Record<string, boolean>>({});
 
   function toggleEvent(eventId: string) {
-    const newSet = new Set(expandedEvents);
-    if (newSet.has(eventId)) {
-      newSet.delete(eventId);
-    } else {
-      newSet.add(eventId);
-    }
-    expandedEvents = newSet;
+    expandedEvents = { ...expandedEvents, [eventId]: !expandedEvents[eventId] };
   }
 </script>
 
@@ -289,18 +296,18 @@
         <p>No events in this session</p>
       </div>
     {:else}
-      {#each groupedEvents.entries() as [date, dateEvents]}
+      {#each groupedEvents as group (group.date)}
         <div class="mb-6">
           <div class="text-xs font-semibold uppercase text-fg-muted mb-3 pb-1 border-b border-surface-muted">
-            {date}
+            {group.date}
           </div>
           <div class="flex flex-col gap-2">
-            {#each dateEvents as event (event.id)}
+            {#each group.events as event (event.id)}
               {@const toolCalls = extractToolCalls(event.raw_payload)}
               {@const thinking = extractThinking(event.raw_payload)}
               {@const gitBranch = extractGitBranch(event.raw_payload)}
               {@const cwd = extractCwd(event.raw_payload)}
-              {@const isExpanded = expandedEvents.has(event.id)}
+              {@const isExpanded = Boolean(expandedEvents[event.id])}
 
               <div
                 class="flex gap-3 p-3 bg-surface-soft rounded border border-transparent transition-colors hover:border-surface-muted cursor-pointer group"
@@ -355,7 +362,7 @@
 
                   {#if toolCalls.length > 0}
                     <div class="mt-2 flex flex-wrap gap-1">
-                      {#each toolCalls as tool}
+                      {#each toolCalls as tool, index (tool.id || `${tool.name}-${index}`)}
                         <span
                           class="inline-flex items-center gap-1 px-2 py-0.5 bg-surface-muted rounded text-xs text-fg-dim">
                           <span class="i-ri-tools-line"></span>

@@ -21,9 +21,9 @@
     error = null;
     try {
       metrics = await invoke<SessionMetricsData | null>("get_session_metrics", { sessionId: session.id });
-    } catch (e) {
-      error = String(e);
-      console.error("Failed to load session metrics:", e);
+    } catch (error_) {
+      error = String(error_);
+      console.error("Failed to load session metrics:", error_);
     } finally {
       loading = false;
     }
@@ -138,8 +138,8 @@
               class:text-green={metrics.p95_latency_ms && metrics.p95_latency_ms < 5000}
               class:text-yellow={metrics.p95_latency_ms &&
                 metrics.p95_latency_ms >= 5000 &&
-                metrics.p95_latency_ms < 15000}
-              class:text-red={metrics.p95_latency_ms && metrics.p95_latency_ms >= 15000}>
+                metrics.p95_latency_ms < 15_000}
+              class:text-red={metrics.p95_latency_ms && metrics.p95_latency_ms >= 15_000}>
               {formatDuration(metrics.p95_latency_ms)}
             </div>
           </div>

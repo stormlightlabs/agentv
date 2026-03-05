@@ -26,7 +26,7 @@ function createBookmarkStore() {
   let bookmarks = $state<Bookmark[]>([]);
 
   function loadFromStorage(): Bookmark[] {
-    if (typeof window === "undefined") return [];
+    if (globalThis.window === undefined) return [];
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -39,7 +39,7 @@ function createBookmarkStore() {
   }
 
   function saveToStorage(items: Bookmark[]): void {
-    if (typeof window === "undefined") return;
+    if (globalThis.window === undefined) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
@@ -110,47 +110,61 @@ export const bookmarkStore = createBookmarkStore();
 
 export function getBookmarkDescription(bookmark: Bookmark): string {
   switch (bookmark.type) {
-    case "session":
+    case "session": {
       return `Session: ${bookmark.data.sessionId?.slice(0, 8) || "Unknown"}`;
-    case "search":
+    }
+    case "search": {
       return bookmark.data.query || "Search";
+    }
     case "filter": {
       const filterCount = Object.values(bookmark.data.filters || {}).filter(Boolean).length;
-      return `${filterCount} active filter${filterCount !== 1 ? "s" : ""}`;
+      return `${filterCount} active filter${filterCount === 1 ? "" : "s"}`;
     }
-    case "chart":
+    case "chart": {
       return bookmark.data.chartType || "Chart";
-    default:
+    }
+    default: {
       return "";
+    }
   }
 }
 
 export function getBookmarkIcon(type: Bookmark["type"]): string {
   switch (type) {
-    case "session":
+    case "session": {
       return "i-ri-chat-3-line";
-    case "search":
+    }
+    case "search": {
       return "i-ri-search-line";
-    case "filter":
+    }
+    case "filter": {
       return "i-ri-filter-3-line";
-    case "chart":
+    }
+    case "chart": {
       return "i-ri-bar-chart-line";
-    default:
+    }
+    default: {
       return "i-ri-bookmark-line";
+    }
   }
 }
 
 export function getBookmarkColor(type: Bookmark["type"]): string {
   switch (type) {
-    case "session":
+    case "session": {
       return "text-blue";
-    case "search":
+    }
+    case "search": {
       return "text-green";
-    case "filter":
+    }
+    case "filter": {
       return "text-purple";
-    case "chart":
+    }
+    case "chart": {
       return "text-cyan";
-    default:
+    }
+    default: {
       return "text-fg-muted";
+    }
   }
 }

@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import Modal from "./Modal.svelte";
 
-  let selectedIndex = $state(0);
+  let selectedIndex = $derived(0);
   let inputRef: HTMLInputElement | null = $state(null);
 
   $effect(() => {
@@ -11,10 +11,6 @@
       selectedIndex = 0;
       inputRef?.focus();
     }
-  });
-
-  $effect(() => {
-    selectedIndex = 0;
   });
 
   function handleKeydown(event: KeyboardEvent) {
@@ -57,76 +53,89 @@
 
   function getCategoryIcon(category: string): string {
     switch (category) {
-      case "navigation":
+      case "navigation": {
         return "i-ri-compass-3-line";
-      case "action":
+      }
+      case "action": {
         return "i-ri-flashlight-line";
-      case "search":
+      }
+      case "search": {
         return "i-ri-search-line";
-      case "export":
+      }
+      case "export": {
         return "i-ri-download-line";
-      case "view":
+      }
+      case "view": {
         return "i-ri-eye-line";
-      default:
+      }
+      default: {
         return "i-ri-circle-fill";
+      }
     }
   }
 
   function getCategoryColor(category: string): string {
     switch (category) {
-      case "navigation":
+      case "navigation": {
         return "text-blue";
-      case "action":
+      }
+      case "action": {
         return "text-yellow";
-      case "search":
+      }
+      case "search": {
         return "text-green";
-      case "export":
+      }
+      case "export": {
         return "text-purple";
-      case "view":
+      }
+      case "view": {
         return "text-cyan";
-      default:
+      }
+      default: {
         return "text-fg-muted";
+      }
     }
   }
 
+  const keydownHandler = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      keyboardStore.openCommandPalette();
+    }
+  };
+
   onMount(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        keyboardStore.openCommandPalette();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    globalThis.addEventListener("keydown", keydownHandler);
+    return () => globalThis.removeEventListener("keydown", keydownHandler);
   });
 </script>
 
 <Modal
   bind:open={keyboardStore.commandPaletteOpen}
   size="md"
-  class="!items-start !pt-[20vh]"
+  class="items-start! pt-[20vh]!"
   contentClass="border border-surface-muted"
   aria-label="Command palette">
-  <div class="flex items-center gap-3 px-4 py-3 border-b border-surface-muted">
+  <div class="border-surface-muted flex items-center gap-3 border-b px-4 py-3">
     <span class="i-ri-command-line text-fg-muted"></span>
     <input
       bind:this={inputRef}
       type="text"
-      class="flex-1 bg-transparent border-none text-fg font-inherit text-base focus:outline-none placeholder-fg-muted"
+      class="text-fg font-inherit placeholder-fg-muted flex-1 border-none bg-transparent text-base focus:outline-none"
       placeholder="Type a command or search..."
       bind:value={keyboardStore.commandPaletteSearch}
       onkeydown={handleKeydown} />
     <div class="flex gap-1">
-      <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">↑↓</kbd>
-      <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">↵</kbd>
-      <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">Esc</kbd>
+      <kbd class="bg-surface-muted text-fg-dim rounded px-2 py-1 text-xs">↑↓</kbd>
+      <kbd class="bg-surface-muted text-fg-dim rounded px-2 py-1 text-xs">↵</kbd>
+      <kbd class="bg-surface-muted text-fg-dim rounded px-2 py-1 text-xs">Esc</kbd>
     </div>
   </div>
 
   <div class="max-h-[50vh] overflow-y-auto">
     {#if keyboardStore.filteredCommands.length === 0}
-      <div class="px-4 py-8 text-center text-fg-dim">
-        <div class="i-ri-ghost-line text-3xl mb-2"></div>
+      <div class="text-fg-dim px-4 py-8 text-center">
+        <div class="i-ri-ghost-line mb-2 text-3xl"></div>
         <p>No commands found</p>
         <p class="text-sm">Try a different search term</p>
       </div>
@@ -140,15 +149,15 @@
         {} as Record<string, CommandPaletteItem[]>,
       )}
 
-      {#each Object.entries(grouped) as [category, items], groupIndex}
-        <div class="px-4 py-2 text-xs font-semibold text-fg-dim uppercase tracking-wide flex items-center gap-2">
+      {#each Object.entries(grouped) as [category, items] (category)}
+        <div class="text-fg-dim flex items-center gap-2 px-4 py-2 text-xs font-semibold tracking-wide uppercase">
           <span class="{getCategoryIcon(category)} {getCategoryColor(category)}"></span>
           {category}
         </div>
-        {#each items as item, index (item.id)}
+        {#each items as item (item.id)}
           {@const globalIndex = keyboardStore.filteredCommands.indexOf(item)}
           <button
-            class="w-full px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-surface-soft {selectedIndex ===
+            class="hover:bg-surface-soft flex w-full items-center gap-3 px-4 py-3 text-left transition-colors {selectedIndex ===
             globalIndex
               ? 'bg-surface-soft'
               : ''}"
@@ -157,14 +166,14 @@
             {#if item.icon}
               <span class="{item.icon} text-fg-dim"></span>
             {/if}
-            <div class="flex-1 min-w-0">
-              <div class="text-sm text-fg font-medium">{item.title}</div>
+            <div class="min-w-0 flex-1">
+              <div class="text-fg text-sm font-medium">{item.title}</div>
               {#if item.subtitle}
-                <div class="text-xs text-fg-dim truncate">{item.subtitle}</div>
+                <div class="text-fg-dim truncate text-xs">{item.subtitle}</div>
               {/if}
             </div>
             {#if item.shortcut}
-              <kbd class="px-2 py-1 bg-surface-muted rounded text-xs text-fg-dim">{item.shortcut}</kbd>
+              <kbd class="bg-surface-muted text-fg-dim rounded px-2 py-1 text-xs">{item.shortcut}</kbd>
             {/if}
           </button>
         {/each}
@@ -172,7 +181,7 @@
     {/if}
   </div>
 
-  <div class="px-4 py-2 border-t border-surface-muted text-xs text-fg-dim flex justify-between">
+  <div class="border-surface-muted text-fg-dim flex justify-between border-t px-4 py-2 text-xs">
     <span>{keyboardStore.filteredCommands.length} commands available</span>
     <span>Cmd+K to open</span>
   </div>

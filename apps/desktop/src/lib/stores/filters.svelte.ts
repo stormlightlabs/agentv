@@ -1,4 +1,6 @@
 import { goto } from "$app/navigation";
+import { resolve } from "$app/paths";
+import { SvelteURLSearchParams } from "svelte/reactivity";
 
 type Nullable<T> = T | null;
 
@@ -28,65 +30,64 @@ const defaultState: FilterState = {
   eventId: null,
 };
 
-function createFilterStore() {
-  let state = $state<FilterState>({ ...defaultState });
+class FilterStore {
+  private stateValue = $state<FilterState>({ ...defaultState });
 
-  const activeCount = $derived(
+  private activeCountValue = $derived(
     [
-      state.query !== "" ? 1 : 0,
-      state.source !== null ? 1 : 0,
-      state.project !== null ? 1 : 0,
-      state.kind !== null ? 1 : 0,
-      state.role !== null ? 1 : 0,
-      state.tool !== null ? 1 : 0,
-      state.since !== null ? 1 : 0,
-      state.until !== null ? 1 : 0,
+      this.stateValue.query === "" ? 0 : 1,
+      this.stateValue.source === null ? 0 : 1,
+      this.stateValue.project === null ? 0 : 1,
+      this.stateValue.kind === null ? 0 : 1,
+      this.stateValue.role === null ? 0 : 1,
+      this.stateValue.tool === null ? 0 : 1,
+      this.stateValue.since === null ? 0 : 1,
+      this.stateValue.until === null ? 0 : 1,
     ].reduce((a, b) => a + b, 0),
   );
 
-  const hasActiveFilters = $derived(
-    state.query !== "" ||
-      state.source !== null ||
-      state.project !== null ||
-      state.kind !== null ||
-      state.role !== null ||
-      state.tool !== null ||
-      state.since !== null ||
-      state.until !== null,
+  private hasActiveFiltersValue = $derived(
+    this.stateValue.query !== "" ||
+      this.stateValue.source !== null ||
+      this.stateValue.project !== null ||
+      this.stateValue.kind !== null ||
+      this.stateValue.role !== null ||
+      this.stateValue.tool !== null ||
+      this.stateValue.since !== null ||
+      this.stateValue.until !== null,
   );
 
-  function setFilter(key: keyof FilterState, value: string | null) {
-    state = { ...state, [key]: value };
+  get state() {
+    return this.stateValue;
   }
 
-  function clearFilter(key: keyof FilterState) {
-    state = { ...state, [key]: null };
+  set state(newState: FilterState) {
+    this.stateValue = newState;
   }
 
-  function clearAll() {
-    state = { ...defaultState };
+  get activeCount() {
+    return this.activeCountValue;
   }
 
-  return {
-    get state() {
-      return state;
-    },
-    set state(newState) {
-      state = newState;
-    },
-    get activeCount() {
-      return activeCount;
-    },
-    get hasActiveFilters() {
-      return hasActiveFilters;
-    },
-    setFilter,
-    clearFilter,
-    clearAll,
-  };
+  get hasActiveFilters() {
+    return this.hasActiveFiltersValue;
+  }
+
+  setFilter<K extends keyof FilterState>(key: K, value: FilterState[K]) {
+    this.stateValue = { ...this.stateValue, [key]: value };
+  }
+
+  clearFilter<K extends keyof FilterState>(key: K) {
+    const clearedValue = (key === "query" ? "" : null) as FilterState[K];
+    this.stateValue = { ...this.stateValue, [key]: clearedValue };
+  }
+
+  clearAll() {
+    this.stateValue = { ...defaultState };
+  }
 }
 
-export const filterStore = createFilterStore();
+export const filterStore = new FilterStore();
 
 export function syncFiltersFromURL(searchParams: URLSearchParams): void {
   filterStore.state = {
@@ -104,7 +105,7 @@ export function syncFiltersFromURL(searchParams: URLSearchParams): void {
 }
 
 export function updateURLFromFilters(filters: FilterState): void {
-  const searchParams = new URLSearchParams();
+  const searchParams = new SvelteURLSearchParams();
 
   if (filters.query) searchParams.set("q", filters.query);
   if (filters.source) searchParams.set("source", filters.source);
@@ -117,14 +118,13 @@ export function updateURLFromFilters(filters: FilterState): void {
   if (filters.sessionId) searchParams.set("session", filters.sessionId);
   if (filters.eventId) searchParams.set("event", filters.eventId);
 
-  const queryString = searchParams.toString();
-  const url = queryString ? `?${queryString}` : "/";
+  const url = resolve("/", Object.fromEntries(searchParams));
 
   goto(url, { replaceState: true, keepFocus: true });
 }
 
 export function buildDeepLink(filters: FilterState): string {
-  const searchParams = new URLSearchParams();
+  const searchParams = new SvelteURLSearchParams();
 
   if (filters.query) searchParams.set("q", filters.query);
   if (filters.source) searchParams.set("source", filters.source);
@@ -138,5 +138,5 @@ export function buildDeepLink(filters: FilterState): string {
   if (filters.eventId) searchParams.set("event", filters.eventId);
 
   const queryString = searchParams.toString();
-  return queryString ? `${window.location.origin}?${queryString}` : window.location.origin;
+  return queryString ? `${globalThis.location.origin}?${queryString}` : globalThis.location.origin;
 }

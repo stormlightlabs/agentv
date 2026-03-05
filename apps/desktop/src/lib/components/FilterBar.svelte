@@ -71,10 +71,12 @@
   function getActiveFilterLabel(key: keyof FilterState, value: string | null): string {
     if (!value) return "";
     switch (key) {
-      case "since":
+      case "since": {
         return dateOptions.find((o) => o.value === value)?.label || value;
-      default:
+      }
+      default: {
         return value;
+      }
     }
   }
 
@@ -199,7 +201,7 @@
           value={filterStore.state.source || ""}
           onchange={(e) => handleFilterChange("source", e.currentTarget.value || null)}>
           <option value="">All sources</option>
-          {#each sources as source}
+          {#each sources as source (source)}
             <option value={source}>{source}</option>
           {/each}
         </select>
@@ -213,7 +215,7 @@
           value={filterStore.state.project || ""}
           onchange={(e) => handleFilterChange("project", e.currentTarget.value || null)}>
           <option value="">All projects</option>
-          {#each projects as project}
+          {#each projects as project (project)}
             <option value={project}>{project}</option>
           {/each}
         </select>
@@ -227,7 +229,7 @@
           value={filterStore.state.kind || ""}
           onchange={(e) => handleFilterChange("kind", e.currentTarget.value || null)}>
           <option value="">All kinds</option>
-          {#each kinds as kind}
+          {#each kinds as kind (kind)}
             <option value={kind}>{kind}</option>
           {/each}
         </select>
@@ -242,7 +244,7 @@
             value={filterStore.state.role || ""}
             onchange={(e) => handleFilterChange("role", e.currentTarget.value || null)}>
             <option value="">All roles</option>
-            {#each roles.length > 0 ? roles : roleOptions as role}
+            {#each roles.length > 0 ? roles : roleOptions as role (role)}
               <option value={role}>{role}</option>
             {/each}
           </select>
@@ -258,7 +260,7 @@
             value={filterStore.state.tool || ""}
             onchange={(e) => handleFilterChange("tool", e.currentTarget.value || null)}>
             <option value="">All tools</option>
-            {#each tools as tool}
+            {#each tools as tool (tool)}
               <option value={tool}>{tool}</option>
             {/each}
           </select>
@@ -273,7 +275,7 @@
             class="px-2 py-1.5 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
             value={filterStore.state.since || ""}
             onchange={(e) => handleFilterChange("since", e.currentTarget.value || null)}>
-            {#each dateOptions as option}
+            {#each dateOptions as option (option.value)}
               <option value={option.value}>{option.label}</option>
             {/each}
           </select>

@@ -18,16 +18,21 @@
   function getTransition(node: Element) {
     const params = { duration, delay, easing };
     switch (type) {
-      case "fade":
+      case "fade": {
         return fade(node, params);
-      case "fly":
+      }
+      case "fly": {
         return fly(node, { ...params, x, y });
-      case "slide":
+      }
+      case "slide": {
         return slide(node, params);
-      case "scale":
+      }
+      case "scale": {
         return scale(node, { ...params, start: 0.95 });
-      default:
+      }
+      default: {
         return fade(node, params);
+      }
     }
   }
 </script>

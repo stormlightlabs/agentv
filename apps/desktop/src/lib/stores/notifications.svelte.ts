@@ -1,36 +1,38 @@
 import { useToast } from "$lib/stores/toast.svelte";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { SvelteMap } from "svelte/reactivity";
 
-type NotificationStore = {
-  get windowFocused(): boolean;
-  init(): Promise<void>;
-  notify(title: string, body: string): void;
+type NotificationGroup = {
+  title: string;
+  count: number;
+  messages: string[];
 };
 
-let store: NotificationStore | null = null;
+export class NotificationStore {
+  private readonly toast = useToast();
+  private readonly throttleMap = new SvelteMap<string, number>();
+  private readonly groupedNotifications = new SvelteMap<string, NotificationGroup>();
+  private windowFocusedValue = $state(true);
+  private osPermissionGranted = $state(false);
+  private readonly throttleMs = 10_000;
+  private readonly groupWindowMs = 1500;
 
-// TODO: this should be a class
-export function useNotifications(): NotificationStore {
-  if (store) return store;
-
-  const toast = useToast();
-  let windowFocused = $state(true);
-  let osPermissionGranted = $state(false);
-  const throttleMap = new Map<string, number>();
-  const THROTTLE_MS = 10_000;
-
-  function onFocus() {
-    windowFocused = true;
+  get windowFocused(): boolean {
+    return this.windowFocusedValue;
   }
 
-  function onBlur() {
-    windowFocused = false;
-  }
+  private onFocus = () => {
+    this.windowFocusedValue = true;
+  };
 
-  async function init() {
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("blur", onBlur);
-    windowFocused = document.hasFocus();
+  private onBlur = () => {
+    this.windowFocusedValue = false;
+  };
+
+  async init(): Promise<void> {
+    window.addEventListener("focus", this.onFocus);
+    window.addEventListener("blur", this.onBlur);
+    this.windowFocusedValue = document.hasFocus();
 
     try {
       let granted = await isPermissionGranted();
@@ -38,32 +40,76 @@ export function useNotifications(): NotificationStore {
         const permission = await requestPermission();
         granted = permission === "granted";
       }
-      osPermissionGranted = granted;
+      this.osPermissionGranted = granted;
     } catch {
-      osPermissionGranted = false;
+      this.osPermissionGranted = false;
     }
   }
 
-  function notify(title: string, body: string) {
-    const now = Date.now();
-    const lastTime = throttleMap.get(title) ?? 0;
-    const throttled = now - lastTime < THROTTLE_MS;
+  private flushGroup(title: string): void {
+    const group = this.groupedNotifications.get(title);
+    if (!group) return;
 
-    if (!windowFocused && osPermissionGranted && !throttled) {
-      throttleMap.set(title, now);
+    this.groupedNotifications.delete(title);
+
+    const body = this.formatGroupedBody(group);
+    this.dispatchNotification(group.title, body);
+  }
+
+  private formatGroupedBody(group: NotificationGroup): string {
+    if (group.count <= 1) {
+      return group.messages[0] ?? "New update";
+    }
+
+    const previewMessages = group.messages.slice(0, 2);
+    const previewText = previewMessages.join(" | ");
+    const extraCount = group.count - previewMessages.length;
+    const extraText = extraCount > 0 ? ` (+${extraCount} more)` : "";
+
+    return previewText ? `${group.count} updates: ${previewText}${extraText}` : `${group.count} new updates`;
+  }
+
+  private dispatchNotification(title: string, body: string): void {
+    const now = Date.now();
+    const lastTime = this.throttleMap.get(title) ?? 0;
+    const throttled = now - lastTime < this.throttleMs;
+
+    if (!this.windowFocusedValue && this.osPermissionGranted && !throttled) {
+      this.throttleMap.set(title, now);
       sendNotification({ title, body });
     } else {
-      toast.info(body);
+      this.toast.info(body);
     }
   }
 
-  store = {
-    get windowFocused() {
-      return windowFocused;
-    },
-    init,
-    notify,
-  };
+  notify(title: string, body: string): void {
+    const existingGroup = this.groupedNotifications.get(title);
 
+    if (existingGroup) {
+      existingGroup.count += 1;
+      if (!existingGroup.messages.includes(body) && existingGroup.messages.length < 3) {
+        existingGroup.messages.push(body);
+      }
+      return;
+    }
+
+    globalThis.setTimeout(() => {
+      this.flushGroup(title);
+    }, this.groupWindowMs);
+
+    this.groupedNotifications.set(title, {
+      title,
+      count: 1,
+      messages: [body],
+    });
+  }
+}
+
+let store: NotificationStore | null = null;
+
+export function useNotifications(): NotificationStore {
+  if (!store) {
+    store = new NotificationStore();
+  }
   return store;
 }

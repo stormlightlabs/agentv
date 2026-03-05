@@ -23,18 +23,24 @@
 
   function getKindBadgeClass(kind: string): string {
     switch (kind) {
-      case "message":
+      case "message": {
         return "bg-blue/20 text-blue";
-      case "tool_call":
+      }
+      case "tool_call": {
         return "bg-purple/20 text-purple";
-      case "tool_result":
+      }
+      case "tool_result": {
         return "bg-green/20 text-green";
-      case "error":
+      }
+      case "error": {
         return "bg-red/20 text-red";
-      case "system":
+      }
+      case "system": {
         return "bg-fg-dim/20 text-fg-dim";
-      default:
+      }
+      default: {
         return "bg-surface-muted text-fg-dim";
+      }
     }
   }
 
@@ -44,12 +50,15 @@
 
   function getRoleClass(role: string | null): string {
     switch (role) {
-      case "user":
+      case "user": {
         return "text-green";
-      case "assistant":
+      }
+      case "assistant": {
         return "text-blue";
-      default:
+      }
+      default: {
         return "text-fg-dim";
+      }
     }
   }
 
@@ -138,7 +147,7 @@
               {getRoleLabel(event.role)}
             </span>
             <span class="text-fg truncate min-w-0">
-              {event.content?.slice(0, 200).replace(/\n/g, " ") ?? ""}
+              {event.content?.slice(0, 200).replaceAll('\n', " ") ?? ""}
             </span>
           </div>
         {/each}

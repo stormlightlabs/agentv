@@ -12,7 +12,7 @@ function createSupportNudgeStore() {
   });
 
   function loadFromStorage(): SupportNudgeState {
-    if (typeof window === "undefined") {
+    if (globalThis.window === undefined) {
       return { onboardingComplete: false, nudgeDismissed: false, firstIngestCompleted: false };
     }
     try {
@@ -27,7 +27,7 @@ function createSupportNudgeStore() {
   }
 
   function saveToStorage(newState: SupportNudgeState): void {
-    if (typeof window === "undefined") return;
+    if (globalThis.window === undefined) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
     } catch {

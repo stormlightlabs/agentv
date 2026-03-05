@@ -4,21 +4,20 @@
   import { page } from "$app/state";
   import AnalyticsPanel from "$lib/components/AnalyticsPanel.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
-  import Dialog from "$lib/components/Dialog.svelte";
-  import Drawer from "$lib/components/Drawer.svelte";
-  import EventInspector from "$lib/components/EventInspector.svelte";
+  import HomeBookmarksSheet from "$lib/components/home/HomeBookmarksSheet.svelte";
+  import HomeEventInspectorModal from "$lib/components/home/HomeEventInspectorModal.svelte";
+  import HomeIngestProgressFooter from "$lib/components/home/HomeIngestProgressFooter.svelte";
+  import HomeSessionListDrawer from "$lib/components/home/HomeSessionListDrawer.svelte";
+  import HomeSessionMetaModal from "$lib/components/home/HomeSessionMetaModal.svelte";
+  import HomeSessionsTab from "$lib/components/home/HomeSessionsTab.svelte";
+  import HomeSupportDialog from "$lib/components/home/HomeSupportDialog.svelte";
+  import HomeTopHeader from "$lib/components/home/HomeTopHeader.svelte";
   import IngestStatusPanel from "$lib/components/IngestStatusPanel.svelte";
-  import Modal from "$lib/components/Modal.svelte";
   import SearchPanel from "$lib/components/SearchPanel.svelte";
-  import SessionList from "$lib/components/SessionList.svelte";
-  import SessionViewer from "$lib/components/SessionViewer.svelte";
-  import Sheet from "$lib/components/Sheet.svelte";
   import SupportPanel from "$lib/components/SupportPanel.svelte";
   import Toast from "$lib/components/Toast.svelte";
-  import WelcomeScreen from "$lib/components/WelcomeScreen.svelte";
   import {
     bookmarkStore,
-    getBookmarkColor,
     getBookmarkDescription,
     getBookmarkIcon,
     type Bookmark,
@@ -46,35 +45,13 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { onDestroy, onMount } from "svelte";
-  import { fade, slide } from "svelte/transition";
+  import { resolve } from "$app/paths";
+  import { SvelteURLSearchParams } from "svelte/reactivity";
 
   type Tab = "sessions" | "search" | "analytics" | "status" | "support";
 
   const toast = useToast();
   const notifications = useNotifications();
-
-  const tabs: Array<{ id: Tab; label: string; icon: string }> = [
-    { id: "sessions", label: "Sessions", icon: "i-ri-chat-3-line" },
-    { id: "search", label: "Search", icon: "i-ri-search-line" },
-    { id: "analytics", label: "Analytics", icon: "i-ri-bar-chart-line" },
-    { id: "status", label: "Status", icon: "i-ri-heart-pulse-line" },
-    { id: "support", label: "Support", icon: "i-ri-heart-line" },
-  ];
-
-  const dateRanges = [
-    { label: "All time", value: "" },
-    { label: "Last 24h", value: "1d" },
-    { label: "Last 7d", value: "7d" },
-    { label: "Last 30d", value: "30d" },
-    { label: "Last 90d", value: "90d" },
-  ];
-
-  const sources = [
-    { id: "claude", name: "Claude" },
-    { id: "codex", name: "Codex" },
-    { id: "opencode", name: "OpenCode" },
-    { id: "crush", name: "Crush" },
-  ];
 
   const minSidebarWidth = 350;
   const maxSidebarWidth = 800;
@@ -109,10 +86,26 @@
   let hasDiffOnly = $state(false);
   let errorsOnly = $state(false);
 
-  let refreshInterval: number | null = null;
+  const params = $derived.by(() => {
+    const p = new SvelteURLSearchParams();
+    if (activeTab !== "sessions") p.set("tab", activeTab);
+    if (filterStore.state.query) p.set("q", filterStore.state.query);
+    if (filterStore.state.sessionId) p.set("session", filterStore.state.sessionId);
+    if (filterStore.state.source) p.set("source", filterStore.state.source);
+    if (filterStore.state.project) p.set("project", filterStore.state.project);
+    if (filterStore.state.kind) p.set("kind", filterStore.state.kind);
+    if (filterStore.state.role) p.set("role", filterStore.state.role);
+    if (filterStore.state.since) p.set("since", filterStore.state.since);
+    if (hasDiffOnly) p.set("hasDiff", "1");
+    if (errorsOnly) p.set("errors", "1");
+
+    return p;
+  });
+
+  let refreshInterval: ReturnType<typeof setInterval> | null = null;
   let showSupportNudge = $state(false);
   let ingestProgress = $state<IngestProgress | null>(null);
-  let progressHideTimeout: number | null = null;
+  let progressHideTimeout: ReturnType<typeof setTimeout> | null = null;
 
   function parseRangeToMs(range: string | null): number | null {
     if (!range) return null;
@@ -175,7 +168,7 @@
 
   let latestVisibleSession = $derived.by(() => {
     if (filteredSessions.length === 0) return null;
-    return [...filteredSessions].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null;
+    return [...filteredSessions].toSorted((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null;
   });
 
   async function loadSessionMetrics() {
@@ -185,8 +178,8 @@
         offset: 0,
       });
       sessionMetricsById = Object.fromEntries(metrics.map((metric) => [metric.session_id, metric]));
-    } catch (e) {
-      console.error("Failed to load session metrics:", e);
+    } catch (error_) {
+      console.error("Failed to load session metrics:", error_);
       sessionMetricsById = {};
     }
   }
@@ -198,9 +191,9 @@
       sessions = await invoke<SessionData[]>("list_sessions");
       newSessionsAvailable = false;
       await loadSessionMetrics();
-    } catch (e) {
-      error = String(e);
-      toast.error(`Failed to load sessions: ${e}`);
+    } catch (error_) {
+      error = String(error_);
+      toast.error(`Failed to load sessions: ${error_}`);
     } finally {
       loading = false;
     }
@@ -215,17 +208,17 @@
         newSessionsAvailable = true;
         toast.info("New sessions available - click refresh to load");
       }
-    } catch (e) {
-      console.error("Failed to check for new sessions:", e);
+    } catch (error_) {
+      console.error("Failed to check for new sessions:", error_);
     }
   }
 
   function startAutoRefresh() {
     if (refreshInterval) return;
 
-    refreshInterval = window.setInterval(() => {
+    refreshInterval = globalThis.setInterval(() => {
       checkForNewSessions();
-    }, 120000);
+    }, 120_000);
   }
 
   function stopAutoRefresh() {
@@ -244,17 +237,6 @@
       stopAutoRefresh();
       toast.info("Auto-refresh disabled");
     }
-  }
-
-  function setSourceScope(source: string | null) {
-    filterStore.setFilter("source", source);
-  }
-
-  function clearTopFilters() {
-    filterStore.setFilter("query", "");
-    filterStore.setFilter("since", null);
-    hasDiffOnly = false;
-    errorsOnly = false;
   }
 
   function handleWindowResize() {
@@ -278,13 +260,13 @@
       const a = document.createElement("a");
       a.href = url;
       a.download = `session-${selectedSession.external_id.slice(0, 8)}.${format}`;
-      document.body.appendChild(a);
+      document.body.append(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       toast.success(`Exported ${format.toUpperCase()}`);
-    } catch (e) {
-      toast.error(`Failed to export session: ${e}`);
+    } catch (error_) {
+      toast.error(`Failed to export session: ${error_}`);
     }
   }
 
@@ -295,9 +277,9 @@
     try {
       events = await invoke<EventData[]>("get_session_events", { sessionId: session.id });
       logInfo("Session selected", { sessionId: session.id, eventCount: events.length });
-    } catch (e) {
-      console.error("Failed to load events:", e);
-      toast.error(`Failed to load events: ${e}`);
+    } catch (error_) {
+      console.error("Failed to load events:", error_);
+      toast.error(`Failed to load events: ${error_}`);
       events = [];
     }
   }
@@ -324,27 +306,32 @@
     if (isNarrowLayout) return;
 
     const step = 20;
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      sidebarWidth = Math.max(minSidebarWidth, sidebarWidth - step);
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault();
-      sidebarWidth = Math.min(maxSidebarWidth, sidebarWidth + step);
-    } else if (event.key === "Home") {
-      event.preventDefault();
-      sidebarWidth = minSidebarWidth;
-    } else if (event.key === "End") {
-      event.preventDefault();
-      sidebarWidth = maxSidebarWidth;
-    }
-  }
+    switch (event.key) {
+      case "ArrowLeft": {
+        event.preventDefault();
+        sidebarWidth = Math.max(minSidebarWidth, sidebarWidth - step);
 
-  async function copyToClipboard(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Copied to clipboard");
-    } catch {
-      toast.error("Failed to copy");
+        break;
+      }
+      case "ArrowRight": {
+        event.preventDefault();
+        sidebarWidth = Math.min(maxSidebarWidth, sidebarWidth + step);
+
+        break;
+      }
+      case "Home": {
+        event.preventDefault();
+        sidebarWidth = minSidebarWidth;
+
+        break;
+      }
+      case "End": {
+        event.preventDefault();
+        sidebarWidth = maxSidebarWidth;
+
+        break;
+      }
+      // No default
     }
   }
 
@@ -397,9 +384,9 @@
       }
 
       await loadSessions();
-    } catch (e) {
-      error = String(e);
-      toast.error(`Failed to ingest ${sourceId}: ${e}`);
+    } catch (error_) {
+      error = String(error_);
+      toast.error(`Failed to ingest ${sourceId}: ${error_}`);
     } finally {
       ingestLoading = false;
     }
@@ -435,9 +422,9 @@
       }
 
       await loadSessions();
-    } catch (e) {
-      error = String(e);
-      toast.error(`Failed to ingest all sources: ${e}`);
+    } catch (error_) {
+      error = String(error_);
+      toast.error(`Failed to ingest all sources: ${error_}`);
     } finally {
       ingestLoading = false;
     }
@@ -480,24 +467,27 @@
 
   function applyBookmark(bookmark: Bookmark) {
     switch (bookmark.type) {
-      case "session":
+      case "session": {
         if (bookmark.data.sessionId) {
           selectSessionById(bookmark.data.sessionId);
         }
         break;
-      case "filter":
+      }
+      case "filter": {
         if (bookmark.data.filters) {
-          Object.entries(bookmark.data.filters).forEach(([key, value]) => {
+          for (const [key, value] of Object.entries(bookmark.data.filters)) {
             if (value) filterStore.setFilter(key as keyof typeof filterStore.state, value);
-          });
+          }
         }
         break;
-      case "search":
+      }
+      case "search": {
         if (bookmark.data.query) {
           filterStore.setFilter("query", bookmark.data.query);
           activeTab = "search";
         }
         break;
+      }
     }
     bookmarksOpen = false;
   }
@@ -730,7 +720,7 @@
       const p = event.payload;
       if (p.phase === "Complete") {
         if (progressHideTimeout) clearTimeout(progressHideTimeout);
-        progressHideTimeout = window.setTimeout(() => {
+        progressHideTimeout = globalThis.setTimeout(() => {
           ingestProgress = null;
         }, 1500);
       } else {
@@ -755,7 +745,7 @@
       }
 
       if (!payload.is_new_session && payload.events.length > 0) {
-        const lastEvent = payload.events[payload.events.length - 1];
+        const lastEvent = payload.events.at(-1)!;
         const summary = (lastEvent.content ?? lastEvent.kind).slice(0, 80);
         notifications.notify(payload.source, summary);
       }
@@ -773,18 +763,18 @@
     setupIngestProgressListener();
     handleWindowResize();
 
-    window.addEventListener("keydown", handleKeydown);
-    window.addEventListener("mousemove", handleResize);
-    window.addEventListener("mouseup", stopResizing);
+    globalThis.addEventListener("keydown", handleKeydown);
+    globalThis.addEventListener("mousemove", handleResize);
+    globalThis.addEventListener("mouseup", stopResizing);
     window.addEventListener("resize", handleWindowResize);
 
     return () => {
       stopAutoRefresh();
       if (unlistenAgentEvents) unlistenAgentEvents();
       if (unlistenIngestProgress) unlistenIngestProgress();
-      window.removeEventListener("keydown", handleKeydown);
-      window.removeEventListener("mousemove", handleResize);
-      window.removeEventListener("mouseup", stopResizing);
+      globalThis.removeEventListener("keydown", handleKeydown);
+      globalThis.removeEventListener("mousemove", handleResize);
+      globalThis.removeEventListener("mouseup", stopResizing);
       window.removeEventListener("resize", handleWindowResize);
     };
   });
@@ -801,19 +791,7 @@
 
   $effect(() => {
     if (browser) {
-      const params = new URLSearchParams();
-      if (activeTab !== "sessions") params.set("tab", activeTab);
-      if (filterStore.state.query) params.set("q", filterStore.state.query);
-      if (filterStore.state.sessionId) params.set("session", filterStore.state.sessionId);
-      if (filterStore.state.source) params.set("source", filterStore.state.source);
-      if (filterStore.state.project) params.set("project", filterStore.state.project);
-      if (filterStore.state.kind) params.set("kind", filterStore.state.kind);
-      if (filterStore.state.role) params.set("role", filterStore.state.role);
-      if (filterStore.state.since) params.set("since", filterStore.state.since);
-      if (hasDiffOnly) params.set("hasDiff", "1");
-      if (errorsOnly) params.set("errors", "1");
-
-      const url = params.toString() ? `?${params.toString()}` : "/";
+      const url = resolve("/", Object.fromEntries(params));
       goto(url, { replaceState: true, keepFocus: true });
     }
   });
@@ -835,455 +813,75 @@
 
 <CommandPalette />
 
-<Sheet bind:open={bookmarksOpen} side="right" width="md" aria-label="Bookmarks">
-  <div class="flex flex-col h-full">
-    <div class="flex items-center justify-between p-4 border-b border-surface-muted">
-      <h2 class="text-lg font-semibold text-fg m-0">Bookmarks</h2>
-      <button
-        class="p-2 text-fg-dim hover:text-fg transition-colors"
-        onclick={() => (bookmarksOpen = false)}
-        aria-label="Close bookmarks">
-        <span class="i-ri-close-line"></span>
-      </button>
-    </div>
+<HomeBookmarksSheet
+  open={bookmarksOpen}
+  onOpenChange={(open) => (bookmarksOpen = open)}
+  bookmarks={bookmarkStore.bookmarks}
+  onApplyBookmark={applyBookmark}
+  onDeleteBookmark={deleteBookmark} />
 
-    <div class="flex-1 overflow-y-auto p-4 space-y-2">
-      {#if bookmarkStore.bookmarks.length === 0}
-        <div class="text-center text-fg-dim py-8">
-          <div class="i-ri-bookmark-line text-3xl mb-2 opacity-50"></div>
-          <p>No bookmarks yet</p>
-          <p class="text-sm">Use Cmd+D to bookmark sessions</p>
-        </div>
-      {:else}
-        {#each bookmarkStore.bookmarks as bookmark (bookmark.id)}
-          <div
-            class="group flex items-start gap-3 p-3 bg-surface-soft rounded border border-surface-muted hover:border-blue transition-colors"
-            onclick={() => applyBookmark(bookmark)}
-            role="button"
-            tabindex="0"
-            onkeydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                applyBookmark(bookmark);
-              }
-            }}>
-            <span class="{getBookmarkIcon(bookmark.type)} {getBookmarkColor(bookmark.type)} mt-0.5"></span>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium text-fg truncate">{bookmark.name}</div>
-              {#if bookmark.description}
-                <div class="text-xs text-fg-dim truncate">{bookmark.description}</div>
-              {/if}
-            </div>
-            <button
-              class="opacity-0 group-hover:opacity-100 p-1 text-fg-dim hover:text-red transition-all"
-              onclick={(e) => {
-                e.stopPropagation();
-                deleteBookmark(bookmark.id);
-              }}
-              aria-label="Delete bookmark"
-              type="button">
-              <span class="i-ri-delete-bin-line"></span>
-            </button>
-          </div>
-        {/each}
-      {/if}
-    </div>
-  </div>
-</Sheet>
+<HomeEventInspectorModal
+  open={showEventInspector}
+  onOpenChange={(open) => (showEventInspector = open)}
+  {selectedEvent} />
 
-{#if showEventInspector && selectedEvent}
-  <Modal bind:open={showEventInspector} size="lg" aria-label="Event inspector">
-    <div class="h-[80vh]">
-      <EventInspector
-        event={selectedEvent}
-        onCopyId={() => toast.success("ID copied")}
-        onCopyPayload={() => toast.success("Payload copied")}
-        onNavigateParent={(parentId) => {
-          if (parentId) {
-            toast.info(`Navigate to parent: ${parentId}`);
-          }
-        }} />
-    </div>
-  </Modal>
-{/if}
-
-{#if showSessionMetaModal && selectedSession}
-  <Modal bind:open={showSessionMetaModal} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-surface-muted bg-surface-soft">
-      <div class="flex items-center gap-3">
-        <h2 class="text-xl font-semibold text-fg m-0">
-          {selectedSession.title || "Untitled Session"}
-        </h2>
-        <span class="px-2 py-0.5 bg-surface-muted rounded text-2xs text-fg-dim uppercase">
-          {selectedSession.source}
-        </span>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          class="px-3 py-1.5 bg-surface border border-surface-muted rounded text-sm text-fg hover:border-blue hover:text-blue transition-colors flex items-center gap-1"
-          onclick={() => copyToClipboard(JSON.stringify(selectedSession, null, 2))}
-          type="button">
-          <span class="i-ri-file-copy-line"></span>
-          Copy Session JSON
-        </button>
-        <button
-          class="p-2 text-fg-dim hover:text-fg transition-colors"
-          onclick={() => (showSessionMetaModal = false)}
-          type="button"
-          aria-label="Close session details">
-          <span class="i-ri-close-line text-xl"></span>
-        </button>
-      </div>
-    </div>
-    <div class="flex-1 overflow-auto p-6">
-      <div class="mb-6 grid grid-cols-3 gap-4 text-sm">
-        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
-          <div class="text-xs text-fg-muted mb-1">Session ID</div>
-          <div class="text-fg font-mono text-xs">{selectedSession.id}</div>
-        </div>
-        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
-          <div class="text-xs text-fg-muted mb-1">External ID</div>
-          <div class="text-fg font-mono text-xs">{selectedSession.external_id}</div>
-        </div>
-        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
-          <div class="text-xs text-fg-muted mb-1">Project</div>
-          <div class="text-fg">{selectedSession.project || "No project"}</div>
-        </div>
-        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
-          <div class="text-xs text-fg-muted mb-1">Created</div>
-          <div class="text-fg">{new Date(selectedSession.created_at).toLocaleString()}</div>
-        </div>
-        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
-          <div class="text-xs text-fg-muted mb-1">Updated</div>
-          <div class="text-fg">{new Date(selectedSession.updated_at).toLocaleString()}</div>
-        </div>
-        <div class="p-3 bg-surface-soft rounded border border-surface-muted">
-          <div class="text-xs text-fg-muted mb-1">Events</div>
-          <div class="text-fg">{events.length} events</div>
-        </div>
-      </div>
-      <div class="bg-surface-soft rounded border border-surface-muted overflow-hidden">
-        <div class="px-4 py-2 border-b border-surface-muted bg-surface-muted/50 flex items-center justify-between">
-          <span class="text-sm font-semibold text-fg">Full Session Data</span>
-          <span class="text-2xs text-fg-dim">JSON</span>
-        </div>
-        <pre class="p-4 text-sm text-fg-dim overflow-x-auto max-h-[50vh]"><code>{JSON.stringify(selectedSession, null, 2)}</code></pre>
-      </div>
-    </div>
-  </Modal>
-{/if}
+<HomeSessionMetaModal
+  open={showSessionMetaModal}
+  onOpenChange={(open) => (showSessionMetaModal = open)}
+  {selectedSession}
+  eventsCount={events.length} />
 
 {#if activeTab === "sessions" && isNarrowLayout}
-  <Drawer bind:open={showSessionListDrawer} direction="left" size="lg" aria-label="Session list drawer">
-    <div class="h-full flex flex-col bg-surface-soft">
-      <div class="px-4 py-3 border-b border-surface-muted flex items-center justify-between">
-        <h2 class="m-0 text-sm font-semibold text-fg">Sessions</h2>
-        <span class="text-2xs text-fg-dim">{filteredSessions.length}</span>
-      </div>
-      <div class="flex-1 overflow-hidden">
-        <SessionList sessions={filteredSessions} {selectedSession} onSelect={selectSession} />
-      </div>
-    </div>
-  </Drawer>
+  <HomeSessionListDrawer
+    open={showSessionListDrawer}
+    onOpenChange={(open) => (showSessionListDrawer = open)}
+    {filteredSessions}
+    {selectedSession}
+    onSelectSession={selectSession} />
 {/if}
 
-<div class="flex h-screen overflow-hidden flex-col">
-  <header class="border-b border-surface-muted bg-surface">
-    <div class="px-4 py-3 flex items-center gap-3 flex-wrap">
-      <div class="flex items-center gap-2">
-        {#if activeTab === "sessions" && isNarrowLayout}
-          <button
-            class="p-2 border border-surface-muted rounded bg-surface-soft text-fg-dim hover:text-fg"
-            onclick={() => (showSessionListDrawer = true)}
-            type="button"
-            title="Open sessions list">
-            <span class="i-ri-menu-line"></span>
-          </button>
-        {/if}
-        <h1 class="m-0 text-lg font-semibold text-fg">Agent V</h1>
-      </div>
-
-      <nav class="flex items-center gap-1 rounded border border-surface-muted bg-surface-soft p-1">
-        {#each tabs as tab}
-          <button
-            class="px-3 py-1.5 rounded text-xs transition-colors border border-transparent flex items-center gap-1.5 {activeTab ===
-            tab.id
-              ? 'bg-surface border-surface-muted text-blue'
-              : 'bg-transparent text-fg-dim hover:text-fg'}"
-            onclick={() => (activeTab = tab.id)}
-            type="button">
-            <span class={tab.icon}></span>
-            <span>{tab.label}</span>
-          </button>
-        {/each}
-      </nav>
-
-      <div class="ml-auto flex items-center gap-2 flex-wrap">
-        <button
-          class="px-2.5 py-1.5 border rounded text-xs bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5"
-          onclick={toggleAutoRefresh}
-          type="button">
-          <span class={autoRefreshEnabled ? "i-ri-checkbox-circle-line text-green" : "i-ri-checkbox-blank-circle-line"}></span>
-          <span>{autoRefreshEnabled ? "Auto" : "Manual"}</span>
-        </button>
-
-        <button
-          class="px-2.5 py-1.5 border rounded text-xs bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5"
-          onclick={loadSessions}
-          type="button">
-          <span class="i-ri-refresh-line"></span>
-          <span>Refresh</span>
-        </button>
-
-        <button
-          class="px-2.5 py-1.5 border rounded text-xs bg-blue text-surface border-blue hover:bg-blue-bright disabled:opacity-50"
-          onclick={ingestAllSources}
-          disabled={ingestLoading}
-          type="button">
-          {ingestLoading ? "Ingesting..." : "Ingest All"}
-        </button>
-
-        <div class="hidden sm:flex items-center gap-1 rounded border border-surface-muted bg-surface-soft p-1">
-          <span class="text-2xs text-fg-dim px-1">Export</span>
-          <button
-            class="px-2 py-1 rounded text-2xs text-fg-dim hover:text-fg"
-            onclick={() => exportSelectedSession("md")}
-            type="button">
-            .md
-          </button>
-          <button
-            class="px-2 py-1 rounded text-2xs text-fg-dim hover:text-fg"
-            onclick={() => exportSelectedSession("json")}
-            type="button">
-            .json
-          </button>
-          <button
-            class="px-2 py-1 rounded text-2xs text-fg-dim hover:text-fg"
-            onclick={() => exportSelectedSession("jsonl")}
-            type="button">
-            .jsonl
-          </button>
-        </div>
-
-        <button
-          class="p-2 text-fg-dim hover:text-fg transition-colors relative"
-          onclick={() => (bookmarksOpen = !bookmarksOpen)}
-          title="Bookmarks (Cmd+B)">
-          <span class="i-ri-bookmark-line"></span>
-          {#if bookmarkStore.bookmarks.length > 0}
-            <span class="absolute top-1 right-1 w-2 h-2 bg-blue rounded-full" aria-hidden="true"> </span>
-          {/if}
-        </button>
-
-        <button
-          class="px-2.5 py-1.5 border rounded text-xs bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5"
-          onclick={keyboardStore.openCommandPalette}
-          type="button">
-          <span class="i-ri-command-line"></span>
-          <span>Cmd+K</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="px-4 py-2 border-t border-surface-muted bg-surface-soft flex items-center gap-2 flex-wrap">
-      <span class="text-2xs text-fg-dim uppercase tracking-wide">Sources</span>
-      <div class="flex items-center gap-1 rounded border border-surface-muted p-1 bg-surface">
-        <button
-          class="px-2 py-1 rounded text-2xs border border-transparent {filterStore.state.source === null
-            ? 'bg-surface-soft border-surface-muted text-blue'
-            : 'text-fg-dim hover:text-fg'}"
-          onclick={() => setSourceScope(null)}
-          type="button">
-          All
-        </button>
-        {#each sources as source}
-          <button
-            class="px-2 py-1 rounded text-2xs border border-transparent {filterStore.state.source === source.id
-              ? 'bg-surface-soft border-surface-muted text-blue'
-              : 'text-fg-dim hover:text-fg'}"
-            onclick={() => setSourceScope(source.id)}
-            type="button">
-            {source.name}
-          </button>
-        {/each}
-      </div>
-
-      <button
-        class="px-2.5 py-1.5 border rounded text-xs bg-surface border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1"
-        onclick={() => (showTopFilters = !showTopFilters)}
-        type="button">
-        <span class="i-ri-filter-3-line"></span>
-        <span>{showTopFilters ? "Hide Filters" : "Filters"}</span>
-      </button>
-
-      {#if filterStore.state.source}
-        <button
-          class="px-2.5 py-1.5 border rounded text-xs bg-surface border-surface-muted text-fg-dim hover:text-fg"
-          onclick={() => ingestSource(filterStore.state.source!)}
-          disabled={ingestLoading}
-          type="button">
-          Refresh {filterStore.state.source}
-        </button>
-      {/if}
-
-      {#if newSessionsAvailable}
-        <div class="ml-auto px-3 py-1.5 bg-yellow/20 border border-yellow rounded text-xs text-yellow flex items-center gap-2" transition:slide>
-          <span class="i-ri-notification-3-line animate-pulse"></span>
-          <span>New sessions available</span>
-          <button
-            class="bg-transparent border-none p-0 text-yellow font-semibold cursor-pointer hover:underline"
-            onclick={loadSessions}
-            type="button">
-            Load
-          </button>
-        </div>
-      {/if}
-    </div>
-
-    {#if showTopFilters}
-      <div class="px-4 py-3 border-t border-surface-muted bg-surface" transition:slide>
-        <div class="grid gap-3 lg:grid-cols-[minmax(0,2fr)_180px_auto_auto_auto] items-center">
-          <div class="relative">
-            <input
-              type="text"
-              class="w-full px-3 py-2 pl-9 bg-surface-soft border border-surface-muted rounded text-fg text-sm focus:outline-none focus:border-blue"
-              placeholder="Search sessions..."
-              bind:value={filterStore.state.query} />
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 i-ri-search-line text-fg-muted"></span>
-          </div>
-
-          <label class="flex items-center gap-2 text-xs text-fg-dim">
-            <span>Date</span>
-            <select
-              class="px-2 py-2 bg-surface-soft border border-surface-muted rounded text-sm text-fg"
-              value={filterStore.state.since || ""}
-              onchange={(e) => filterStore.setFilter("since", e.currentTarget.value || null)}>
-              {#each dateRanges as range}
-                <option value={range.value}>{range.label}</option>
-              {/each}
-            </select>
-          </label>
-
-          <button
-            class="px-3 py-2 border rounded text-xs transition-colors {hasDiffOnly
-              ? 'bg-blue/15 border-blue text-blue'
-              : 'bg-surface-soft border-surface-muted text-fg-dim hover:text-fg'}"
-            onclick={() => (hasDiffOnly = !hasDiffOnly)}
-            type="button">
-            Has diff
-          </button>
-
-          <button
-            class="px-3 py-2 border rounded text-xs transition-colors {errorsOnly
-              ? 'bg-blue/15 border-blue text-blue'
-              : 'bg-surface-soft border-surface-muted text-fg-dim hover:text-fg'}"
-            onclick={() => (errorsOnly = !errorsOnly)}
-            type="button">
-            Errors
-          </button>
-
-          <div class="flex items-center gap-2 justify-end">
-            <button
-              class="px-3 py-2 bg-surface-soft border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
-              onclick={() => (activeTab = "search")}
-              type="button">
-              Open Search
-            </button>
-            <button
-              class="px-3 py-2 bg-transparent border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
-              onclick={clearTopFilters}
-              type="button">
-              Clear
-            </button>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    {#if error}
-      <div class="mx-4 my-2 p-2 bg-red text-surface rounded text-xs" transition:fade>
-        {error}
-      </div>
-    {/if}
-  </header>
+<div class="flex h-screen flex-col overflow-hidden">
+  <HomeTopHeader
+    bind:activeTab
+    bind:bookmarksOpen
+    bind:showTopFilters
+    bind:hasDiffOnly
+    bind:errorsOnly
+    {isNarrowLayout}
+    {autoRefreshEnabled}
+    {ingestLoading}
+    {newSessionsAvailable}
+    {error}
+    onOpenSessionList={() => (showSessionListDrawer = true)}
+    onToggleAutoRefresh={toggleAutoRefresh}
+    onRefreshSessions={loadSessions}
+    onIngestAllSources={ingestAllSources}
+    onExportSession={exportSelectedSession}
+    onIngestSource={ingestSource}
+    onLoadNewSessions={loadSessions} />
 
   <div class="flex-1 overflow-hidden">
     {#if activeTab === "sessions"}
-      <div class="flex h-full overflow-hidden">
-        {#if !isNarrowLayout}
-          <aside
-            class="bg-surface-soft border-r border-surface-muted flex flex-col overflow-hidden relative"
-            style="width: {sidebarWidth}px; min-width: {minSidebarWidth}px;">
-            <!-- TODO: address these -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-            <div
-              class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue/50 transition-colors z-10"
-              onmousedown={startResizing}
-              onkeydown={handleResizerKeydown}
-              role="separator"
-              aria-label="Resize sidebar"
-              aria-valuenow={sidebarWidth}
-              aria-valuemin={minSidebarWidth}
-              aria-valuemax={maxSidebarWidth}
-              tabindex="0">
-            </div>
-
-            <div class="flex-1 overflow-hidden">
-              <SessionList sessions={filteredSessions} {selectedSession} onSelect={selectSession} />
-            </div>
-
-            <div class="p-2 border-t border-surface-muted bg-surface text-xs text-fg-dim">
-              <div class="flex justify-between items-center">
-                <span>{filteredSessions.length} shown</span>
-                <span>{sessions.length} total</span>
-              </div>
-              {#if lastIngestTime}
-                <div class="mt-1">Last update: {lastIngestTime.toLocaleTimeString()}</div>
-              {/if}
-            </div>
-          </aside>
-        {/if}
-
-        <main class="flex-1 overflow-hidden flex flex-col">
-          {#if sessions.length === 0 && !loading}
-            <WelcomeScreen onGetStarted={ingestAllSources} />
-          {:else if selectedSession}
-            <SessionViewer
-              session={selectedSession}
-              {events}
-              onSelectEvent={selectEvent}
-              onOpenDrawer={() => (showSessionMetaModal = true)} />
-          {:else}
-            <div class="flex-1 flex items-center justify-center text-fg-dim px-6" in:fade>
-              <div class="text-center max-w-lg">
-                <div class="i-ri-chat-3-line text-4xl mb-3 opacity-50"></div>
-                <p class="m-0 text-base text-fg">Select a session</p>
-                <p class="text-sm text-fg-muted mt-2 mb-4">Choose a session from the left pane to inspect timeline details.</p>
-                <div class="text-sm text-fg-dim space-y-1">
-                  <p class="m-0">Press Cmd+K to jump to a command or session.</p>
-                  <p class="m-0">Use the top search and filter chips to narrow results.</p>
-                  <p class="m-0">Use Live after opening a session to follow new events.</p>
-                </div>
-                <div class="mt-4 flex items-center justify-center gap-2 flex-wrap">
-                  <button
-                    class="px-3 py-2 bg-surface-soft border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
-                    onclick={keyboardStore.openCommandPalette}
-                    type="button">
-                    Cmd+K Command Palette
-                  </button>
-                  <button
-                    class="px-3 py-2 bg-surface-soft border border-surface-muted rounded text-xs text-fg-dim hover:text-fg"
-                    onclick={followLatestSession}
-                    type="button">
-                    Open Latest Session
-                  </button>
-                </div>
-              </div>
-            </div>
-          {/if}
-        </main>
-      </div>
+      <HomeSessionsTab
+        state={{
+          isNarrowLayout,
+          sidebarWidth,
+          filteredSessions,
+          sessions,
+          selectedSession,
+          events,
+          lastIngestTime,
+          loading,
+        }}
+        actions={{
+          onStartResizing: startResizing,
+          onResizerKeydown: handleResizerKeydown,
+          onSelectSession: selectSession,
+          onGetStarted: ingestAllSources,
+          onSelectEvent: selectEvent,
+          onOpenSessionMeta: () => (showSessionMetaModal = true),
+          onFollowLatestSession: followLatestSession,
+        }} />
     {:else}
       <main class="h-full overflow-hidden">
         {#if activeTab === "search"}
@@ -1300,90 +898,10 @@
   </div>
 </div>
 
-<Dialog bind:open={showSupportNudge} closeOnOutsideClick={false} role="dialog" aria-label="Support Agent V">
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-surface-muted rounded-lg max-w-md w-full shadow-xl">
-      <div class="p-6">
-        <div class="flex items-center gap-3 mb-4">
-          <span class="i-ri-heart-line text-3xl text-red"></span>
-          <h2 class="m-0 text-xl font-semibold text-fg">Support Agent V</h2>
-        </div>
+<HomeSupportDialog
+  open={showSupportNudge}
+  onOpenChange={(open) => (showSupportNudge = open)}
+  onLearnMore={() => (activeTab = "support")}
+  onDismiss={supportNudgeStore.dismissNudge} />
 
-        <p class="m-0 mb-4 text-fg-dim leading-relaxed">
-          Great! You've successfully imported your first sessions. Agent V is <strong>donationware</strong> - free to use
-          with no paid tiers.
-        </p>
-
-        <p class="m-0 mb-6 text-fg-dim leading-relaxed">
-          If Agent V helps your workflow, consider supporting its continued development. Your contribution keeps the
-          project independent and privacy-focused.
-        </p>
-
-        <div class="space-y-3 mb-6">
-          <a
-            href="https://github.com/sponsors/desertthunder"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-3 p-3 bg-surface-soft border border-surface-muted rounded-lg hover:border-blue transition-all no-underline">
-            <span class="i-ri-github-line text-xl text-fg-dim"></span>
-            <div class="flex-1">
-              <div class="font-medium text-fg">GitHub Sponsors</div>
-              <div class="text-sm text-fg-dim">Monthly or one-time support</div>
-            </div>
-            <span class="i-ri-external-link-line text-fg-dim"></span>
-          </a>
-
-          <a
-            href="https://ko-fi.com/desertthunder"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-3 p-3 bg-surface-soft border border-surface-muted rounded-lg hover:border-blue transition-all no-underline">
-            <span class="i-ri-cup-line text-xl text-fg-dim"></span>
-            <div class="flex-1">
-              <div class="font-medium text-fg">Ko-fi</div>
-              <div class="text-sm text-fg-dim">Quick one-time donations</div>
-            </div>
-            <span class="i-ri-external-link-line text-fg-dim"></span>
-          </a>
-        </div>
-
-        <div class="flex gap-3">
-          <button
-            class="flex-1 px-4 py-2 bg-blue text-surface border-none rounded font-medium cursor-pointer hover:bg-blue-bright transition-colors"
-            onclick={() => {
-              showSupportNudge = false;
-              activeTab = "support";
-            }}>
-            Learn More
-          </button>
-          <button
-            class="px-4 py-2 bg-transparent border border-surface-muted rounded text-fg cursor-pointer hover:border-fg transition-colors"
-            onclick={() => {
-              supportNudgeStore.dismissNudge();
-              showSupportNudge = false;
-            }}>
-            Dismiss
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</Dialog>
-
-{#if ingestProgress}
-  <div class="fixed bottom-0 left-0 right-0 z-50" transition:fade={{ duration: 200 }}>
-    <div
-      class="flex items-center justify-between px-3 py-1 bg-surface-soft/90 backdrop-blur-sm border-t border-surface-muted text-xs text-fg-dim">
-      <span>
-        Ingesting {ingestProgress.source}... {ingestProgress.current}/{ingestProgress.total}
-      </span>
-      <span>{ingestProgress.total > 0 ? Math.round((ingestProgress.current / ingestProgress.total) * 100) : 0}%</span>
-    </div>
-    <div class="h-1 bg-surface-muted">
-      <div
-        class="h-full bg-blue transition-all duration-300 ease-out"
-        style="width: {ingestProgress.total > 0 ? (ingestProgress.current / ingestProgress.total) * 100 : 0}%">
-      </div>
-    </div>
-  </div>
-{/if}
+<HomeIngestProgressFooter {ingestProgress} />

@@ -1,11 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=Inter:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap");
 @import "tailwindcss";
 @plugin "@egoist/tailwindcss-icons";
+@plugin "@tailwindcss/forms";
 
 /* Based on Spacemacs Base16 Dark Colors */
 @theme {
-  --color-surface: #282828;
-  --color-surface-soft: #444155;
+  --color-surface: #444155;
+  --color-surface-soft: #282828;
   --color-surface-muted: #585858;
   --color-surface-hard: #1f2022;
 
@@ -51,6 +52,15 @@ body {
   color: var(--color-fg);
   font-size: 14px;
   line-height: 1.6;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 ::-webkit-scrollbar {

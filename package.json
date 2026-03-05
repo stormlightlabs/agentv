@@ -9,7 +9,8 @@
     "build": "pnpm --filter agent-v-gui build",
     "check": "pnpm -r check",
     "format": "pnpm -r format && cargo fmt --all",
-    "tauri": "pnpm --filter agent-v-gui tauri"
+    "tauri": "pnpm --filter agent-v-gui tauri",
+    "lint": "pnpm --filter agent-v-gui lint"
   },
   "devDependencies": {
     "prettier": "^3.8.1",

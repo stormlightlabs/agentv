@@ -1,7 +1,7 @@
 <script lang="ts">
   import DataTable from "$lib/components/DataTable.svelte";
   import { bookmarkStore } from "$lib/stores/bookmarks.svelte";
-  import type { DataTableColumn, SessionData } from "$lib/types";
+  import type { DataTableColumn, DataTableRowAction, SessionData } from "$lib/types";
   import { SvelteSet } from "svelte/reactivity";
   import { fly } from "svelte/transition";
 
@@ -92,6 +92,16 @@
     { key: "project", header: "Project", filterable: true, render: (row) => getProjectName(row) },
     { key: "updated_at", header: "Updated", width: "120px", render: (row) => formatDate(row.updated_at) },
   ];
+
+  const rowActions: DataTableRowAction<SessionData>[] = [
+    {
+      id: "open",
+      label: "Open",
+      icon: "i-ri-external-link-line",
+      title: "Open session",
+      onClick: (row) => onSelect(row),
+    },
+  ];
 </script>
 
 <div class="flex h-full flex-col overflow-hidden" in:fly={{ y: 10, duration: 200 }}>
@@ -138,6 +148,8 @@
   <DataTable
     data={sortedSessions}
     {columns}
+    {rowActions}
+    expandableRows
     keyExtractor={(row) => row.id}
     pageSize={100}
     {onSelect}

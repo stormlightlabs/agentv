@@ -33,8 +33,8 @@
       availableSources = sources;
       availableProjects = projects;
       availableKinds = kinds;
-    } catch (e) {
-      console.error("Failed to load facets:", e);
+    } catch (error_) {
+      console.error("Failed to load facets:", error_);
     }
   }
 
@@ -50,8 +50,8 @@
     try {
       const searchResults: SearchResult[] = await invoke("search_events", { query: query.trim(), facets, limit: 50 });
       results = searchResults;
-    } catch (e) {
-      error = String(e);
+    } catch (error_) {
+      error = String(error_);
       results = [];
     } finally {
       loading = false;
@@ -62,8 +62,8 @@
     try {
       const stats: ActivityStats[] = await invoke("get_activity_stats", { since: "30d", until: null });
       activityStats = stats;
-    } catch (e) {
-      console.error("Failed to load activity stats:", e);
+    } catch (error_) {
+      console.error("Failed to load activity stats:", error_);
     }
   }
 
@@ -107,7 +107,7 @@
 
   function truncateContent(content: string | null, maxLen: number = 120): string {
     if (!content) return "(no content)";
-    const cleaned = content.replace(/\\n/g, " ").replace(/\\s+/g, " ");
+    const cleaned = content.replaceAll(String.raw`\n`, " ").replaceAll(/\\s+/g, " ");
     if (cleaned.length <= maxLen) return cleaned;
     return cleaned.slice(0, maxLen) + "...";
   }
@@ -162,7 +162,7 @@
             performSearch();
           }}>
           <option value="">All sources</option>
-          {#each availableSources as source}
+          {#each availableSources as source (source)}
             <option value={source}>{source}</option>
           {/each}
         </select>
@@ -179,7 +179,7 @@
             performSearch();
           }}>
           <option value="">All projects</option>
-          {#each availableProjects as project}
+          {#each availableProjects as project (project)}
             <option value={project}>{project}</option>
           {/each}
         </select>
@@ -196,7 +196,7 @@
             performSearch();
           }}>
           <option value="">All kinds</option>
-          {#each availableKinds as kind}
+          {#each availableKinds as kind (kind)}
             <option value={kind}>{kind}</option>
           {/each}
         </select>
@@ -232,7 +232,7 @@
     <div class="p-4 bg-surface-soft border-b border-surface-muted">
       <h3 class="m-0 mb-3 text-sm font-semibold text-fg">Activity (Last 30 Days)</h3>
       <div class="flex items-end gap-1 h-25 pb-6 relative">
-        {#each activityStats.slice(0, 14) as stat}
+        {#each activityStats.slice(0, 14) as stat (stat.day)}
           {@const maxEvents = Math.max(...activityStats.map((s) => s.event_count))}
           {@const barHeight = maxEvents > 0 ? (stat.event_count / maxEvents) * 100 : 0}
           <div class="flex-1 flex flex-col items-center relative h-full group">

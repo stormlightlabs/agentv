@@ -18,8 +18,8 @@
       healthData = await invoke<SourceHealth[]>("get_source_health");
       lastChecked = new Date();
       onRefresh?.();
-    } catch (e) {
-      console.error("Failed to load source health:", e);
+    } catch (error) {
+      console.error("Failed to load source health:", error);
     } finally {
       loading = false;
     }
@@ -27,27 +27,35 @@
 
   function getStatusColor(status: SourceHealth["status"]): string {
     switch (status) {
-      case "healthy":
+      case "healthy": {
         return "bg-green";
-      case "degraded":
+      }
+      case "degraded": {
         return "bg-yellow";
-      case "unhealthy":
+      }
+      case "unhealthy": {
         return "bg-red";
-      default:
+      }
+      default: {
         return "bg-fg-dim";
+      }
     }
   }
 
   function getStatusIcon(status: SourceHealth["status"]): string {
     switch (status) {
-      case "healthy":
+      case "healthy": {
         return "i-ri-checkbox-circle-line";
-      case "degraded":
+      }
+      case "degraded": {
         return "i-ri-alert-line";
-      case "unhealthy":
+      }
+      case "unhealthy": {
         return "i-ri-close-circle-line";
-      default:
+      }
+      default: {
         return "i-ri-question-line";
+      }
     }
   }
 

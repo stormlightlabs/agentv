@@ -51,6 +51,9 @@ importers:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.4
         version: 6.2.4(rolldown-vite@7.3.1(@types/node@25.3.3)(esbuild@0.27.0)(jiti@2.6.1))(svelte@5.49.2)
+      '@tailwindcss/forms':
+        specifier: ^0.5.11
+        version: 0.5.11(tailwindcss@4.1.18)
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(rolldown-vite@7.3.1(@types/node@25.3.3)(esbuild@0.27.0)(jiti@2.6.1))
@@ -722,6 +725,11 @@ packages:
     peerDependencies:
       svelte: ^5.0.0
       vite: ^6.3.0 || ^7.0.0
+
+  '@tailwindcss/forms@0.5.11':
+    resolution: {integrity: sha512-h9wegbZDPurxG22xZSoWtdzc41/OlNEUQERNqI/0fOwa2aVlWGu7C35E/x6LDyD3lgtztFSSjKZyuVM0hxhbgA==}
+    peerDependencies:
+      tailwindcss: '>=3.0.0 || >= 3.0.0-alpha.1 || >= 4.0.0-alpha.20 || >= 4.0.0-beta.1'
 
   '@tailwindcss/node@4.1.18':
     resolution: {integrity: sha512-DoR7U1P7iYhw16qJ49fgXUlry1t4CpXeErJHnQ44JgTSKMaZUdf17cfn5mHchfJ4KRBZRFA/Coo+MUF5+gOaCQ==}
@@ -1471,6 +1479,10 @@ packages:
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
+
+  mini-svg-data-uri@1.4.4:
+    resolution: {integrity: sha512-r9deDe9p5FJUPZAk3A59wGH7Ii9YrjjWw0jmw/liSbHl2CHiyXj6FcDXDu2K3TjVAXqiJdaw3xxwlZZr9E6nHg==}
+    hasBin: true
 
   miniflare@4.20260205.0:
     resolution: {integrity: sha512-jG1TknEDeFqcq/z5gsOm1rKeg4cNG7ruWxEuiPxl3pnQumavxo8kFpeQC6XKVpAhh2PI9ODGyIYlgd77sTHl5g==}
@@ -2351,6 +2363,11 @@ snapshots:
       vite: rolldown-vite@7.3.1(@types/node@25.3.3)(esbuild@0.27.0)(jiti@2.6.1)
       vitefu: 1.1.1(rolldown-vite@7.3.1(@types/node@25.3.3)(esbuild@0.27.0)(jiti@2.6.1))
 
+  '@tailwindcss/forms@0.5.11(tailwindcss@4.1.18)':
+    dependencies:
+      mini-svg-data-uri: 1.4.4
+      tailwindcss: 4.1.18
+
   '@tailwindcss/node@4.1.18':
     dependencies:
       '@jridgewell/remapping': 2.3.5
@@ -3037,6 +3054,8 @@ snapshots:
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  mini-svg-data-uri@1.4.4: {}
 
   miniflare@4.20260205.0:
     dependencies:

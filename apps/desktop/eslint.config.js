@@ -1,28 +1,41 @@
-// @ts-check
+import { includeIgnoreFile } from "@eslint/compat";
 import js from "@eslint/js";
+import unicorn from "eslint-plugin-unicorn";
 import svelte from "eslint-plugin-svelte";
-import globals from "globals";
 import { defineConfig } from "eslint/config";
+import globals from "globals";
+import { fileURLToPath } from "node:url";
 import ts from "typescript-eslint";
 import svelteConfig from "./svelte.config.js";
-import unicorn from "eslint-plugin-unicorn";
+
+const gitignorePath = fileURLToPath(new URL("../../.gitignore", import.meta.url));
 
 export default defineConfig(
+  includeIgnoreFile(gitignorePath),
   js.configs.recommended,
   ...ts.configs.recommended,
   ...svelte.configs.recommended,
   unicorn.configs.recommended,
-  { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
+  ...svelte.configs.prettier,
+  {
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    /**
+     * typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
+     * see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
+     */
+    rules: {
+      "no-undef": "off",
+      "unicorn/filename-case": "off",
+      "unicorn/no-null": "off",
+      "unicorn/prevent-abbreviations": "off",
+      "unicorn/no-array-reduce": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+    },
+  },
   {
     files: ["**/*.svelte", "**/*.svelte.ts", "**/*.svelte.js"],
     languageOptions: {
-      parserOptions: {
-        projectService: true,
-        extraFileExtensions: [".svelte"],
-        parser: ts.parser,
-        svelteConfig: { ...svelteConfig, kit: { ...svelteConfig.kit, typescript: undefined } },
-      },
+      parserOptions: { projectService: true, extraFileExtensions: [".svelte"], parser: ts.parser, svelteConfig },
     },
-    rules: { "unicorn/filename-case": "off", "unicorn/no-null": "off", "unicorn/prevent-abbreviations": "off" },
   },
 );

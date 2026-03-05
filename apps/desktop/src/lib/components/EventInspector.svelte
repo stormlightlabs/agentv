@@ -90,28 +90,38 @@
 
     return thinkingBlock?.signature ?? null;
   }
+
+  function getKindColor(kind: string): string {
+    switch (kind) {
+      case "error": {
+        return "bg-red text-surface";
+      }
+      case "tool_call": {
+        return "bg-purple text-surface";
+      }
+      case "tool_result": {
+        return "bg-green text-surface";
+      }
+      default: {
+        return "bg-surface-muted text-fg";
+      }
+    }
+  }
 </script>
 
-<div class="flex flex-col h-full bg-surface">
-  <div class="flex items-center justify-between px-4 py-3 border-b border-surface-muted">
+<div class="bg-surface flex h-full flex-col">
+  <div class="border-surface-muted flex items-center justify-between border-b px-4 py-3">
     <div class="flex items-center gap-2">
-      <span
-        class="px-2 py-1 text-2xs font-semibold uppercase rounded {event.kind === 'error'
-          ? 'bg-red text-surface'
-          : event.kind === 'tool_call'
-            ? 'bg-purple text-surface'
-            : event.kind === 'tool_result'
-              ? 'bg-green text-surface'
-              : 'bg-surface-muted text-fg'}">
+      <span class="text-2xs rounded px-2 py-1 font-semibold uppercase {getKindColor(event.kind)}">
         {event.kind}
       </span>
       {#if event.role}
-        <span class="text-xs text-fg-dim">{event.role}</span>
+        <span class="text-fg-dim text-xs">{event.role}</span>
       {/if}
     </div>
     <div class="flex items-center gap-2">
       <button
-        class="p-1.5 text-fg-dim hover:text-fg transition-colors"
+        class="text-fg-dim hover:text-fg p-1.5 transition-colors"
         title="Copy ID"
         onclick={() => {
           copyToClipboard(event.id);
@@ -120,7 +130,7 @@
         <span class="i-ri-clipboard-line"></span>
       </button>
       <button
-        class="p-1.5 text-fg-dim hover:text-fg transition-colors"
+        class="text-fg-dim hover:text-fg p-1.5 transition-colors"
         title="Copy Payload"
         onclick={() => {
           copyToClipboard(formatJson(payload));
@@ -131,10 +141,10 @@
     </div>
   </div>
 
-  <div class="flex border-b border-surface-muted">
+  <div class="border-surface-muted flex border-b">
     <button
       class="px-4 py-2 text-sm transition-colors {activeTab === 'normalized'
-        ? 'text-fg border-b-2 border-blue'
+        ? 'text-fg border-blue border-b-2'
         : 'text-fg-dim hover:text-fg'}"
       onclick={() => (activeTab = "normalized")}>
       Fields
@@ -142,7 +152,7 @@
     {#if thinkingContent}
       <button
         class="px-4 py-2 text-sm transition-colors {activeTab === 'thinking'
-          ? 'text-fg border-b-2 border-blue'
+          ? 'text-fg border-blue border-b-2'
           : 'text-fg-dim hover:text-fg'}"
         onclick={() => (activeTab = "thinking")}>
         Thinking
@@ -151,7 +161,7 @@
     {#if toolCalls.length > 0}
       <button
         class="px-4 py-2 text-sm transition-colors {activeTab === 'tools'
-          ? 'text-fg border-b-2 border-blue'
+          ? 'text-fg border-blue border-b-2'
           : 'text-fg-dim hover:text-fg'}"
         onclick={() => (activeTab = "tools")}>
         Tools ({toolCalls.length})
@@ -159,7 +169,7 @@
     {/if}
     <button
       class="px-4 py-2 text-sm transition-colors {activeTab === 'raw'
-        ? 'text-fg border-b-2 border-blue'
+        ? 'text-fg border-blue border-b-2'
         : 'text-fg-dim hover:text-fg'}"
       onclick={() => (activeTab = "raw")}>
       Raw JSON
@@ -169,29 +179,29 @@
   <div class="flex-1 overflow-auto p-4">
     {#if activeTab === "normalized"}
       <div class="space-y-3">
-        {#each normalizedFields as field}
+        {#each normalizedFields as field (field.label)}
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
-              <span class="text-xs text-fg-dim uppercase tracking-wide">{field.label}</span>
+              <span class="text-fg-dim text-xs tracking-wide uppercase">{field.label}</span>
               {#if field.type === "parent"}
                 <button
-                  class="text-xs text-blue hover:text-blue-bright"
+                  class="text-blue hover:text-blue-bright text-xs"
                   onclick={() => onNavigateParent?.(field.value)}>
                   Jump to parent
                 </button>
               {/if}
             </div>
             <div
-              class="text-sm text-fg font-mono bg-surface-soft p-2 rounded {field.type === 'path' ? 'break-all' : ''}">
+              class="text-fg bg-surface-soft rounded p-2 font-mono text-sm {field.type === 'path' ? 'break-all' : ''}">
               {field.value}
             </div>
           </div>
         {/each}
 
         {#if event.content}
-          <div class="flex flex-col gap-1 pt-2 border-t border-surface-muted">
-            <span class="text-xs text-fg-dim uppercase tracking-wide">Content</span>
-            <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-surface-soft p-3 rounded">
+          <div class="border-surface-muted flex flex-col gap-1 border-t pt-2">
+            <span class="text-fg-dim text-xs tracking-wide uppercase">Content</span>
+            <div class="text-fg bg-surface-soft rounded p-3 font-mono text-sm whitespace-pre-wrap">
               {event.content}
             </div>
           </div>
@@ -200,37 +210,37 @@
     {:else if activeTab === "thinking" && thinkingContent}
       <div class="space-y-4">
         <div class="flex flex-col gap-1">
-          <span class="text-xs text-fg-dim uppercase tracking-wide">Thinking Content</span>
-          <div class="text-sm text-fg whitespace-pre-wrap font-mono bg-surface-soft p-4 rounded">
+          <span class="text-fg-dim text-xs tracking-wide uppercase">Thinking Content</span>
+          <div class="text-fg bg-surface-soft rounded p-4 font-mono text-sm whitespace-pre-wrap">
             {thinkingContent}
           </div>
         </div>
         {#if signature}
           <div class="flex flex-col gap-1">
-            <span class="text-xs text-fg-dim uppercase tracking-wide">Signature</span>
-            <div class="text-xs text-fg-dim font-mono bg-surface-muted p-2 rounded break-all">{signature}</div>
+            <span class="text-fg-dim text-xs tracking-wide uppercase">Signature</span>
+            <div class="text-fg-dim bg-surface-muted rounded p-2 font-mono text-xs break-all">{signature}</div>
           </div>
         {/if}
       </div>
     {:else if activeTab === "tools" && toolCalls.length > 0}
       <div class="space-y-4">
         {#each toolCalls as tool (tool.id)}
-          <div class="border border-surface-muted rounded-lg overflow-hidden">
-            <div class="bg-surface-soft px-3 py-2 flex items-center gap-2">
+          <div class="border-surface-muted overflow-hidden rounded-lg border">
+            <div class="bg-surface-soft flex items-center gap-2 px-3 py-2">
               <span class="i-ri-tools-line text-fg-dim"></span>
-              <span class="text-sm font-medium text-fg">{tool.name}</span>
-              <span class="text-xs text-fg-dim font-mono">{tool.id}</span>
+              <span class="text-fg text-sm font-medium">{tool.name}</span>
+              <span class="text-fg-dim font-mono text-xs">{tool.id}</span>
             </div>
             <div class="p-3">
-              <div class="text-xs text-fg-dim uppercase tracking-wide mb-1">Input</div>
-              <pre class="text-xs text-fg-dim bg-surface-muted p-2 rounded overflow-x-auto"><code
+              <div class="text-fg-dim mb-1 text-xs tracking-wide uppercase">Input</div>
+              <pre class="text-fg-dim bg-surface-muted overflow-x-auto rounded p-2 text-xs"><code
                   >{formatJson(tool.input)}</code></pre>
             </div>
           </div>
         {/each}
       </div>
     {:else if activeTab === "raw"}
-      <pre class="text-xs text-fg-dim"><code>{formatJson(event.raw_payload)}</code></pre>
+      <pre class="text-fg-dim text-xs"><code>{formatJson(event.raw_payload)}</code></pre>
     {/if}
   </div>
 </div>

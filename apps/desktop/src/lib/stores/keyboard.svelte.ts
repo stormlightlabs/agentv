@@ -84,7 +84,7 @@ export function registerShortcut(shortcut: KeyboardShortcut): () => void {
   shortcuts.push(shortcut);
   return () => {
     const index = shortcuts.indexOf(shortcut);
-    if (index > -1) shortcuts.splice(index, 1);
+    if (index !== -1) shortcuts.splice(index, 1);
   };
 }
 
