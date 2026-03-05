@@ -1,5 +1,6 @@
 <script lang="ts" generics="T extends Record<string, unknown>">
   import type { DataTableColumn, DataTableRowAction } from "$lib/types";
+  import { onMount } from "svelte";
   import { fade, fly } from "svelte/transition";
 
   type Props = {
@@ -33,6 +34,17 @@
   let filters = $state<Record<string, string>>({});
   let currentPage = $state(1);
   let expandedRowIds = $state<string[]>([]);
+  let tableViewportEl = $state<HTMLDivElement | null>(null);
+  let tableViewportWidth = $state(0);
+  let columnWidths = $state<Record<string, number>>({});
+  let hasUserResizedColumns = $state(false);
+  let resizingColumn = $state<{ key: string; startX: number; startWidth: number } | null>(null);
+  const minColumnWidth = 120;
+  const actionColumnWidth = 112;
+  let validExpandedRowIds = $derived.by(() => {
+    const validIds = new Set(filteredData.map((row) => keyExtractor(row)));
+    return expandedRowIds.filter((id) => validIds.has(id));
+  });
 
   function handleSort(column: DataTableColumn<T>) {
     if (!column.sortable) return;
@@ -98,6 +110,7 @@
   let paginatedData = $derived(filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize));
   let hasRowActions = $derived(rowActions.length > 0 || expandableRows);
   let totalColumns = $derived(columns.length + (hasRowActions ? 1 : 0));
+  let columnKeys = $derived(columns.map((column) => String(column.key)));
 
   function handlePageChange(page: number) {
     if (page >= 1 && page <= totalPages) {
@@ -110,8 +123,45 @@
     return sortDirection === "asc" ? "i-ri-arrow-up-line" : "i-ri-arrow-down-line";
   }
 
+  function getColumnWidth(column: DataTableColumn<T>): number {
+    return columnWidths[String(column.key)] ?? getInitialColumnWidth(column);
+  }
+
+  function getInitialColumnWidth(column: DataTableColumn<T>): number {
+    if (!column.width) return minColumnWidth;
+    const parsed = Number.parseInt(column.width, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) return minColumnWidth;
+    return Math.max(minColumnWidth, parsed);
+  }
+
+  function startColumnResize(event: MouseEvent, column: DataTableColumn<T>): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const key = String(column.key);
+    hasUserResizedColumns = true;
+    resizingColumn = { key, startX: event.clientX, startWidth: columnWidths[key] ?? getColumnWidth(column) };
+  }
+
+  function nudgeColumnWidth(column: DataTableColumn<T>, delta: number): void {
+    const key = String(column.key);
+    hasUserResizedColumns = true;
+    const currentWidth = columnWidths[key] ?? getColumnWidth(column);
+    columnWidths = { ...columnWidths, [key]: Math.max(minColumnWidth, currentWidth + delta) };
+  }
+
+  function resizeColumn(event: MouseEvent): void {
+    if (!resizingColumn) return;
+    const delta = event.clientX - resizingColumn.startX;
+    const nextWidth = Math.max(minColumnWidth, resizingColumn.startWidth + delta);
+    columnWidths = { ...columnWidths, [resizingColumn.key]: nextWidth };
+  }
+
+  function stopColumnResize(): void {
+    resizingColumn = null;
+  }
+
   function isRowExpanded(rowId: string): boolean {
-    return expandedRowIds.includes(rowId);
+    return validExpandedRowIds.includes(rowId);
   }
 
   function toggleRowExpansion(rowId: string): void {
@@ -145,19 +195,52 @@
   });
 
   $effect(() => {
-    const validIds = new Set(filteredData.map((row) => keyExtractor(row)));
-    expandedRowIds = expandedRowIds.filter((id) => validIds.has(id));
+    if (hasUserResizedColumns || columnKeys.length === 0 || tableViewportWidth <= 0) {
+      return;
+    }
+
+    const availableWidth = Math.max(
+      tableViewportWidth - (hasRowActions ? actionColumnWidth : 0),
+      minColumnWidth * columnKeys.length,
+    );
+    const equalWidth = Math.max(minColumnWidth, Math.floor(availableWidth / columnKeys.length));
+    columnWidths = Object.fromEntries(
+      columns.map((column) => [String(column.key), Math.max(equalWidth, getInitialColumnWidth(column))]),
+    );
+  });
+
+  onMount(() => {
+    const updateTableWidth = () => {
+      if (tableViewportEl) {
+        tableViewportWidth = tableViewportEl.clientWidth;
+      }
+    };
+
+    const observer = new ResizeObserver(updateTableWidth);
+    if (tableViewportEl) {
+      observer.observe(tableViewportEl);
+    }
+    updateTableWidth();
+
+    globalThis.addEventListener("mousemove", resizeColumn);
+    globalThis.addEventListener("mouseup", stopColumnResize);
+
+    return () => {
+      observer.disconnect();
+      globalThis.removeEventListener("mousemove", resizeColumn);
+      globalThis.removeEventListener("mouseup", stopColumnResize);
+    };
   });
 </script>
 
-<div class="flex flex-col h-full overflow-hidden">
+<div class="flex h-full flex-col overflow-hidden">
   {#if columns.some((c) => c.filterable)}
-    <div class="p-2 border-b border-surface-muted bg-surface-soft flex flex-wrap gap-2">
+    <div class="border-surface-muted bg-surface-soft flex flex-wrap gap-2 border-b p-2">
       {#each columns.filter((c) => c.filterable) as column (String(column.key))}
         <div class="flex items-center gap-1">
           <input
             type="text"
-            class="px-2 py-1 bg-surface border border-surface-muted rounded text-xs text-fg placeholder-fg-dim focus:outline-none focus:border-blue"
+            class="bg-surface border-surface-muted text-fg placeholder-fg-dim focus:border-blue rounded border px-2 py-1 text-xs focus:outline-none"
             placeholder="Filter {column.header}..."
             value={filters[String(column.key)] || ""}
             oninput={(e) => {
@@ -166,37 +249,37 @@
         </div>
       {/each}
       {#if Object.keys(filters).length > 0}
-        <button class="px-2 py-1 text-xs text-fg-dim hover:text-fg transition-colors" onclick={() => (filters = {})}>
+        <button class="text-fg-dim hover:text-fg px-2 py-1 text-xs transition-colors" onclick={() => (filters = {})}>
           Clear filters
         </button>
       {/if}
     </div>
   {/if}
 
-  <div class="flex-1 overflow-auto">
+  <div class="flex-1 overflow-auto" bind:this={tableViewportEl}>
     {#if loading}
-      <div class="p-4 space-y-2">
+      <div class="space-y-2 p-4">
         {#each Array.from({ length: 5 }) as _, i (i)}
-          <div class="h-12 bg-surface-muted rounded animate-pulse" in:fade={{ delay: i * 50 }}></div>
+          <div class="bg-surface-muted h-12 animate-pulse rounded" in:fade={{ delay: i * 50 }}></div>
         {/each}
       </div>
     {:else if paginatedData.length === 0}
-      <div class="flex items-center justify-center h-full text-fg-dim p-8">
+      <div class="text-fg-dim flex h-full items-center justify-center p-8">
         <div class="text-center" in:fade>
-          <div class="i-ri-inbox-line text-4xl mb-2 mx-auto"></div>
+          <div class="i-ri-inbox-line mx-auto mb-2 text-4xl"></div>
           <p class="text-sm">No data available</p>
         </div>
       </div>
     {:else}
-      <table class="w-full text-sm">
-        <thead class="sticky top-0 bg-surface-soft z-10">
-          <tr class="border-b border-surface-muted">
+      <table class="w-full table-fixed text-sm">
+        <thead class="bg-surface-soft sticky top-0 z-10">
+          <tr class="border-surface-muted border-b">
             {#each columns as column (String(column.key))}
               <th
-                class="px-4 py-2 text-left text-xs font-semibold text-fg-dim uppercase tracking-wide whitespace-nowrap {column.sortable
-                  ? 'cursor-pointer hover:text-fg select-none'
+                class="text-fg-dim relative px-4 py-2 pr-5 text-left text-xs font-semibold tracking-wide whitespace-nowrap uppercase {column.sortable
+                  ? 'hover:text-fg cursor-pointer select-none'
                   : ''}"
-                style={column.width ? `width: ${column.width}` : undefined}
+                style={`width: ${getColumnWidth(column)}px;`}
                 onclick={() => handleSort(column)}>
                 <div class="flex items-center gap-1">
                   {column.header}
@@ -204,10 +287,30 @@
                     <span class="{getSortIcon(column)} text-xs opacity-50"></span>
                   {/if}
                 </div>
+                <button
+                  class="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none"
+                  type="button"
+                  aria-label="Resize {column.header} column"
+                  onclick={(event) => event.stopPropagation()}
+                  onkeydown={(event) => {
+                    if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      nudgeColumnWidth(column, -12);
+                    } else if (event.key === "ArrowRight") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      nudgeColumnWidth(column, 12);
+                    }
+                  }}
+                  onmousedown={(event) => startColumnResize(event, column)}>
+                </button>
               </th>
             {/each}
             {#if hasRowActions}
-              <th class="px-4 py-2 text-right text-xs font-semibold text-fg-dim uppercase tracking-wide whitespace-nowrap">
+              <th
+                class="text-fg-dim px-4 py-2 text-right text-xs font-semibold tracking-wide whitespace-nowrap uppercase"
+                style={`width: ${actionColumnWidth}px;`}>
                 Actions
               </th>
             {/if}
@@ -217,14 +320,14 @@
           {#each paginatedData as row, index (keyExtractor(row))}
             {@const rowId = keyExtractor(row)}
             <tr
-              class="border-b border-surface-muted last:border-b-0 transition-colors {selectable
-                ? 'cursor-pointer hover:bg-surface-muted'
+              class="border-surface-muted border-b transition-colors last:border-b-0 {selectable
+                ? 'hover:bg-surface-muted cursor-pointer'
                 : ''} {selectedId === rowId ? 'bg-surface-muted' : ''}"
               in:fly={{ y: 10, duration: 200, delay: index * 30 }}
               onclick={() => selectable && onSelect?.(row)}>
               {#each columns as column (String(column.key))}
                 <td class="px-4 py-3 {getColumnClass(row, column)}">
-                  <div class="max-w-[320px] truncate whitespace-nowrap" title={formatColumnValue(row, column)}>
+                  <div class="min-w-0 truncate whitespace-nowrap" title={formatColumnValue(row, column)}>
                     {formatColumnValue(row, column)}
                   </div>
                 </td>
@@ -244,12 +347,12 @@
                         {#if action.icon}
                           <span class={action.icon}></span>
                         {/if}
-                        <span>{action.label}</span>
+                        <span class:sr-only={!!action.icon}>{action.label}</span>
                       </button>
                     {/each}
                     {#if expandableRows}
                       <button
-                        class="bg-surface border-surface-muted text-fg-dim hover:text-fg rounded border px-2 py-1 text-xs"
+                        class="bg-surface border-surface-muted text-fg-dim hover:text-fg flex items-center rounded border px-2 py-1 text-xs"
                         title={isRowExpanded(rowId) ? "Collapse row details" : "Expand row details"}
                         type="button"
                         onclick={(event) => {
@@ -257,7 +360,7 @@
                           toggleRowExpansion(rowId);
                         }}>
                         <span class={isRowExpanded(rowId) ? "i-ri-arrow-up-s-line" : "i-ri-arrow-down-s-line"}></span>
-                        <span>{isRowExpanded(rowId) ? "Collapse" : "Expand"}</span>
+                        <span class="sr-only">{isRowExpanded(rowId) ? "Collapse" : "Expand"}</span>
                       </button>
                     {/if}
                   </div>
@@ -265,13 +368,15 @@
               {/if}
             </tr>
             {#if expandableRows && isRowExpanded(rowId)}
-              <tr class="border-b border-surface-muted bg-surface/50">
+              <tr class="border-surface-muted bg-surface/50 border-b">
                 <td class="px-4 py-3" colspan={totalColumns}>
                   <div class="grid gap-3 sm:grid-cols-2">
                     {#each columns as column (String(column.key))}
                       <div class="min-w-0">
-                        <div class="text-fg-dim text-2xs uppercase tracking-wide">{column.header}</div>
-                        <div class="text-fg mt-1 break-words whitespace-pre-wrap">{formatColumnValue(row, column)}</div>
+                        <div class="text-fg-dim text-2xs tracking-wide uppercase">{column.header}</div>
+                        <div class="text-fg mt-1 wrap-break-word whitespace-pre-wrap">
+                          {formatColumnValue(row, column)}
+                        </div>
                       </div>
                     {/each}
                   </div>
@@ -285,29 +390,29 @@
   </div>
 
   {#if totalPages > 1}
-    <div class="p-2 border-t border-surface-muted bg-surface-soft flex items-center justify-between text-xs">
+    <div class="border-surface-muted bg-surface-soft flex items-center justify-between border-t p-2 text-xs">
       <span class="text-fg-dim">
         Showing {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length}
       </span>
       <div class="flex items-center gap-1">
         <button
-          class="px-2 py-1 rounded border border-surface-muted bg-surface text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="border-surface-muted bg-surface text-fg-dim hover:text-fg flex items-center rounded border px-2 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           onclick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}
           aria-label="Previous page"
           title="Previous page">
-          <span class="i-ri-arrow-left-s-line"></span>
+          <i class="i-ri-arrow-left-s-line"></i>
         </button>
-        <span class="px-2 text-fg-dim">
+        <span class="text-fg-dim px-2">
           {currentPage} / {totalPages}
         </span>
         <button
-          class="px-2 py-1 rounded border border-surface-muted bg-surface text-fg-dim hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="border-surface-muted bg-surface text-fg-dim hover:text-fg flex items-center rounded border px-2 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           onclick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           aria-label="Next page"
           title="Next page">
-          <span class="i-ri-arrow-right-s-line"></span>
+          <i class="i-ri-arrow-right-s-line"></i>
         </button>
       </div>
     </div>

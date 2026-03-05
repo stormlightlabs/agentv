@@ -27,10 +27,7 @@
     onFollowLatestSession?: () => void;
   };
 
-  type Props = {
-    state: SessionsTabState;
-    actions: SessionsTabActions;
-  };
+  type Props = { state: SessionsTabState; actions: SessionsTabActions };
 
   const minSidebarWidth = 350;
 
@@ -40,7 +37,7 @@
 <div class="flex h-full overflow-hidden">
   {#if !state.isNarrowLayout}
     <aside
-      class="bg-surface-soft border-surface-muted relative flex flex-col overflow-hidden border-r"
+      class="bg-surface-soft border-surface-muted relative flex shrink-0 flex-col overflow-hidden border-r"
       style="width: {state.sidebarWidth}px; min-width: {minSidebarWidth}px;">
       <button
         class="hover:bg-blue/50 absolute top-0 right-0 z-10 h-full w-1 cursor-col-resize border-none bg-transparent p-0 transition-colors"
@@ -51,22 +48,27 @@
       </button>
 
       <div class="flex-1 overflow-hidden">
-        <SessionList sessions={state.filteredSessions} selectedSession={state.selectedSession} onSelect={actions.onSelectSession} />
+        <SessionList
+          sessions={state.filteredSessions}
+          selectedSession={state.selectedSession}
+          onSelect={actions.onSelectSession} />
       </div>
 
-      <div class="border-surface-muted bg-surface text-fg-dim border-t p-2 text-xs">
-        <div class="flex items-center justify-between">
-          <span>{state.filteredSessions.length} shown</span>
-          <span>{state.sessions.length} total</span>
+      <div class="border-surface-muted bg-surface text-fg-dim flex items-center justify-between border-t p-2 text-xs">
+        <div class="flex items-center gap-2">
+          {#if state.lastIngestTime}
+            <span>Last updated: {state.lastIngestTime.toLocaleTimeString()}</span>
+          {/if}
         </div>
-        {#if state.lastIngestTime}
-          <div class="mt-1">Last update: {state.lastIngestTime.toLocaleTimeString()}</div>
-        {/if}
+        <div class="flex items-center gap-2">
+          <span>Loaded</span>
+          <span>{state.filteredSessions.length} / {state.sessions.length} sessions</span>
+        </div>
       </div>
     </aside>
   {/if}
 
-  <main class="flex flex-1 flex-col overflow-hidden">
+  <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
     {#if state.sessions.length === 0 && !state.loading}
       <WelcomeScreen onGetStarted={actions.onGetStarted} />
     {:else if state.selectedSession}
@@ -76,7 +78,9 @@
         onSelectEvent={actions.onSelectEvent}
         onOpenDrawer={actions.onOpenSessionMeta} />
     {:else}
-      <HomeSessionEmptyState onOpenCommandPalette={keyboardStore.openCommandPalette} onFollowLatestSession={actions.onFollowLatestSession} />
+      <HomeSessionEmptyState
+        onOpenCommandPalette={keyboardStore.openCommandPalette}
+        onFollowLatestSession={actions.onFollowLatestSession} />
     {/if}
   </main>
 </div>

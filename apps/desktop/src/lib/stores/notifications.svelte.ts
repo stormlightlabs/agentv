@@ -15,7 +15,7 @@ export class NotificationStore {
   private windowFocusedValue = $state(true);
   private osPermissionGranted = $state(false);
   private readonly throttleMs = 10_000;
-  private readonly groupWindowMs = 1500;
+  private readonly groupWindowMs = 5000;
 
   get windowFocused(): boolean {
     return this.windowFocusedValue;

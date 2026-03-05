@@ -463,6 +463,15 @@ just list
 - [ ] One-click export bundles (charts + stats + referenced sessions)
 - [ ] Performance targets on reference dataset (startup, query p95, memory budget)
 
+### M21 - Parking Lot
+
+**Tasks:**
+
+- [ ] UI State persistence (between app open & close) -> use key:value in SQLite?
+  - [ ] Expanded rows
+  - [ ] Resizable element sizes
+  - [ ] Filters
+
 ## Acceptance Criteria by Phase
 
 - **M0-M1:** Can ingest Claude Code sessions and view them in CLI + Desktop

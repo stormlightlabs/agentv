@@ -55,6 +55,7 @@
 
   const minSidebarWidth = 350;
   const maxSidebarWidth = 800;
+  const minSessionViewerWidth = 520;
   const narrowLayoutBreakpoint = 1180;
 
   let unlistenAgentEvents: UnlistenFn | null = null;
@@ -106,6 +107,29 @@
   let showSupportNudge = $state(false);
   let ingestProgress = $state<IngestProgress | null>(null);
   let progressHideTimeout: ReturnType<typeof setTimeout> | null = null;
+  const refreshProgressLabel = "sessions";
+  const ingestAllProgressLabel = "all sources";
+
+  function clearProgressHideTimeout() {
+    if (progressHideTimeout) {
+      clearTimeout(progressHideTimeout);
+      progressHideTimeout = null;
+    }
+  }
+
+  function setIngestProgress(progress: IngestProgress) {
+    clearProgressHideTimeout();
+    ingestProgress = progress;
+  }
+
+  function completeIngestProgress(source: string, total: number, phase = "Complete") {
+    clearProgressHideTimeout();
+    ingestProgress = { source, phase, current: total, total };
+    progressHideTimeout = globalThis.setTimeout(() => {
+      ingestProgress = null;
+      progressHideTimeout = null;
+    }, 1500);
+  }
 
   function parseRangeToMs(range: string | null): number | null {
     if (!range) return null;
@@ -199,6 +223,15 @@
     }
   }
 
+  async function refreshSessionsWithProgress(source = refreshProgressLabel) {
+    setIngestProgress({ source, phase: "Refreshing", current: 0, total: 1 });
+    try {
+      await loadSessions();
+    } finally {
+      completeIngestProgress(source, 1);
+    }
+  }
+
   async function checkForNewSessions() {
     if (!autoRefreshEnabled) return;
 
@@ -241,6 +274,8 @@
 
   function handleWindowResize() {
     isNarrowLayout = window.innerWidth < narrowLayoutBreakpoint;
+    const sidebarMaxForViewport = Math.max(minSidebarWidth, Math.min(maxSidebarWidth, window.innerWidth - minSessionViewerWidth));
+    sidebarWidth = Math.min(sidebarWidth, sidebarMaxForViewport);
     if (!isNarrowLayout) {
       showSessionListDrawer = false;
     }
@@ -293,7 +328,8 @@
   function handleResize(e: MouseEvent) {
     if (!isResizing || isNarrowLayout) return;
     const newWidth = e.clientX;
-    if (newWidth >= minSidebarWidth && newWidth <= maxSidebarWidth) {
+    const sidebarMaxForViewport = Math.max(minSidebarWidth, Math.min(maxSidebarWidth, window.innerWidth - minSessionViewerWidth));
+    if (newWidth >= minSidebarWidth && newWidth <= sidebarMaxForViewport) {
       sidebarWidth = newWidth;
     }
   }
@@ -361,6 +397,7 @@
   async function ingestSource(sourceId: string) {
     ingestLoading = true;
     error = null;
+    setIngestProgress({ source: sourceId, phase: "Ingesting", current: 0, total: 2 });
 
     try {
       const result = await invoke<IngestResult>("ingest_source", { source: sourceId });
@@ -383,10 +420,13 @@
         toast.info(`No new sessions found in ${sourceId}`);
       }
 
+      setIngestProgress({ source: sourceId, phase: "Refreshing", current: 1, total: 2 });
       await loadSessions();
+      completeIngestProgress(sourceId, 2);
     } catch (error_) {
       error = String(error_);
       toast.error(`Failed to ingest ${sourceId}: ${error_}`);
+      completeIngestProgress(sourceId, 1, "Failed");
     } finally {
       ingestLoading = false;
     }
@@ -395,6 +435,7 @@
   async function ingestAllSources() {
     ingestLoading = true;
     error = null;
+    setIngestProgress({ source: ingestAllProgressLabel, phase: "Ingesting", current: 0, total: 2 });
 
     try {
       const results = await invoke<IngestResult[]>("ingest_all_sources");
@@ -421,10 +462,13 @@
         toast.info("No new sessions found");
       }
 
+      setIngestProgress({ source: ingestAllProgressLabel, phase: "Refreshing", current: 1, total: 2 });
       await loadSessions();
+      completeIngestProgress(ingestAllProgressLabel, 2);
     } catch (error_) {
       error = String(error_);
       toast.error(`Failed to ingest all sources: ${error_}`);
+      completeIngestProgress(ingestAllProgressLabel, 1, "Failed");
     } finally {
       ingestLoading = false;
     }
@@ -552,7 +596,7 @@
       modifiers: { meta: true },
       description: "Refresh sessions",
       scope: "global",
-      handler: loadSessions,
+      handler: refreshSessionsWithProgress,
     });
 
     registerShortcut({
@@ -636,7 +680,7 @@
         icon: "i-ri-refresh-line",
         category: "action",
         shortcut: "Cmd+R",
-        action: loadSessions,
+        action: refreshSessionsWithProgress,
       },
       {
         id: "ingest-all",
@@ -719,16 +763,9 @@
     unlistenIngestProgress = await listen<IngestProgress>("ingest-progress", (event) => {
       const p = event.payload;
       if (p.phase === "Complete") {
-        if (progressHideTimeout) clearTimeout(progressHideTimeout);
-        progressHideTimeout = globalThis.setTimeout(() => {
-          ingestProgress = null;
-        }, 1500);
+        completeIngestProgress(p.source, Math.max(p.total, 1));
       } else {
-        if (progressHideTimeout) {
-          clearTimeout(progressHideTimeout);
-          progressHideTimeout = null;
-        }
-        ingestProgress = p;
+        setIngestProgress(p);
       }
     });
   }
@@ -736,15 +773,18 @@
   async function setupAgentEventListener() {
     unlistenAgentEvents = await listen<StreamingEventPayload>("agent-events", (event) => {
       const payload = event.payload;
+      const isCurrentSession = selectedSession?.external_id === payload.session_external_id;
 
       if (payload.is_new_session) {
         loadSessions();
         notifications.notify(`New ${payload.source} session`, `New session from ${payload.source}`);
-      } else if (selectedSession && selectedSession.external_id === payload.session_external_id) {
+      } else if (isCurrentSession) {
         events = [...events, ...payload.events];
       }
 
-      if (!payload.is_new_session && payload.events.length > 0) {
+      // Avoid spamming toasts for the exact session the user is actively viewing.
+      const shouldNotifyEvent = !payload.is_new_session && payload.events.length > 0 && (!isCurrentSession || !notifications.windowFocused);
+      if (shouldNotifyEvent) {
         const lastEvent = payload.events.at(-1)!;
         const summary = (lastEvent.content ?? lastEvent.kind).slice(0, 80);
         notifications.notify(payload.source, summary);
@@ -854,11 +894,11 @@
     {error}
     onOpenSessionList={() => (showSessionListDrawer = true)}
     onToggleAutoRefresh={toggleAutoRefresh}
-    onRefreshSessions={loadSessions}
+    onRefreshSessions={refreshSessionsWithProgress}
     onIngestAllSources={ingestAllSources}
     onExportSession={exportSelectedSession}
     onIngestSource={ingestSource}
-    onLoadNewSessions={loadSessions} />
+    onLoadNewSessions={refreshSessionsWithProgress} />
 
   <div class="flex-1 overflow-hidden">
     {#if activeTab === "sessions"}
@@ -891,7 +931,7 @@
         {:else if activeTab === "support"}
           <SupportPanel />
         {:else}
-          <IngestStatusPanel onRefresh={loadSessions} />
+          <IngestStatusPanel onRefresh={refreshSessionsWithProgress} />
         {/if}
       </main>
     {/if}

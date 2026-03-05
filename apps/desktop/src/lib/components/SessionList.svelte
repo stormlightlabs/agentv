@@ -34,7 +34,7 @@
 
   function getSourceBadgeClass(source: string): string {
     const classes: Record<string, string> = {
-      claude: "bg-orange text-surface",
+      claude: "bg-orange-bright text-white",
       codex: "bg-surface-hard text-fg-dim",
       opencode: "bg-surface-hard text-fg-dim",
       crush: "bg-purple-bright text-surface",
@@ -90,7 +90,7 @@
       }),
     },
     { key: "project", header: "Project", filterable: true, render: (row) => getProjectName(row) },
-    { key: "updated_at", header: "Updated", width: "120px", render: (row) => formatDate(row.updated_at) },
+    { key: "updated_at", header: "Updated", width: "170px", render: (row) => formatDate(row.updated_at) },
   ];
 
   const rowActions: DataTableRowAction<SessionData>[] = [

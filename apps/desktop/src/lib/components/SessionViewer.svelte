@@ -203,8 +203,8 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col overflow-hidden">
-  <header class="sticky top-0 z-20 px-6 py-4 bg-surface-soft border-b border-surface-muted flex justify-between items-start gap-4">
+<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+  <header class="bg-surface-soft border-surface-muted sticky top-0 z-20 flex flex-wrap items-start justify-between gap-4 border-b px-6 py-4">
     <div class="flex-1 min-w-0">
       <h2 class="m-0 mb-2 text-xl font-semibold text-fg overflow-hidden text-ellipsis whitespace-nowrap">
         {session.title || "Untitled Session"}
@@ -230,7 +230,7 @@
         </span>
       </div>
     </div>
-    <div class="text-right text-xs text-fg-dim shrink-0">
+    <div class="text-right text-fg-dim min-w-0 max-w-full text-xs">
       <div class="mb-1">
         <span class="text-fg-muted">Created:</span>
         {formatDate(session.created_at)}
@@ -239,7 +239,7 @@
         <span class="text-fg-muted">Updated:</span>
         {formatDate(session.updated_at)}
       </div>
-      <div class="flex gap-1 justify-end">
+      <div class="flex flex-wrap justify-end gap-1">
         <button
           class="px-2 py-1 border rounded text-xs cursor-pointer transition-colors {viewMode === 'live'
             ? 'bg-green/10 border-green text-green'
