@@ -100,23 +100,23 @@
   });
 </script>
 
-<div class="flex flex-col h-full">
-  <div class="flex items-center justify-between px-4 py-2 border-b border-surface-muted bg-surface-soft">
+<div class="flex h-full flex-col">
+  <div class="border-surface-muted bg-surface-soft flex items-center justify-between border-b px-4 py-2">
     <div class="flex items-center gap-2 text-sm">
       {#if isLive}
         <span class="relative flex h-2.5 w-2.5">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green"></span>
+          <span class="bg-green absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"></span>
+          <span class="bg-green relative inline-flex h-2.5 w-2.5 rounded-full"></span>
         </span>
         <span class="text-green font-medium">Live</span>
       {:else}
-        <span class="h-2.5 w-2.5 rounded-full bg-fg-dim"></span>
+        <span class="bg-fg-dim h-2.5 w-2.5 rounded-full"></span>
         <span class="text-fg-dim">Idle</span>
       {/if}
       <span class="text-fg-muted text-xs">{eventBuffer.length} events</span>
     </div>
     <button
-      class="px-2 py-1 text-xs border rounded transition-colors {autoScroll
+      class="rounded border px-2 py-1 text-xs transition-colors {autoScroll
         ? 'border-green text-green bg-green/10'
         : 'border-surface-muted text-fg-dim hover:border-fg-dim'}"
       onclick={() => {
@@ -132,22 +132,22 @@
     bind:this={scrollContainer}
     onscroll={handleScroll}>
     {#if eventBuffer.length === 0}
-      <div class="flex items-center justify-center h-full text-fg-dim">
+      <div class="text-fg-dim flex h-full items-center justify-center">
         <p>Waiting for events...</p>
       </div>
     {:else}
-      <div class="p-2 space-y-0.5">
+      <div class="space-y-0.5 p-2">
         {#each eventBuffer as event (event.id)}
-          <div class="flex gap-2 py-1 px-2 rounded hover:bg-surface-soft transition-colors group">
-            <span class="text-fg-muted shrink-0 w-[72px]">{formatTime(event.timestamp)}</span>
-            <span class="shrink-0 px-1.5 py-0.5 rounded text-2xs font-medium {getKindBadgeClass(event.kind)}">
+          <div class="hover:bg-surface-soft group flex gap-2 rounded px-2 py-1 transition-colors">
+            <span class="text-fg-muted w-[72px] shrink-0">{formatTime(event.timestamp)}</span>
+            <span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium {getKindBadgeClass(event.kind)}">
               {event.kind}
             </span>
-            <span class="shrink-0 w-[68px] font-semibold uppercase text-2xs {getRoleClass(event.role)}">
+            <span class="w-[68px] shrink-0 text-xs font-semibold uppercase {getRoleClass(event.role)}">
               {getRoleLabel(event.role)}
             </span>
-            <span class="text-fg truncate min-w-0">
-              {event.content?.slice(0, 200).replaceAll('\n', " ") ?? ""}
+            <span class="text-fg min-w-0 truncate">
+              {event.content?.slice(0, 200).replaceAll("\n", " ") ?? ""}
             </span>
           </div>
         {/each}

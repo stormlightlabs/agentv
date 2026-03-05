@@ -151,7 +151,7 @@
               class="bg-blue group-hover:bg-blue-bright min-h-0.5 w-full rounded-t-sm transition-colors"
               style="height: {barHeight}%">
             </div>
-            <div class="text-2xs text-fg-dim absolute -bottom-6 origin-center -rotate-45 whitespace-nowrap">
+            <div class="text-fg-dim absolute -bottom-6 origin-center -rotate-45 text-xs whitespace-nowrap">
               {stat.day.slice(5)}
             </div>
             <div

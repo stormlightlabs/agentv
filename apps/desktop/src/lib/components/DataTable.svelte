@@ -74,14 +74,23 @@
     return row[key as keyof T];
   }
 
+  function getColumnByKey(key: string): DataTableColumn<T> | undefined {
+    return columns.find((column) => String(column.key) === key);
+  }
+
+  function getColumnValue(row: T, column: DataTableColumn<T>): unknown {
+    return column.valueAccessor ? column.valueAccessor(row) : getCellValue(row, column.key);
+  }
+
   let filteredData = $derived.by(() => {
     let result = [...data];
 
     for (const [key, filterValue] of Object.entries(filters)) {
       if (filterValue) {
         const lowerFilter = filterValue.toLowerCase();
+        const filterColumn = getColumnByKey(key);
         result = result.filter((row) => {
-          const value = getCellValue(row, key);
+          const value = filterColumn ? getColumnValue(row, filterColumn) : getCellValue(row, key);
           return String(value ?? "")
             .toLowerCase()
             .includes(lowerFilter);
@@ -90,10 +99,11 @@
     }
 
     if (sortKey) {
+      const sortColumn = getColumnByKey(sortKey);
       const sortKeyValue = sortKey as keyof T | string;
       result.sort((a, b) => {
-        const aVal = getCellValue(a, sortKeyValue);
-        const bVal = getCellValue(b, sortKeyValue);
+        const aVal = sortColumn ? getColumnValue(a, sortColumn) : getCellValue(a, sortKeyValue);
+        const bVal = sortColumn ? getColumnValue(b, sortColumn) : getCellValue(b, sortKeyValue);
 
         if (aVal === null || aVal === undefined) return 1;
         if (bVal === null || bVal === undefined) return -1;
@@ -169,23 +179,26 @@
   }
 
   function formatColumnValue(row: T, column: DataTableColumn<T>): string {
+    const value = getColumnValue(row, column);
     if (column.render) {
       const rendered = column.render(row);
       if (typeof rendered === "string") return rendered;
       return rendered.text;
     }
-    const value = getCellValue(row, column.key);
     return String(value ?? "-");
   }
 
-  function getColumnClass(row: T, column: DataTableColumn<T>): string {
+  function getColumnPresentation(
+    row: T,
+    column: DataTableColumn<T>,
+  ): { className: string; text: string; value: unknown } {
+    const value = getColumnValue(row, column);
     if (column.render) {
       const rendered = column.render(row);
-      if (typeof rendered === "object" && rendered.className) {
-        return rendered.className;
-      }
+      if (typeof rendered === "string") return { className: "", text: rendered, value };
+      return { className: rendered.className ?? "", text: rendered.text, value };
     }
-    return "";
+    return { className: "", text: String(value ?? "-"), value };
   }
 
   $effect(() => {
@@ -326,10 +339,15 @@
               in:fly={{ y: 10, duration: 200, delay: index * 30 }}
               onclick={() => selectable && onSelect?.(row)}>
               {#each columns as column (String(column.key))}
-                <td class="px-4 py-3 {getColumnClass(row, column)}">
-                  <div class="min-w-0 truncate whitespace-nowrap" title={formatColumnValue(row, column)}>
-                    {formatColumnValue(row, column)}
-                  </div>
+                {@const cell = getColumnPresentation(row, column)}
+                <td class="px-4 py-3 {cell.className}">
+                  {#if column.cellSnippet}
+                    {@render column.cellSnippet(row, cell.value)}
+                  {:else}
+                    <div class="min-w-0 truncate whitespace-nowrap" title={cell.text}>
+                      {cell.text}
+                    </div>
+                  {/if}
                 </td>
               {/each}
               {#if hasRowActions}
@@ -373,7 +391,7 @@
                   <div class="grid gap-3 sm:grid-cols-2">
                     {#each columns as column (String(column.key))}
                       <div class="min-w-0">
-                        <div class="text-fg-dim text-2xs tracking-wide uppercase">{column.header}</div>
+                        <div class="text-fg-dim text-xs tracking-wide uppercase">{column.header}</div>
                         <div class="text-fg mt-1 wrap-break-word whitespace-pre-wrap">
                           {formatColumnValue(row, column)}
                         </div>

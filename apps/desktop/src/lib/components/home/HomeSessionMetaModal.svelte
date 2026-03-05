@@ -40,7 +40,7 @@
         <h2 class="text-fg m-0 text-xl font-semibold">
           {displayTitle}
         </h2>
-        <span class="bg-surface-muted text-2xs text-fg-dim rounded px-2 py-0.5 uppercase">
+        <span class="bg-surface-muted text-fg-dim rounded px-2 py-0.5 text-xs uppercase">
           {selectedSession.source}
         </span>
       </div>
@@ -91,7 +91,7 @@
       <div class="bg-surface-soft border-surface-muted overflow-hidden rounded border">
         <div class="border-surface-muted bg-surface-muted/50 flex items-center justify-between border-b px-4 py-2">
           <span class="text-fg text-sm font-semibold">Full Session Data</span>
-          <span class="text-2xs text-fg-dim">JSON</span>
+          <span class="text-fg-dim text-xs">JSON</span>
         </div>
         <pre class="text-fg-dim max-h-[50vh] overflow-x-auto p-4 text-sm"><code
             >{JSON.stringify(selectedSession, null, 2)}</code></pre>

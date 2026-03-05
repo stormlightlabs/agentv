@@ -16,7 +16,6 @@ export default defineConfig(
   ...ts.configs.recommended,
   ...svelte.configs.recommended,
   unicorn.configs.recommended,
-  ...svelte.configs.prettier,
   {
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     /**

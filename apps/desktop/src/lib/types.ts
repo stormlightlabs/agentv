@@ -1,3 +1,5 @@
+import type { Snippet } from "svelte";
+
 export type SessionData = {
   id: string;
   source: string;
@@ -120,8 +122,9 @@ export type DataTableColumn<T = Record<string, unknown>> = {
   sortable?: boolean;
   filterable?: boolean;
   width?: string;
-  // TODO: support rendering a snippet instead of a string
+  valueAccessor?: (row: T) => unknown;
   render?: (row: T) => string | { text: string; className?: string };
+  cellSnippet?: Snippet<[T, unknown]>;
 };
 
 export type DataTableRowAction<T = Record<string, unknown>> = {

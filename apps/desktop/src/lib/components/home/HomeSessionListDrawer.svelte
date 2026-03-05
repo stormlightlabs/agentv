@@ -18,7 +18,7 @@
   <div class="bg-surface-soft flex h-full flex-col">
     <div class="border-surface-muted flex items-center justify-between border-b px-4 py-3">
       <h2 class="text-fg m-0 text-sm font-semibold">Sessions</h2>
-      <span class="text-2xs text-fg-dim">{filteredSessions.length}</span>
+      <span class="text-fg-dim text-xs">{filteredSessions.length}</span>
     </div>
     <div class="flex-1 overflow-hidden">
       <SessionList sessions={filteredSessions} {selectedSession} onSelect={onSelectSession} />

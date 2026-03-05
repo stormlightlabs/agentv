@@ -76,11 +76,11 @@
   });
 </script>
 
-<div class="flex flex-col h-full overflow-hidden p-4" in:fade={{ duration: 200 }}>
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-semibold text-fg m-0">Data Source Status</h2>
+<div class="flex h-full flex-col overflow-hidden p-4" in:fade={{ duration: 200 }}>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-fg m-0 text-lg font-semibold">Data Source Status</h2>
     <button
-      class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg flex items-center gap-1"
+      class="border-surface-muted text-fg-dim font-inherit hover:border-blue hover:text-fg flex cursor-pointer items-center gap-1 rounded border bg-transparent px-3 py-1.5 text-xs transition-all"
       onclick={loadHealth}
       disabled={loading}>
       <span class={loading ? "i-ri-loader-4-line animate-spin" : "i-ri-refresh-line"}></span>
@@ -88,21 +88,21 @@
     </button>
   </div>
 
-  <div class="text-xs text-fg-dim mb-4">
+  <div class="text-fg-dim mb-4 text-xs">
     Last checked: {formatLastChecked()}
   </div>
 
   <div class="space-y-3">
     {#each healthData as source, index (source.source)}
       <div
-        class="p-3 bg-surface-soft border border-surface-muted rounded transition-all hover:border-blue"
+        class="bg-surface-soft border-surface-muted hover:border-blue rounded border p-3 transition-all"
         in:fly={{ y: 10, duration: 200, delay: index * 50 }}>
-        <div class="flex items-center justify-between mb-2">
+        <div class="mb-2 flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-fg capitalize">
+            <span class="text-fg text-sm font-medium capitalize">
               {source.source}
             </span>
-            <span class="text-2xs uppercase px-1.5 py-0.5 rounded text-surface {getStatusColor(source.status)}">
+            <span class="text-surface rounded px-1.5 py-0.5 text-xs uppercase {getStatusColor(source.status)}">
               {source.status}
             </span>
           </div>
@@ -110,15 +110,15 @@
         </div>
 
         {#if source.path}
-          <div class="text-xs text-fg-dim mb-1 flex items-start gap-1">
-            <span class="i-ri-folder-line shrink-0 mt-0.5"></span>
+          <div class="text-fg-dim mb-1 flex items-start gap-1 text-xs">
+            <span class="i-ri-folder-line mt-0.5 shrink-0"></span>
             <span class="break-all">{source.path}</span>
           </div>
         {/if}
 
         {#if source.message}
-          <div class="text-xs text-fg-dim flex items-start gap-1">
-            <span class="i-ri-information-line shrink-0 mt-0.5"></span>
+          <div class="text-fg-dim flex items-start gap-1 text-xs">
+            <span class="i-ri-information-line mt-0.5 shrink-0"></span>
             <span class="break-all">{source.message}</span>
           </div>
         {/if}
@@ -133,23 +133,23 @@
     {/each}
   </div>
 
-  <div class="mt-4 p-3 bg-surface-soft border border-surface-muted rounded">
-    <h3 class="text-xs font-semibold text-fg-dim uppercase tracking-wide mb-2">Legend</h3>
+  <div class="bg-surface-soft border-surface-muted mt-4 rounded border p-3">
+    <h3 class="text-fg-dim mb-2 text-xs font-semibold tracking-wide uppercase">Legend</h3>
     <div class="space-y-1 text-xs">
       <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-green"></span>
+        <span class="bg-green h-2 w-2 rounded-full"></span>
         <span class="text-fg-dim">Healthy - Source is accessible and working</span>
       </div>
       <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-yellow"></span>
+        <span class="bg-yellow h-2 w-2 rounded-full"></span>
         <span class="text-fg-dim">Degraded - Source accessible but may have issues</span>
       </div>
       <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-red"></span>
+        <span class="bg-red h-2 w-2 rounded-full"></span>
         <span class="text-fg-dim">Unhealthy - Source is not accessible</span>
       </div>
       <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-fg-dim"></span>
+        <span class="bg-fg-dim h-2 w-2 rounded-full"></span>
         <span class="text-fg-dim">Unknown - Could not determine status</span>
       </div>
     </div>

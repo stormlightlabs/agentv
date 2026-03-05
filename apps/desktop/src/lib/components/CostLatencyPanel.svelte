@@ -49,14 +49,14 @@
   }
 </script>
 
-<div class="bg-surface-soft border-b border-surface-muted">
+<div class="bg-surface-soft border-surface-muted border-b">
   {#if loading}
-    <div class="px-6 py-3 flex items-center gap-2 text-fg-dim text-sm">
+    <div class="text-fg-dim flex items-center gap-2 px-6 py-3 text-sm">
       <span class="i-ri-loader-4-line animate-spin"></span>
       Loading cost & latency metrics...
     </div>
   {:else if error}
-    <div class="px-6 py-3 text-red text-sm" transition:fade>
+    <div class="text-red px-6 py-3 text-sm" transition:fade>
       Failed to load metrics: {error}
     </div>
   {:else if metrics}
@@ -66,23 +66,22 @@
       metrics.avg_latency_ms != null || metrics.p50_latency_ms != null || metrics.p95_latency_ms != null}
 
     <div class="px-6 py-4" transition:fade>
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-semibold text-fg flex items-center gap-2 m-0">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-fg m-0 flex items-center gap-2 text-sm font-semibold">
           <span class="i-ri-coins-line text-fg-dim"></span>
           Cost & Efficiency
         </h3>
         {#if metrics.model}
-          <span class="text-xs text-fg-dim bg-surface-muted px-2 py-0.5 rounded">
+          <span class="text-fg-dim bg-surface-muted rounded px-2 py-0.5 text-xs">
             {metrics.provider || "unknown"}/{metrics.model}
           </span>
         {/if}
       </div>
 
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Cost Column -->
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {#if hasCostData}
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-xs text-fg-dim mb-1">Estimated Cost</div>
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim mb-1 text-xs">Estimated Cost</div>
             <div
               class="text-xl font-semibold"
               class:text-green={metrics.estimated_cost && metrics.estimated_cost < 0.01}
@@ -94,45 +93,44 @@
             </div>
           </div>
 
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-xs text-fg-dim mb-1">Input Tokens</div>
-            <div class="text-xl font-semibold text-fg">
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim mb-1 text-xs">Input Tokens</div>
+            <div class="text-fg text-xl font-semibold">
               {formatTokens(metrics.input_tokens)}
             </div>
           </div>
 
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-xs text-fg-dim mb-1">Output Tokens</div>
-            <div class="text-xl font-semibold text-fg">
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim mb-1 text-xs">Output Tokens</div>
+            <div class="text-fg text-xl font-semibold">
               {formatTokens(metrics.output_tokens)}
             </div>
           </div>
         {:else}
-          <div class="p-3 bg-surface rounded border border-surface-muted col-span-2 lg:col-span-3">
-            <div class="text-sm text-fg-dim">
+          <div class="bg-surface border-surface-muted col-span-2 rounded border p-3 lg:col-span-3">
+            <div class="text-fg-dim text-sm">
               No cost data available. Cost tracking requires model metadata and token estimates.
             </div>
           </div>
         {/if}
 
-        <!-- Latency Column -->
         {#if hasLatencyData}
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-xs text-fg-dim mb-1">Avg Latency</div>
-            <div class="text-xl font-semibold text-fg">
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim mb-1 text-xs">Avg Latency</div>
+            <div class="text-fg text-xl font-semibold">
               {formatDuration(metrics.avg_latency_ms)}
             </div>
           </div>
 
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-xs text-fg-dim mb-1">P50 Latency</div>
-            <div class="text-xl font-semibold text-fg">
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim mb-1 text-xs">P50 Latency</div>
+            <div class="text-fg text-xl font-semibold">
               {formatDuration(metrics.p50_latency_ms)}
             </div>
           </div>
 
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-xs text-fg-dim mb-1">P95 Latency</div>
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim mb-1 text-xs">P95 Latency</div>
             <div
               class="text-xl font-semibold"
               class:text-green={metrics.p95_latency_ms && metrics.p95_latency_ms < 5000}
@@ -144,9 +142,9 @@
             </div>
           </div>
 
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-xs text-fg-dim mb-1">Duration</div>
-            <div class="text-xl font-semibold text-fg">
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim mb-1 text-xs">Duration</div>
+            <div class="text-fg text-xl font-semibold">
               {#if metrics.duration_seconds}
                 {Math.round(metrics.duration_seconds / 60)}m
               {:else}
@@ -155,20 +153,19 @@
             </div>
           </div>
         {:else}
-          <div class="p-3 bg-surface rounded border border-surface-muted">
-            <div class="text-sm text-fg-dim">No latency data available</div>
+          <div class="bg-surface border-surface-muted rounded border p-3">
+            <div class="text-fg-dim text-sm">No latency data available</div>
           </div>
         {/if}
       </div>
 
-      <!-- Efficiency Metrics -->
       {#if metrics.tool_call_count > 0 || metrics.error_count > 0}
-        <div class="mt-4 pt-3 border-t border-surface-muted">
+        <div class="border-surface-muted mt-4 border-t pt-3">
           <div class="grid grid-cols-3 gap-4 text-sm">
             <div class="flex items-center gap-2">
               <span class="i-ri-tools-line text-fg-dim"></span>
               <span class="text-fg-dim">Tool Calls:</span>
-              <span class="font-semibold text-fg">{metrics.tool_call_count}</span>
+              <span class="text-fg font-semibold">{metrics.tool_call_count}</span>
             </div>
             <div class="flex items-center gap-2">
               <span class="i-ri-error-warning-line text-fg-dim"></span>
@@ -183,13 +180,13 @@
             <div class="flex items-center gap-2">
               <span class="i-ri-file-line text-fg-dim"></span>
               <span class="text-fg-dim">Files Touched:</span>
-              <span class="font-semibold text-fg">{metrics.files_touched}</span>
+              <span class="text-fg font-semibold">{metrics.files_touched}</span>
             </div>
           </div>
         </div>
       {/if}
     </div>
   {:else}
-    <div class="px-6 py-3 text-fg-dim text-sm" transition:fade>No metrics available for this session.</div>
+    <div class="text-fg-dim px-6 py-3 text-sm" transition:fade>No metrics available for this session.</div>
   {/if}
 </div>

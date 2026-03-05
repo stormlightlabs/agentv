@@ -119,17 +119,17 @@
   });
 </script>
 
-<div class="flex flex-col h-full overflow-hidden">
-  <div class="p-4 border-b border-surface-muted bg-surface-soft">
-    <div class="flex gap-2 mb-3">
+<div class="flex h-full flex-col overflow-hidden">
+  <div class="border-surface-muted bg-surface-soft border-b p-4">
+    <div class="mb-3 flex gap-2">
       <input
         type="text"
-        class="flex-1 px-3 py-2 bg-surface border border-surface-muted rounded text-fg font-inherit text-sm focus:outline-none focus:border-blue"
+        class="bg-surface border-surface-muted text-fg font-inherit focus:border-blue flex-1 rounded border px-3 py-2 text-sm focus:outline-none"
         placeholder="Search across sessions..."
         bind:value={query}
         onkeydown={handleKeydown} />
       <button
-        class="px-4 py-2 bg-blue text-surface border-none rounded font-inherit text-sm cursor-pointer transition-colors hover:not-disabled:bg-blue-bright disabled:opacity-50 disabled:cursor-not-allowed"
+        class="bg-blue text-surface font-inherit hover:not-disabled:bg-blue-bright cursor-pointer rounded border-none px-4 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         onclick={performSearch}
         disabled={loading}>
         {loading ? "Searching..." : "Search"}
@@ -138,12 +138,12 @@
 
     <div class="flex gap-2">
       <button
-        class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
+        class="border-surface-muted text-fg-dim font-inherit hover:border-blue hover:text-fg cursor-pointer rounded border bg-transparent px-3 py-1.5 text-xs transition-all"
         onclick={() => (showFilters = !showFilters)}>
         {showFilters ? "Hide Filters" : "Show Filters"}
       </button>
       <button
-        class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer transition-all hover:border-blue hover:text-fg"
+        class="border-surface-muted text-fg-dim font-inherit hover:border-blue hover:text-fg cursor-pointer rounded border bg-transparent px-3 py-1.5 text-xs transition-all"
         onclick={() => (showAnalytics = !showAnalytics)}>
         {showAnalytics ? "Hide Analytics" : "Show Analytics"}
       </button>
@@ -151,12 +151,12 @@
   </div>
 
   {#if showFilters}
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 p-4 bg-surface border-b border-surface-muted">
+    <div class="bg-surface border-surface-muted grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-b p-4">
       <div class="flex flex-col gap-1">
-        <label for="since-filter" class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
+        <label for="since-filter" class="text-fg-dim text-xs tracking-wide uppercase">Since</label>
         <select
           id="since-filter"
-          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="bg-surface-soft border-surface-muted text-fg font-inherit focus:border-blue cursor-pointer rounded border px-2 py-1.5 text-sm focus:outline-none"
           value={facets.since || ""}
           onchange={(e) => {
             facets.since = e.currentTarget.value || undefined;
@@ -170,10 +170,10 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label for="project-filter" class="text-xs text-fg-dim uppercase tracking-wide">Project</label>
+        <label for="project-filter" class="text-fg-dim text-xs tracking-wide uppercase">Project</label>
         <select
           id="project-filter"
-          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="bg-surface-soft border-surface-muted text-fg font-inherit focus:border-blue cursor-pointer rounded border px-2 py-1.5 text-sm focus:outline-none"
           value={facets.project || ""}
           onchange={(e) => {
             facets.project = e.currentTarget.value || undefined;
@@ -187,10 +187,10 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label for="kind-filter" class="text-xs text-fg-dim uppercase tracking-wide">Event Kind</label>
+        <label for="kind-filter" class="text-fg-dim text-xs tracking-wide uppercase">Event Kind</label>
         <select
           id="kind-filter"
-          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="bg-surface-soft border-surface-muted text-fg font-inherit focus:border-blue cursor-pointer rounded border px-2 py-1.5 text-sm focus:outline-none"
           value={facets.kind || ""}
           onchange={(e) => {
             facets.kind = e.currentTarget.value || undefined;
@@ -204,10 +204,10 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label for="since-filter" class="text-xs text-fg-dim uppercase tracking-wide">Since</label>
+        <label for="since-filter" class="text-fg-dim text-xs tracking-wide uppercase">Since</label>
         <select
           id="since-filter"
-          class="px-2 py-1.5 bg-surface-soft border border-surface-muted rounded text-fg font-inherit text-sm cursor-pointer focus:outline-none focus:border-blue"
+          class="bg-surface-soft border-surface-muted text-fg font-inherit focus:border-blue cursor-pointer rounded border px-2 py-1.5 text-sm focus:outline-none"
           value={facets.since || ""}
           onchange={(e) => {
             facets.since = e.currentTarget.value || undefined;
@@ -222,7 +222,7 @@
       </div>
 
       <button
-        class="px-3 py-1.5 bg-transparent border border-surface-muted rounded text-fg-dim font-inherit text-xs cursor-pointer self-end transition-colors hover:border-red hover:text-red"
+        class="border-surface-muted text-fg-dim font-inherit hover:border-red hover:text-red cursor-pointer self-end rounded border bg-transparent px-3 py-1.5 text-xs transition-colors"
         onclick={clearFilters}>
         Clear Filters
       </button>
@@ -230,22 +230,22 @@
   {/if}
 
   {#if showAnalytics && activityStats.length > 0}
-    <div class="p-4 bg-surface-soft border-b border-surface-muted">
-      <h3 class="m-0 mb-3 text-sm font-semibold text-fg">Activity (Last 30 Days)</h3>
-      <div class="flex items-end gap-1 h-25 pb-6 relative">
+    <div class="bg-surface-soft border-surface-muted border-b p-4">
+      <h3 class="text-fg m-0 mb-3 text-sm font-semibold">Activity (Last 30 Days)</h3>
+      <div class="relative flex h-25 items-end gap-1 pb-6">
         {#each activityStats.slice(0, 14) as stat (stat.day)}
           {@const maxEvents = Math.max(...activityStats.map((s) => s.event_count))}
           {@const barHeight = maxEvents > 0 ? (stat.event_count / maxEvents) * 100 : 0}
-          <div class="flex-1 flex flex-col items-center relative h-full group">
+          <div class="group relative flex h-full flex-1 flex-col items-center">
             <div
-              class="w-full bg-blue rounded-t-sm min-h-0.5 transition-colors group-hover:bg-blue-bright"
+              class="bg-blue group-hover:bg-blue-bright min-h-0.5 w-full rounded-t-sm transition-colors"
               style="height: {barHeight}%">
             </div>
-            <div class="absolute -bottom-5 text-2xs text-fg-dim -rotate-45 origin-center whitespace-nowrap">
+            <div class="text-fg-dim absolute -bottom-5 origin-center -rotate-45 text-xs whitespace-nowrap">
               {stat.day.slice(5)}
             </div>
             <div
-              class="absolute bottom-full left-1/2 -translate-x-1/2 px-2 py-1 bg-surface border border-surface-muted rounded text-xs text-fg whitespace-nowrap opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 z-10">
+              class="bg-surface border-surface-muted text-fg pointer-events-none absolute bottom-full left-1/2 z-10 -translate-x-1/2 rounded border px-2 py-1 text-xs whitespace-nowrap opacity-0 transition-opacity group-hover:opacity-100">
               {stat.day}: {stat.event_count} events, {stat.session_count} sessions
             </div>
           </div>
@@ -255,19 +255,19 @@
   {/if}
 
   {#if error}
-    <div class="mx-4 my-2 p-2 bg-red text-surface rounded text-xs">{error}</div>
+    <div class="bg-red text-surface mx-4 my-2 rounded p-2 text-xs">{error}</div>
   {/if}
 
-  <div class="flex-1 overflow-hidden flex flex-col">
+  <div class="flex flex-1 flex-col overflow-hidden">
     {#if results.length > 0}
-      <div class="px-4 py-2 border-b border-surface-muted bg-surface-soft">
-        <span class="text-xs text-fg-dim">{results.length} results</span>
+      <div class="border-surface-muted bg-surface-soft border-b px-4 py-2">
+        <span class="text-fg-dim text-xs">{results.length} results</span>
       </div>
 
       <div class="flex-1 overflow-y-auto p-2">
         {#each results as result (result.event.id)}
           <div
-            class="p-3 mb-2 bg-surface-soft border border-surface-muted rounded transition-colors hover:border-blue cursor-pointer"
+            class="bg-surface-soft border-surface-muted hover:border-blue mb-2 cursor-pointer rounded border p-3 transition-colors"
             onclick={() => onSelectEvent?.(result.event)}
             onkeydown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -278,40 +278,40 @@
             role="button"
             tabindex="0"
             aria-label="View event details">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs text-fg-dim">{formatTimestamp(result.event.timestamp)}</span>
-              <span class="text-2xs font-semibold px-1.5 py-0.5 rounded uppercase {getKindClass(result.event.kind)}">
+            <div class="mb-2 flex items-center gap-2">
+              <span class="text-fg-dim text-xs">{formatTimestamp(result.event.timestamp)}</span>
+              <span class="rounded px-1.5 py-0.5 text-xs font-semibold uppercase {getKindClass(result.event.kind)}">
                 {getKindLabel(result.event.kind)}
               </span>
               {#if result.event.role}
-                <span class="text-2xs text-fg-dim lowercase">{result.event.role}</span>
+                <span class="text-fg-dim text-xs lowercase">{result.event.role}</span>
               {/if}
             </div>
-            <div class="text-sm text-fg leading-snug wrap-break-word mb-2">
+            <div class="text-fg mb-2 text-sm leading-snug wrap-break-word">
               {truncateContent(result.event.content)}
             </div>
-            <div class="flex justify-between items-center">
+            <div class="flex items-center justify-between">
               <button
-                class="bg-transparent border-none p-0 font-inherit text-xs text-blue cursor-pointer underline hover:text-blue-bright"
+                class="font-inherit text-blue hover:text-blue-bright cursor-pointer border-none bg-transparent p-0 text-xs underline"
                 onclick={() => onSelectSession?.(result.event.session_id)}>
                 Session: {result.event.session_id.slice(0, 8)}
               </button>
-              <span class="text-2xs text-fg-dim">rank: {result.rank.toFixed(4)}</span>
+              <span class="text-fg-dim text-xs">rank: {result.rank.toFixed(4)}</span>
             </div>
           </div>
         {/each}
       </div>
     {:else if query && !loading}
-      <div class="flex-1 flex flex-col items-center justify-center text-fg-dim text-center p-8">
+      <div class="text-fg-dim flex flex-1 flex-col items-center justify-center p-8 text-center">
         <p>No results found for "{query}"</p>
         {#if Object.keys(facets).length > 0}
-          <p class="text-sm mt-2">Try adjusting your filters</p>
+          <p class="mt-2 text-sm">Try adjusting your filters</p>
         {/if}
       </div>
     {:else if !query}
-      <div class="flex-1 flex flex-col items-center justify-center text-fg-dim text-center p-8">
+      <div class="text-fg-dim flex flex-1 flex-col items-center justify-center p-8 text-center">
         <p>Enter a search query to find events across sessions</p>
-        <p class="text-sm mt-2">Search supports full-text matching on event content</p>
+        <p class="mt-2 text-sm">Search supports full-text matching on event content</p>
       </div>
     {/if}
   </div>

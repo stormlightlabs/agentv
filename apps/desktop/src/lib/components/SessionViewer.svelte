@@ -248,43 +248,47 @@
       </div>
       <div class="flex flex-wrap justify-end gap-1">
         <button
-          class="cursor-pointer rounded border px-2 py-1 text-xs transition-colors {viewMode === 'live'
+          class="flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs transition-colors {viewMode ===
+          'live'
             ? 'bg-green/10 border-green text-green'
             : 'bg-surface border-surface-muted hover:border-green hover:text-green'}"
           onclick={() => (viewMode = viewMode === "live" ? "static" : "live")}
           title="Toggle live log view">
           <span class="i-ri-live-line"></span>
-          Live
+          <span>Live</span>
         </button>
         {#if onOpenDrawer}
           <button
-            class="bg-surface border-surface-muted hover:border-blue hover:text-blue cursor-pointer rounded border px-2 py-1 text-xs transition-colors"
+            class="bg-surface border-surface-muted hover:border-blue hover:text-blue flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs transition-colors"
             onclick={onOpenDrawer}
             title="View session details">
             <span class="i-ri-information-line"></span>
-            Details
+            <span>Details</span>
           </button>
         {/if}
         <button
-          class="bg-surface border-surface-muted hover:border-blue hover:text-blue cursor-pointer rounded border px-2 py-1 text-xs transition-colors disabled:opacity-50"
+          class="bg-surface border-surface-muted hover:border-blue hover:text-blue flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs transition-colors disabled:opacity-50"
           onclick={() => exportSession("md")}
           disabled={exporting}
           title="Export as Markdown">
-          .md
+          <i class="i-ri-download-line"></i>
+          <span>.md</span>
         </button>
         <button
-          class="bg-surface border-surface-muted hover:border-blue hover:text-blue cursor-pointer rounded border px-2 py-1 text-xs transition-colors disabled:opacity-50"
+          class="bg-surface border-surface-muted hover:border-blue hover:text-blue flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs transition-colors disabled:opacity-50"
           onclick={() => exportSession("json")}
           disabled={exporting}
           title="Export as JSON">
-          .json
+          <i class="i-ri-download-line"></i>
+          <span>.json</span>
         </button>
         <button
-          class="bg-surface border-surface-muted hover:border-blue hover:text-blue cursor-pointer rounded border px-2 py-1 text-xs transition-colors disabled:opacity-50"
+          class="bg-surface border-surface-muted hover:border-blue hover:text-blue flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs transition-colors disabled:opacity-50"
           onclick={() => exportSession("jsonl")}
           disabled={exporting}
           title="Export as JSONL">
-          .jsonl
+          <i class="i-ri-download-line"></i>
+          <span>.jsonl</span>
         </button>
       </div>
     </div>

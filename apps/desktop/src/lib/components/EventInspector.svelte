@@ -112,7 +112,7 @@
 <div class="bg-surface flex h-full flex-col">
   <div class="border-surface-muted flex items-center justify-between border-b px-4 py-3">
     <div class="flex items-center gap-2">
-      <span class="text-2xs rounded px-2 py-1 font-semibold uppercase {getKindColor(event.kind)}">
+      <span class="rounded px-2 py-1 text-xs font-semibold uppercase {getKindColor(event.kind)}">
         {event.kind}
       </span>
       {#if event.role}

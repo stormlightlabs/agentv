@@ -46,6 +46,30 @@ export function getDisplayProject(project: string | null | undefined): string {
   return value;
 }
 
+export function parseProjectTitle(project: string | null | undefined): { name: string; branch?: string } {
+  const value = compactWhitespace(project);
+  if (!value) return { name: "No project" };
+
+  const gitIndex = value.indexOf(".git/");
+  if (gitIndex !== -1) {
+    const repoPart = value.slice(0, gitIndex);
+    const branchPart = value.slice(gitIndex + 5);
+    const repoName = repoPart.split("/").findLast(Boolean) ?? repoPart;
+    return { name: repoName, branch: branchPart };
+  }
+
+  if (value.startsWith("-Users-")) {
+    return { name: projectFromDashedPath(value) };
+  }
+
+  if (value.startsWith("/")) {
+    const parts = value.split("/").filter(Boolean);
+    return { name: parts.at(-1) ?? value };
+  }
+
+  return { name: value };
+}
+
 export function getDisplayExternalId(source: string, externalId: string): string {
   const value = compactWhitespace(externalId);
   if (!value) return "unknown";

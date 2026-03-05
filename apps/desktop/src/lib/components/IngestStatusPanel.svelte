@@ -44,7 +44,7 @@
         lastDurationMs: previous?.lastDurationMs ?? 0,
         lastImported: previous?.lastImported ?? 0,
         lastFailed: isFailed ? 1 : 0,
-        status: isFailed ? "failed" : (isStale ? "stale" : "fresh"),
+        status: isFailed ? "failed" : isStale ? "stale" : "fresh",
       };
     }
 
@@ -225,7 +225,7 @@
         <div class="mb-3 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="text-fg text-sm font-medium capitalize">{source.source}</span>
-            <span class="text-2xs text-surface rounded px-1.5 py-0.5 uppercase {getStatusColor(source.status)}">
+            <span class="text-surface rounded px-1.5 py-0.5 text-xs uppercase {getStatusColor(source.status)}">
               {source.status}
             </span>
           </div>
@@ -254,9 +254,9 @@
                 <span class="text-fg-dim text-xs">
                   {history.status === "fresh"
                     ? `Last: ${formatTimeAgo(history.lastSuccess)}`
-                    : (history.status === "stale"
+                    : history.status === "stale"
                       ? `Stale for ${formatTimeAgo(new Date(Date.now() - 5 * 60 * 1000))}`
-                      : "Last ingest failed")}
+                      : "Last ingest failed"}
                 </span>
               </div>
               <div class="text-fg-dim text-right text-xs">
@@ -267,15 +267,15 @@
             <div class="grid grid-cols-3 gap-2 text-center">
               <div class="bg-surface rounded p-2">
                 <div class="text-green text-sm font-semibold">{history.successCount}</div>
-                <div class="text-2xs text-fg-dim">Successes</div>
+                <div class="text-fg-dim text-xs">Successes</div>
               </div>
               <div class="bg-surface rounded p-2">
                 <div class="text-red text-sm font-semibold">{history.failureCount}</div>
-                <div class="text-2xs text-fg-dim">Failures</div>
+                <div class="text-fg-dim text-xs">Failures</div>
               </div>
               <div class="bg-surface rounded p-2">
                 <div class="text-blue text-sm font-semibold">{history.lastImported}</div>
-                <div class="text-2xs text-fg-dim">Last Import</div>
+                <div class="text-fg-dim text-xs">Last Import</div>
               </div>
             </div>
           </div>

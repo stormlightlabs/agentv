@@ -2,7 +2,7 @@
   import DataTable from "$lib/components/DataTable.svelte";
   import { bookmarkStore } from "$lib/stores/bookmarks.svelte";
   import type { DataTableColumn, DataTableRowAction, SessionData } from "$lib/types";
-  import { getDisplayProject, getDisplaySessionTitle } from "$lib/utils/sessionDisplay";
+  import { getDisplayProject, getDisplaySessionTitle, parseProjectTitle } from "$lib/utils/sessionDisplay";
   import { SvelteSet } from "svelte/reactivity";
   import { fly } from "svelte/transition";
 
@@ -37,10 +37,10 @@
         return "font-mono bg-orange-bright text-white";
       }
       case "codex": {
-        return "font-mono bg-surface-hard text-fg-dim";
+        return "font-mono bg-surface text-fg-dim";
       }
       case "opencode": {
-        return "font-mono bg-surface-hard text-fg-dim";
+        return "font-mono bg-fg-dim text-surface";
       }
       case "crush": {
         return "font-mono bg-purple-bright text-surface";
@@ -89,17 +89,15 @@
 
   const columns: DataTableColumn<SessionData>[] = [
     { key: "title", header: "Title", filterable: true, render: (row) => getSessionTitle(row) },
+    { key: "source", header: "Source", width: "100px", cellSnippet: sourceBadge },
     {
-      key: "source",
-      header: "Source",
-      width: "100px",
-      render: (row) => ({
-        text: row.source,
-        className: `text-center text-2xs uppercase px-1.5 py-0.5 rounded shrink-0 ${getSourceBadgeClass(row.source)}`,
-      }),
+      key: "project",
+      header: "Project",
+      filterable: true,
+      render: (row) => getProjectName(row),
+      cellSnippet: projectBadge,
     },
-    { key: "project", header: "Project", filterable: true, render: (row) => getProjectName(row) },
-    { key: "updated_at", header: "Updated", width: "170px", render: (row) => formatDate(row.updated_at) },
+    { key: "updated_at", header: "Updated", width: "170px", render: (row) => ({ text: formatDate(row.updated_at) }) },
   ];
 
   const rowActions: DataTableRowAction<SessionData>[] = [
@@ -112,6 +110,40 @@
     },
   ];
 </script>
+
+{#snippet sourceBadge(session: SessionData)}
+  {@const source = session.source}
+  <span
+    class="flex shrink-0 items-center justify-center gap-1 rounded px-1.5 py-0.5 text-center text-xs uppercase ${getSourceBadgeClass(
+      source,
+    )}">
+    {#if source === "claude"}
+      <i class="i-ri-claude-line"></i>
+    {:else if source === "codex"}
+      <i class="i-ri-openai-line"></i>
+    {:else if source === "opencode"}
+      <i class="i-ri-code-ai-fill"></i>
+    {:else if source === "crush"}
+      <i class="i-ri-code-ai-line"></i>
+    {:else}
+      <i class="i-ri-brain-line"></i>
+    {/if}
+    <span>{source}</span>
+  </span>
+{/snippet}
+
+{#snippet projectBadge(session: SessionData)}
+  {@const project = parseProjectTitle(session.project)}
+  <span class="flex shrink-0 items-center justify-center gap-1 rounded px-1.5 py-0.5 text-center text-xs uppercase">
+    {project.name}
+    {#if project.branch}
+      <span class="text-fg-dim flex items-center gap-0.5 lowercase">
+        <span class="font-mono">{project.branch}</span>
+        <i class="i-ri-git-branch-line"></i>
+      </span>
+    {/if}
+  </span>
+{/snippet}
 
 <div class="flex h-full flex-col overflow-hidden" in:fly={{ y: 10, duration: 200 }}>
   <div class="border-surface-muted bg-surface-soft space-y-2 border-b px-4 py-3">

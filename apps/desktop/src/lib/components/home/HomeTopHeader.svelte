@@ -117,7 +117,8 @@
         class="bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs"
         onclick={onToggleAutoRefresh}
         type="button">
-        <span class={autoRefreshEnabled ? "i-ri-checkbox-circle-line text-green" : "i-ri-checkbox-blank-circle-line"}></span>
+        <span class={autoRefreshEnabled ? "i-ri-checkbox-circle-line text-green" : "i-ri-checkbox-blank-circle-line"}
+        ></span>
         <span>{autoRefreshEnabled ? "Auto" : "Manual"}</span>
       </button>
 
@@ -138,21 +139,21 @@
       </button>
 
       <div class="border-surface-muted bg-surface-soft hidden items-center gap-1 rounded border p-1 sm:flex">
-        <span class="text-2xs text-fg-dim px-1">Export</span>
+        <span class="text-fg-dim px-1 text-xs">Export</span>
         <button
-          class="text-2xs text-fg-dim hover:text-fg rounded px-2 py-1"
+          class="text-fg-dim hover:text-fg rounded px-2 py-1 text-xs"
           onclick={() => onExportSession?.("md")}
           type="button">
           .md
         </button>
         <button
-          class="text-2xs text-fg-dim hover:text-fg rounded px-2 py-1"
+          class="text-fg-dim hover:text-fg rounded px-2 py-1 text-xs"
           onclick={() => onExportSession?.("json")}
           type="button">
           .json
         </button>
         <button
-          class="text-2xs text-fg-dim hover:text-fg rounded px-2 py-1"
+          class="text-fg-dim hover:text-fg rounded px-2 py-1 text-xs"
           onclick={() => onExportSession?.("jsonl")}
           type="button">
           .jsonl
@@ -181,10 +182,10 @@
   </div>
 
   <div class="border-surface-muted bg-surface-soft flex flex-wrap items-center gap-2 border-t px-4 py-2">
-    <span class="text-2xs text-fg-dim tracking-wide uppercase">Sources</span>
+    <span class="text-fg-dim text-xs tracking-wide uppercase">Sources</span>
     <div class="border-surface-muted bg-surface flex items-center gap-1 rounded border p-1">
       <button
-        class="text-2xs rounded border border-transparent px-2 py-1 {filterStore.state.source === null
+        class="rounded border border-transparent px-2 py-1 text-xs {filterStore.state.source === null
           ? 'bg-surface-soft border-surface-muted text-blue'
           : 'text-fg-dim hover:text-fg'}"
         onclick={() => setSourceScope(null)}
@@ -193,7 +194,7 @@
       </button>
       {#each sources as source (source.id)}
         <button
-          class="text-2xs rounded border border-transparent px-2 py-1 {filterStore.state.source === source.id
+          class="rounded border border-transparent px-2 py-1 text-xs {filterStore.state.source === source.id
             ? 'bg-surface-soft border-surface-muted text-blue'
             : 'text-fg-dim hover:text-fg'}"
           onclick={() => setSourceScope(source.id)}
