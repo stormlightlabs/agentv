@@ -14,6 +14,8 @@
   let lastChecked = $state<Date | null>(null);
   let showStaleAlert = $state(false);
 
+  type StatusText = "fresh" | "failed" | "stale";
+
   type IngestHistoryEntry = {
     lastSuccess: Date;
     lastFailure: Date | null;
@@ -22,10 +24,24 @@
     lastDurationMs: number;
     lastImported: number;
     lastFailed: number;
-    status: "fresh" | "stale" | "failed";
+    status: StatusText;
   };
 
   const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+
+  function getStatusText(sourceHealth: SourceHealth): StatusText {
+    const isFailed = sourceHealth.status === "unhealthy";
+    const isStale = sourceHealth.status === "degraded";
+    let status = "fresh";
+
+    if (isFailed) {
+      status = "failed";
+    } else if (isStale) {
+      status = "stale";
+    }
+
+    return status as StatusText;
+  }
 
   function syncIngestHistoryFromHealth(sources: SourceHealth[]) {
     const now = new Date();
@@ -34,7 +50,6 @@
     for (const source of sources) {
       const previous = nextHistory[source.source];
       const isFailed = source.status === "unhealthy";
-      const isStale = source.status === "degraded";
 
       nextHistory[source.source] = {
         lastSuccess: isFailed ? (previous?.lastSuccess ?? now) : now,
@@ -44,7 +59,7 @@
         lastDurationMs: previous?.lastDurationMs ?? 0,
         lastImported: previous?.lastImported ?? 0,
         lastFailed: isFailed ? 1 : 0,
-        status: isFailed ? "failed" : isStale ? "stale" : "fresh",
+        status: getStatusText(source),
       };
     }
 
@@ -124,7 +139,7 @@
     }
   }
 
-  function getIngestStatusColor(status: IngestHistoryEntry["status"]): string {
+  function getIngestStatusColor(status: StatusText): string {
     switch (status) {
       case "fresh": {
         return "text-green";
@@ -138,7 +153,7 @@
     }
   }
 
-  function getIngestStatusIcon(status: IngestHistoryEntry["status"]): string {
+  function getIngestStatusIcon(status: StatusText): string {
     switch (status) {
       case "fresh": {
         return "i-ri-check-double-line";
@@ -252,11 +267,13 @@
               <div class="flex items-center gap-2">
                 <span class="{getIngestStatusIcon(history.status)} {getIngestStatusColor(history.status)}"></span>
                 <span class="text-fg-dim text-xs">
-                  {history.status === "fresh"
-                    ? `Last: ${formatTimeAgo(history.lastSuccess)}`
-                    : history.status === "stale"
-                      ? `Stale for ${formatTimeAgo(new Date(Date.now() - 5 * 60 * 1000))}`
-                      : "Last ingest failed"}
+                  {#if history.status === "fresh"}
+                    Last: {formatTimeAgo(history.lastSuccess)}
+                  {:else if history.status === "stale"}
+                    Stale for {formatTimeAgo(new Date(Date.now() - 5 * 60 * 1000))}
+                  {:else}
+                    Last ingest failed
+                  {/if}
                 </span>
               </div>
               <div class="text-fg-dim text-right text-xs">

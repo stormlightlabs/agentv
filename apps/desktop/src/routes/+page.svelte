@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import AnalyticsPanel from "$lib/components/AnalyticsPanel.svelte";
   import CommandPalette from "$lib/components/CommandPalette.svelte";
@@ -25,10 +26,9 @@
     type CommandPaletteItem,
   } from "$lib/stores/keyboard.svelte";
   import { logInfo } from "$lib/stores/logger.svelte";
-  import { supportNudgeStore } from "$lib/stores/supportNudge.svelte";
   import { useNotifications } from "$lib/stores/notifications.svelte";
+  import { supportNudgeStore } from "$lib/stores/supportNudge.svelte";
   import { useToast } from "$lib/stores/toast.svelte";
-  import { getDisplayProject, getDisplaySessionTitle, getSessionSlug } from "$lib/utils/sessionDisplay";
   import type {
     EventData,
     ExportFormat,
@@ -38,10 +38,10 @@
     SessionListMetricsData,
     StreamingEventPayload,
   } from "$lib/types";
+  import { getDisplayProject, getDisplaySessionTitle, getSessionSlug } from "$lib/utils/sessionDisplay";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { onDestroy, onMount } from "svelte";
-  import { resolve } from "$app/paths";
   import { SvelteURLSearchParams } from "svelte/reactivity";
 
   type Tab = "sessions" | "search" | "analytics" | "status" | "support";
@@ -105,6 +105,9 @@
   let showSupportNudge = $state(false);
   let ingestProgress = $state<IngestProgress | null>(null);
   let progressHideTimeout: ReturnType<typeof setTimeout> | null = null;
+  let loadingSessions = $state(false);
+  let currentSessionLoad: Promise<void> | null = null;
+  let pendingSessionReload: Required<LoadSessionsOptions> | null = null;
   const refreshProgressLabel = "sessions";
   const ingestAllProgressLabel = "all sources";
 
@@ -117,16 +120,58 @@
 
   function setIngestProgress(progress: IngestProgress) {
     clearProgressHideTimeout();
-    ingestProgress = progress;
+    ingestProgress = { ...progress, source: normalizeProgressSource(progress.source) };
   }
 
   function completeIngestProgress(source: string, total: number, phase = "Complete") {
     clearProgressHideTimeout();
-    ingestProgress = { source, phase, current: total, total };
+    ingestProgress = { source: normalizeProgressSource(source), phase, current: total, total };
     progressHideTimeout = globalThis.setTimeout(() => {
       ingestProgress = null;
       progressHideTimeout = null;
     }, 1500);
+  }
+
+  function normalizeProgressSource(source: unknown, fallback = refreshProgressLabel): string {
+    if (typeof source !== "string") return fallback;
+    const trimmed = source.trim();
+    if (!trimmed || trimmed === "[object PointerEvent]") return fallback;
+    return trimmed;
+  }
+
+  function getSessionIdentity(session: Pick<SessionData, "source" | "external_id"> | null | undefined): string | null {
+    if (!session) return null;
+    return `${session.source}:${session.external_id}`;
+  }
+
+  function getPayloadSessionIdentity(payload: Pick<StreamingEventPayload, "source" | "session_external_id">): string {
+    return `${payload.source}:${payload.session_external_id}`;
+  }
+
+  function findSessionByIdentity(rows: SessionData[], identity: string | null): SessionData | null {
+    if (!identity) return null;
+    return rows.find((session) => getSessionIdentity(session) === identity) ?? null;
+  }
+
+  function mergeLoadSessionsOptions(
+    current: Required<LoadSessionsOptions> | null,
+    next: Required<LoadSessionsOptions>,
+  ): Required<LoadSessionsOptions> {
+    if (!current) return next;
+
+    return {
+      showLoadingState: current.showLoadingState || next.showLoadingState,
+      preserveSelection: current.preserveSelection || next.preserveSelection,
+      notifyOnError: current.notifyOnError || next.notifyOnError,
+    };
+  }
+
+  function resolveLoadSessionsOptions(options: LoadSessionsOptions): Required<LoadSessionsOptions> {
+    return {
+      showLoadingState: options.showLoadingState ?? sessions.length === 0,
+      preserveSelection: options.preserveSelection ?? true,
+      notifyOnError: options.notifyOnError ?? true,
+    };
   }
 
   function parseRangeToMs(range: string | null): number | null {
@@ -206,27 +251,121 @@
     }
   }
 
-  async function loadSessions() {
+  async function fetchSessionEvents(sessionId: string): Promise<EventData[]> {
+    return invoke<EventData[]>("get_session_events", { sessionId });
+  }
+
+  type LoadSessionsOptions = { showLoadingState?: boolean; preserveSelection?: boolean; notifyOnError?: boolean };
+
+  async function performLoadSessions(initialOptions: Required<LoadSessionsOptions>) {
+    let nextOptions: Required<LoadSessionsOptions> | null = initialOptions;
+    loadingSessions = true;
+
     try {
-      loading = true;
-      error = null;
-      sessions = await invoke<SessionData[]>("list_sessions");
-      newSessionsAvailable = false;
-      await loadSessionMetrics();
-    } catch (error_) {
-      error = String(error_);
-      toast.error(`Failed to load sessions: ${error_}`);
+      while (nextOptions) {
+        const options = nextOptions;
+        nextOptions = null;
+
+        const selectedSessionId = options.preserveSelection
+          ? (selectedSession?.id ?? filterStore.state.sessionId ?? null)
+          : null;
+        const selectedSessionIdentity = options.preserveSelection ? getSessionIdentity(selectedSession) : null;
+        const selectedSessionUpdatedAt = options.preserveSelection ? (selectedSession?.updated_at ?? null) : null;
+        const selectedSessionHadEvents = options.preserveSelection ? events.length > 0 : false;
+
+        try {
+          if (options.showLoadingState) {
+            loading = true;
+          }
+          error = null;
+
+          const loaded = await invoke<SessionData[]>("list_sessions");
+          sessions = loaded;
+          const currentSelectionId = selectedSession?.id ?? filterStore.state.sessionId ?? null;
+          const currentSelectionIdentity = getSessionIdentity(selectedSession);
+          const selectionStillMatches =
+            currentSelectionId === selectedSessionId && currentSelectionIdentity === selectedSessionIdentity;
+
+          const refreshed =
+            (selectedSessionId ? (loaded.find((session) => session.id === selectedSessionId) ?? null) : null) ??
+            findSessionByIdentity(loaded, selectedSessionIdentity);
+
+          if ((selectedSessionId || selectedSessionIdentity) && selectionStillMatches) {
+            if (refreshed) {
+              const shouldReloadEvents =
+                refreshed.id !== selectedSession?.id ||
+                refreshed.updated_at !== selectedSessionUpdatedAt ||
+                !selectedSessionHadEvents;
+
+              selectedSession = refreshed;
+              filterStore.setFilter("sessionId", refreshed.id);
+
+              if (shouldReloadEvents) {
+                const refreshedEvents = await fetchSessionEvents(refreshed.id);
+                if (getSessionIdentity(selectedSession) === getSessionIdentity(refreshed)) {
+                  selectedSession = refreshed;
+                  events = refreshedEvents;
+                  logInfo("Session refreshed", { sessionId: refreshed.id, eventCount: refreshedEvents.length });
+                }
+              }
+            } else {
+              selectedSession = null;
+              events = [];
+              filterStore.setFilter("sessionId", null);
+            }
+          }
+
+          newSessionsAvailable = false;
+          await loadSessionMetrics();
+        } catch (error_) {
+          error = String(error_);
+          if (options.notifyOnError) {
+            toast.error(`Failed to load sessions: ${error_}`);
+          }
+        } finally {
+          if (options.showLoadingState) {
+            loading = false;
+          }
+        }
+
+        if (pendingSessionReload) {
+          nextOptions = pendingSessionReload;
+          pendingSessionReload = null;
+        }
+      }
     } finally {
-      loading = false;
+      loadingSessions = false;
     }
   }
 
-  async function refreshSessionsWithProgress(source = refreshProgressLabel) {
-    setIngestProgress({ source, phase: "Refreshing", current: 0, total: 1 });
+  async function loadSessions(options: LoadSessionsOptions = {}) {
+    const request = resolveLoadSessionsOptions(options);
+
+    if (currentSessionLoad) {
+      pendingSessionReload = mergeLoadSessionsOptions(pendingSessionReload, request);
+      await currentSessionLoad;
+      return;
+    }
+
+    const run = performLoadSessions(request);
+    currentSessionLoad = run;
+
     try {
-      await loadSessions();
+      await run;
     } finally {
-      completeIngestProgress(source, 1);
+      if (currentSessionLoad === run) {
+        currentSessionLoad = null;
+      }
+    }
+  }
+
+  async function refreshSessionsWithProgress(source: unknown = refreshProgressLabel) {
+    const sourceLabel = normalizeProgressSource(source, refreshProgressLabel);
+    setIngestProgress({ source: sourceLabel, phase: "Refreshing", current: 0, total: 1 });
+    try {
+      await loadSessions({ showLoadingState: false });
+    } finally {
+      completeIngestProgress(sourceLabel, 1);
     }
   }
 
@@ -235,10 +374,8 @@
 
     try {
       const hasNewSessions = await invoke<boolean>("check_for_new_sessions");
-      if (hasNewSessions && !newSessionsAvailable) {
-        newSessionsAvailable = true;
-        toast.info("New sessions available - click refresh to load");
-      }
+      if (!hasNewSessions) return;
+      await loadSessions({ showLoadingState: false, notifyOnError: false });
     } catch (error_) {
       console.error("Failed to check for new sessions:", error_);
     }
@@ -317,7 +454,7 @@
     filterStore.setFilter("sessionId", session.id);
     showSessionListDrawer = false;
     try {
-      events = await invoke<EventData[]>("get_session_events", { sessionId: session.id });
+      events = await fetchSessionEvents(session.id);
       logInfo("Session selected", { sessionId: session.id, eventCount: events.length });
     } catch (error_) {
       console.error("Failed to load events:", error_);
@@ -797,13 +934,39 @@
   async function setupAgentEventListener() {
     unlistenAgentEvents = await listen<StreamingEventPayload>("agent-events", (event) => {
       const payload = event.payload;
-      const isCurrentSession = selectedSession?.external_id === payload.session_external_id;
+      const payloadSessionIdentity = getPayloadSessionIdentity(payload);
+      const isCurrentSession = getSessionIdentity(selectedSession) === payloadSessionIdentity;
 
       if (payload.is_new_session) {
-        loadSessions();
-        notifications.notify(`New ${payload.source} session`, `New session from ${payload.source}`);
+        if (autoRefreshEnabled) {
+          void loadSessions({ showLoadingState: false, notifyOnError: false });
+        } else if (!newSessionsAvailable) {
+          newSessionsAvailable = true;
+          toast.info("New sessions available - click refresh to load");
+        }
+
+        if (!notifications.windowFocused) {
+          notifications.notify(`New ${payload.source} session`, `New session from ${payload.source}`);
+        }
       } else if (isCurrentSession) {
         events = [...events, ...payload.events];
+        if (payload.events.length > 0 && selectedSession) {
+          const updatedAt = payload.events.at(-1)?.timestamp ?? new Date().toISOString();
+          selectedSession = {
+            ...selectedSession,
+            updated_at: updatedAt,
+            project: payload.project ?? selectedSession.project,
+          };
+          sessions = sessions
+            .map((session) =>
+              getSessionIdentity(session) === payloadSessionIdentity
+                ? { ...session, updated_at: updatedAt, project: payload.project ?? session.project }
+                : session,
+            )
+            .toSorted((a, b) => b.updated_at.localeCompare(a.updated_at));
+        }
+      } else if (payload.events.length > 0 && autoRefreshEnabled) {
+        void loadSessions({ showLoadingState: false, notifyOnError: false });
       }
 
       const shouldNotifyEvent =
@@ -914,15 +1077,16 @@
     {isNarrowLayout}
     {autoRefreshEnabled}
     {ingestLoading}
+    refreshingSessions={loadingSessions}
     {newSessionsAvailable}
     {error}
     onOpenSessionList={() => (showSessionListDrawer = true)}
     onToggleAutoRefresh={toggleAutoRefresh}
-    onRefreshSessions={refreshSessionsWithProgress}
+    onRefreshSessions={() => refreshSessionsWithProgress()}
     onIngestAllSources={ingestAllSources}
     onExportSession={exportSelectedSession}
     onIngestSource={ingestSource}
-    onLoadNewSessions={refreshSessionsWithProgress} />
+    onLoadNewSessions={() => refreshSessionsWithProgress()} />
 
   <div class="flex-1 overflow-hidden">
     {#if activeTab === "sessions"}
@@ -936,6 +1100,7 @@
           events,
           lastIngestTime,
           loading,
+          refreshingSessions: loadingSessions,
         }}
         actions={{
           onStartResizing: startResizing,
@@ -955,7 +1120,7 @@
         {:else if activeTab === "support"}
           <SupportPanel />
         {:else}
-          <IngestStatusPanel onRefresh={refreshSessionsWithProgress} />
+          <IngestStatusPanel onRefresh={() => refreshSessionsWithProgress()} />
         {/if}
       </main>
     {/if}

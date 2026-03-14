@@ -13,6 +13,7 @@
     isNarrowLayout: boolean;
     autoRefreshEnabled: boolean;
     ingestLoading: boolean;
+    refreshingSessions: boolean;
     showTopFilters: boolean;
     hasDiffOnly: boolean;
     errorsOnly: boolean;
@@ -33,6 +34,7 @@
     isNarrowLayout,
     autoRefreshEnabled,
     ingestLoading,
+    refreshingSessions,
     showTopFilters = $bindable(false),
     hasDiffOnly = $bindable(false),
     errorsOnly = $bindable(false),
@@ -123,11 +125,14 @@
       </button>
 
       <button
-        class="bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs"
+        class="bg-surface-soft border-surface-muted text-fg-dim hover:text-fg flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs disabled:opacity-50"
         onclick={onRefreshSessions}
+        disabled={refreshingSessions || ingestLoading}
         type="button">
-        <span class="i-ri-refresh-line"></span>
-        <span>Refresh</span>
+        <span class="flex items-center">
+          <span class={refreshingSessions ? "i-ri-loader-4-line animate-spin" : "i-ri-refresh-line"}></span>
+        </span>
+        <span>{refreshingSessions ? "Refreshing..." : "Refresh"}</span>
       </button>
 
       <button

@@ -15,6 +15,12 @@ pub async fn ingest_single_source(db: &Database, source: Source) -> Result<Inges
         Source::Crush => ingest_crush(db).await,
     };
 
+    if let Ok(pruned) = db.prune_duplicate_sessions().await {
+        if pruned > 0 {
+            log::info!("Pruned {} duplicate sessions after ingest {}", pruned, source);
+        }
+    }
+
     let duration = start.elapsed().as_millis() as u64;
 
     Ok(IngestResult { imported, failed, total: imported + failed, source: source.to_string(), duration_ms: duration })
@@ -118,33 +124,35 @@ pub async fn check_new_sessions_available(db: &Database) -> Result<bool, String>
         .list_sessions(10000, 0)
         .await
         .map_err(|e| format!("Failed to list sessions: {}", e))?;
-    let existing_ids: std::collections::HashSet<String> =
-        existing_sessions.into_iter().map(|s| s.external_id).collect();
+    let existing_ids: std::collections::HashSet<(String, String)> = existing_sessions
+        .into_iter()
+        .map(|s| (s.source, s.external_id))
+        .collect();
 
     let adapter = ClaudeAdapter::new();
     for session_file in adapter.discover_sessions().await {
-        if !existing_ids.contains(&session_file.session_id) {
+        if !existing_ids.contains(&("claude".to_string(), session_file.session_id.clone())) {
             return Ok(true);
         }
     }
 
     let adapter = CodexAdapter::new();
     for session_file in adapter.discover_sessions().await {
-        if !existing_ids.contains(&session_file.session_id) {
+        if !existing_ids.contains(&("codex".to_string(), session_file.session_id.clone())) {
             return Ok(true);
         }
     }
 
     let adapter = OpenCodeAdapter::new();
     for session in adapter.discover_sessions().await {
-        if !existing_ids.contains(&session.id) {
+        if !existing_ids.contains(&("opencode".to_string(), session.id.clone())) {
             return Ok(true);
         }
     }
 
     let adapter = CrushAdapter::new();
     for session_file in adapter.discover_sessions().await {
-        if !existing_ids.contains(&session_file.session_id) {
+        if !existing_ids.contains(&("crush".to_string(), session_file.session_id.clone())) {
             return Ok(true);
         }
     }

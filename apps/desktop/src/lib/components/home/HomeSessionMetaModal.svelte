@@ -35,7 +35,7 @@
 
 {#if selectedSession}
   <Modal {open} {onOpenChange} size="xl" contentClass="h-[85vh] flex flex-col" aria-label="Session details">
-    <div class="border-surface-muted bg-surface-soft flex items-center justify-between border-b px-6 py-4">
+    <div class="border-surface-muted bg-surface-soft flex items-center justify-between gap-2 border-b px-6 py-4">
       <div class="flex items-center gap-3">
         <h2 class="text-fg m-0 text-xl font-semibold">
           {displayTitle}
@@ -46,11 +46,11 @@
       </div>
       <div class="flex items-center gap-2">
         <button
-          class="bg-surface border-surface-muted text-fg hover:border-blue hover:text-blue flex items-center gap-1 rounded border px-3 py-1.5 text-sm transition-colors"
+          class="bg-surface border-surface-muted text-fg hover:border-blue hover:text-blue flex items-center gap-1 rounded border px-2 py-1.5 text-sm transition-colors"
           onclick={copySessionJson}
           type="button">
           <span class="i-ri-file-copy-line"></span>
-          Copy Session JSON
+          <span class="sr-only">Copy Session JSON</span>
         </button>
         <button
           class="text-fg-dim hover:text-fg p-2 transition-colors"

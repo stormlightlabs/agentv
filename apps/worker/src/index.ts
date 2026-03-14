@@ -37,7 +37,7 @@ export default {
         return jsonResponse({ error: "Invalid path format" }, 400);
       }
 
-      const manifest = await loadLatestManifest(env);
+      const manifest = await loadManifestFromKv(env);
       if (!manifest) {
         return jsonResponse({ error: "Update metadata not found" }, 404);
       }
@@ -65,10 +65,6 @@ export default {
     }
   },
 };
-
-async function loadLatestManifest(env: Env): Promise<UpdateManifest | null> {
-  return loadManifestFromKv(env);
-}
 
 async function loadManifestFromKv(env: Env): Promise<UpdateManifest | null> {
   if (!env.UPDATE_METADATA) {

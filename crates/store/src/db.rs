@@ -2,12 +2,14 @@ use agent_v_core::{Event, EventKind, HealthStatus, ModelMetadata, Session, Sourc
 use chrono::{DateTime, NaiveDate, Utc};
 use log::{error, info};
 use rusqlite::OptionalExtension;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio_rusqlite::Connection;
 
 use crate::migrations::MIGRATIONS;
 use crate::models::{EventRow, SessionMetricsRow, SessionRow};
 use crate::queries;
+use crate::session_merge::{MergeEvent, MergeSession, build_merge_plan};
 
 /// Search result with highlighted snippet
 #[derive(Debug, Clone)]
@@ -177,6 +179,135 @@ impl Database {
                     })?
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(rows)
+            })
+            .await
+    }
+
+    /// Prune duplicate session rows by `(source, external_id)` and keep the richest record.
+    pub async fn prune_duplicate_sessions(&self) -> Result<usize, tokio_rusqlite::Error> {
+        self.conn
+            .call(|conn| {
+                let tx = conn.transaction()?;
+                let mut pruned_sessions = 0usize;
+
+                let duplicate_groups = {
+                    let mut stmt = tx.prepare(
+                        r#"
+                        SELECT source, external_id
+                        FROM sessions
+                        GROUP BY source, external_id
+                        HAVING COUNT(*) > 1
+                        "#,
+                    )?;
+
+                    stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+                        .collect::<Result<Vec<_>, _>>()?
+                };
+
+                for (source, external_id) in duplicate_groups {
+                    let sessions = {
+                        let mut stmt = tx.prepare(
+                            r#"
+                            SELECT
+                                s.id,
+                                s.created_at,
+                                s.updated_at,
+                                (
+                                    SELECT COUNT(*)
+                                    FROM events e
+                                    WHERE e.session_id = s.id
+                                ) AS event_count
+                            FROM sessions s
+                            WHERE s.source = ?1 AND s.external_id = ?2
+                            "#,
+                        )?;
+
+                        stmt.query_map([&source, &external_id], |row| {
+                            Ok(MergeSession {
+                                id: row.get(0)?,
+                                created_at: row.get(1)?,
+                                updated_at: row.get(2)?,
+                                event_count: row.get::<_, i64>(3)?.max(0) as usize,
+                            })
+                        })?
+                        .collect::<Result<Vec<_>, _>>()?
+                    };
+
+                    if sessions.len() < 2 {
+                        continue;
+                    }
+
+                    let mut events_by_session: HashMap<String, Vec<MergeEvent>> = HashMap::new();
+                    for session in &sessions {
+                        let events = {
+                            let mut stmt = tx.prepare(
+                                r#"
+                                SELECT id, kind, role, content, timestamp, raw_payload
+                                FROM events
+                                WHERE session_id = ?1
+                                ORDER BY timestamp ASC, id ASC
+                                "#,
+                            )?;
+
+                            stmt.query_map([&session.id], |row| {
+                                Ok(MergeEvent {
+                                    id: row.get(0)?,
+                                    kind: row.get(1)?,
+                                    role: row.get(2)?,
+                                    content: row.get(3)?,
+                                    timestamp: row.get(4)?,
+                                    raw_payload: row.get(5)?,
+                                })
+                            })?
+                            .collect::<Result<Vec<_>, _>>()?
+                        };
+                        events_by_session.insert(session.id.clone(), events);
+                    }
+
+                    let Some(plan) = build_merge_plan(&sessions, &events_by_session) else {
+                        continue;
+                    };
+
+                    tx.execute(
+                        r#"
+                        UPDATE sessions
+                        SET created_at = ?2, updated_at = ?3
+                        WHERE id = ?1
+                        "#,
+                        rusqlite::params![
+                            &plan.keep_session_id,
+                            &plan.earliest_created_at,
+                            &plan.latest_updated_at
+                        ],
+                    )?;
+
+                    for event in plan.events_to_insert {
+                        tx.execute(
+                            r#"
+                            INSERT INTO events (id, session_id, kind, role, content, timestamp, raw_payload)
+                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                            "#,
+                            rusqlite::params![
+                                event.id,
+                                &plan.keep_session_id,
+                                event.kind,
+                                event.role.unwrap_or_default(),
+                                event.content.unwrap_or_default(),
+                                event.timestamp,
+                                event.raw_payload,
+                            ],
+                        )?;
+                    }
+
+                    for donor_id in &plan.donor_session_ids {
+                        tx.execute("DELETE FROM sessions WHERE id = ?1", [donor_id])?;
+                    }
+
+                    pruned_sessions += plan.donor_session_ids.len();
+                }
+
+                tx.commit()?;
+                Ok(pruned_sessions)
             })
             .await
     }
@@ -1720,5 +1851,185 @@ mod tests {
         assert_eq!(metrics.output_tokens, Some(20));
 
         assert!(metrics.estimated_cost.unwrap() > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_prune_duplicate_sessions_merges_unique_events_and_dedupes_overlaps() {
+        let db = Database::open(":memory:").await.unwrap();
+
+        db.conn
+            .call(|conn| {
+                conn.execute_batch(
+                    r#"
+                    CREATE TABLE sessions (
+                        id TEXT PRIMARY KEY,
+                        source TEXT NOT NULL,
+                        external_id TEXT NOT NULL,
+                        project TEXT,
+                        title TEXT,
+                        created_at TIMESTAMP NOT NULL,
+                        updated_at TIMESTAMP NOT NULL,
+                        raw_payload TEXT NOT NULL
+                    );
+
+                    CREATE TABLE events (
+                        id TEXT PRIMARY KEY,
+                        session_id TEXT NOT NULL,
+                        kind TEXT NOT NULL,
+                        role TEXT,
+                        content TEXT,
+                        timestamp TIMESTAMP NOT NULL,
+                        raw_payload TEXT NOT NULL
+                    );
+                    "#,
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        db.migrate().await.unwrap();
+
+        let keep_id = Uuid::new_v4().to_string();
+        let duplicate_id = Uuid::new_v4().to_string();
+        let source = "claude".to_string();
+        let external_id = "dup-ext-id".to_string();
+
+        db.conn
+            .call({
+                let keep_id = keep_id.clone();
+                let duplicate_id = duplicate_id.clone();
+                let source = source.clone();
+                let external_id = external_id.clone();
+                move |conn| {
+                    conn.execute(
+                        "INSERT INTO sessions (id, source, external_id, project, title, created_at, updated_at, raw_payload)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                        rusqlite::params![
+                            &duplicate_id,
+                            &source,
+                            &external_id,
+                            "proj",
+                            "Older",
+                            "2026-03-01T00:00:00Z",
+                            "2026-03-02T00:00:00Z",
+                            "{}"
+                        ],
+                    )?;
+
+                    conn.execute(
+                        "INSERT INTO sessions (id, source, external_id, project, title, created_at, updated_at, raw_payload)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                        rusqlite::params![
+                            &keep_id,
+                            "claude",
+                            "dup-ext-id",
+                            "proj",
+                            "Richer",
+                            "2026-03-01T00:00:00Z",
+                            "2026-03-04T00:00:00Z",
+                            "{}"
+                        ],
+                    )?;
+
+                    conn.execute(
+                        "INSERT INTO events (id, session_id, kind, role, content, timestamp, raw_payload)
+                         VALUES (?1, ?2, 'message', 'user', 'a', '2026-03-01T00:00:00Z', '{}')",
+                        rusqlite::params![Uuid::new_v4().to_string(), &duplicate_id],
+                    )?;
+                    conn.execute(
+                        "INSERT INTO events (id, session_id, kind, role, content, timestamp, raw_payload)
+                         VALUES (?1, ?2, 'message', 'assistant', 'donor-unique', '2026-03-01T00:02:00Z', '{}')",
+                        rusqlite::params![Uuid::new_v4().to_string(), &duplicate_id],
+                    )?;
+
+                    conn.execute(
+                        "INSERT INTO events (id, session_id, kind, role, content, timestamp, raw_payload)
+                         VALUES (?1, ?2, 'message', 'user', 'a', '2026-03-01T00:00:00Z', '{}')",
+                        rusqlite::params![Uuid::new_v4().to_string(), &keep_id],
+                    )?;
+                    conn.execute(
+                        "INSERT INTO events (id, session_id, kind, role, content, timestamp, raw_payload)
+                         VALUES (?1, ?2, 'message', 'assistant', 'b', '2026-03-01T00:01:00Z', '{}')",
+                        rusqlite::params![Uuid::new_v4().to_string(), &keep_id],
+                    )?;
+
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
+
+        let pruned = db.prune_duplicate_sessions().await.unwrap();
+        assert_eq!(pruned, 1);
+
+        let sessions = db.list_sessions(10, 0).await.unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, keep_id);
+        assert_eq!(sessions[0].created_at, "2026-03-01T00:00:00Z");
+        assert_eq!(sessions[0].updated_at, "2026-03-04T00:00:00Z");
+
+        let events = db.get_session_events(keep_id).await.unwrap();
+        assert_eq!(events.len(), 3);
+        assert!(events.iter().any(|e| e.content.as_deref() == Some("donor-unique")));
+    }
+
+    #[tokio::test]
+    async fn test_prune_duplicate_sessions_does_not_merge_across_sources() {
+        let db = setup_test_db().await;
+        let shared_external_id = "shared-id";
+
+        let claude_session = Session {
+            id: Uuid::new_v4(),
+            source: Source::Claude,
+            external_id: shared_external_id.to_string(),
+            project: Some("p1".to_string()),
+            title: Some("Claude".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            raw_payload: serde_json::json!({}),
+        };
+        let codex_session = Session {
+            id: Uuid::new_v4(),
+            source: Source::Codex,
+            external_id: shared_external_id.to_string(),
+            project: Some("p2".to_string()),
+            title: Some("Codex".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            raw_payload: serde_json::json!({}),
+        };
+
+        let claude_events = vec![Event {
+            id: Uuid::new_v4(),
+            session_id: claude_session.id,
+            kind: EventKind::Message,
+            role: Some(Role::User),
+            content: Some("claude".to_string()),
+            timestamp: Utc::now(),
+            raw_payload: serde_json::json!({}),
+        }];
+        let codex_events = vec![Event {
+            id: Uuid::new_v4(),
+            session_id: codex_session.id,
+            kind: EventKind::Message,
+            role: Some(Role::User),
+            content: Some("codex".to_string()),
+            timestamp: Utc::now(),
+            raw_payload: serde_json::json!({}),
+        }];
+
+        db.insert_session_with_events(&claude_session, &claude_events)
+            .await
+            .unwrap();
+        db.insert_session_with_events(&codex_session, &codex_events)
+            .await
+            .unwrap();
+
+        let pruned = db.prune_duplicate_sessions().await.unwrap();
+        assert_eq!(pruned, 0);
+
+        let sessions = db.list_sessions(10, 0).await.unwrap();
+        assert_eq!(sessions.len(), 2);
     }
 }

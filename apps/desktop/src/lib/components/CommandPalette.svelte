@@ -4,14 +4,7 @@
   import Modal from "./Modal.svelte";
 
   let selectedIndex = $derived(0);
-  let inputRef: HTMLInputElement | null = $state(null);
-
-  $effect(() => {
-    if (keyboardStore.commandPaletteOpen) {
-      selectedIndex = 0;
-      inputRef?.focus();
-    }
-  });
+  let inputRef = $state<HTMLInputElement | null>(null);
 
   function handleKeydown(event: KeyboardEvent) {
     const items = keyboardStore.filteredCommands;
@@ -97,16 +90,23 @@
     }
   }
 
-  const keydownHandler = (e: KeyboardEvent) => {
+  function keydownHandler(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
       e.preventDefault();
       keyboardStore.openCommandPalette();
     }
-  };
+  }
 
   onMount(() => {
     globalThis.addEventListener("keydown", keydownHandler);
     return () => globalThis.removeEventListener("keydown", keydownHandler);
+  });
+
+  $effect(() => {
+    if (keyboardStore.commandPaletteOpen) {
+      selectedIndex = 0;
+      inputRef?.focus();
+    }
   });
 </script>
 

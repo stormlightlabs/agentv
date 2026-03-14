@@ -7,8 +7,7 @@ use commands::{
     get_cost_stats_by_source, get_efficiency_stats, get_error_stats, get_event_kinds, get_files_leaderboard,
     get_latency_distribution, get_long_running_tools, get_model_usage_stats, get_patch_churn, get_projects,
     get_session_events, get_session_metrics, get_source_health, get_sources, get_tool_call_frequency,
-    list_session_metrics,
-    ingest_all_sources, ingest_source, list_sessions, recompute_all_metrics, search_events,
+    ingest_all_sources, ingest_source, list_session_metrics, list_sessions, recompute_all_metrics, search_events,
 };
 use commands::{EventData, StreamingEventPayload};
 use std::sync::Arc;
@@ -48,6 +47,11 @@ pub fn run() {
             tauri::async_runtime::block_on(async {
                 let db = Database::open_default().await.expect("Failed to open database");
                 db.migrate().await.expect("Failed to run database migrations");
+                if let Ok(pruned) = db.prune_duplicate_sessions().await {
+                    if pruned > 0 {
+                        log::info!("Pruned {} duplicate session rows at startup", pruned);
+                    }
+                }
                 app.manage(db);
             });
 

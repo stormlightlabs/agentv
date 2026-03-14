@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { keyboardStore } from "$lib/stores/keyboard.svelte";
-  import SessionViewer from "$lib/components/SessionViewer.svelte";
   import SessionList from "$lib/components/SessionList.svelte";
+  import SessionViewer from "$lib/components/SessionViewer.svelte";
   import WelcomeScreen from "$lib/components/WelcomeScreen.svelte";
+  import { keyboardStore } from "$lib/stores/keyboard.svelte";
   import type { EventData, SessionData } from "$lib/types";
   import HomeSessionEmptyState from "./HomeSessionEmptyState.svelte";
 
@@ -15,6 +15,7 @@
     events: EventData[];
     lastIngestTime: Date | null;
     loading: boolean;
+    refreshingSessions: boolean;
   };
 
   type SessionsTabActions = {
@@ -56,6 +57,14 @@
 
       <div class="border-surface-muted bg-surface text-fg-dim flex items-center justify-between border-t p-2 text-xs">
         <div class="flex items-center gap-2">
+          {#if state.refreshingSessions}
+            <span class="text-blue flex items-center gap-1">
+              <span class="flex items-center">
+                <span class="i-ri-loader-4-line animate-spin"></span>
+              </span>
+              <span>Refreshing</span>
+            </span>
+          {/if}
           {#if state.lastIngestTime}
             <span>Last updated: {state.lastIngestTime.toLocaleTimeString()}</span>
           {/if}
@@ -69,7 +78,17 @@
   {/if}
 
   <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
-    {#if state.sessions.length === 0 && !state.loading}
+    {#if state.loading && state.sessions.length === 0}
+      <div class="text-fg-dim flex flex-1 items-center justify-center px-6">
+        <div class="flex flex-col items-center gap-3 text-center">
+          <span class="flex items-center text-3xl">
+            <span class="i-ri-loader-4-line animate-spin"></span>
+          </span>
+          <div class="text-fg text-base font-medium">Loading sessions</div>
+          <div class="text-fg-muted text-sm">Reading your local agent history and rebuilding the current view.</div>
+        </div>
+      </div>
+    {:else if state.sessions.length === 0}
       <WelcomeScreen onGetStarted={actions.onGetStarted} />
     {:else if state.selectedSession}
       <SessionViewer
